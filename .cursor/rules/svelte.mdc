@@ -1,0 +1,53 @@
+---
+description: Svelte 5 runes, snippets, and event-handler syntax for Vite components
+globs: "**/*.svelte, **/*.svelte.ts, **/*.svelte.js, src/**/*.ts, src/**/*.js"
+alwaysApply: false
+---
+
+# Svelte 5
+
+Svelte 5, not Svelte 4. Runes replace `$:` reactivity. Snippets and `{@render}` replace duplicated markup.
+
+Source: [svelte-5-vs-svelte-4](https://github.com/PatrickJS/awesome-cursorrules/blob/main/rules/svelte-5-vs-svelte-4-cursorrules-prompt-file.mdc) from awesome-cursorrules. Globs are narrowed so this rule stays off Python files. This app uses Vite, not SvelteKit.
+
+## Event handlers
+
+Event handlers are HTML properties, not `on:` directives.
+
+```svelte
+<script>
+  let count = $state(0);
+  let double = $derived(count * 2);
+
+  $effect(() => {
+    if (count > 10) console.warn('Too high');
+  });
+</script>
+
+<button onclick={() => count++}>
+  {count} / {double}
+</button>
+```
+
+Svelte 4 equivalents to avoid:
+
+```svelte
+<script>
+  let count = 0;
+  $: double = count * 2;
+  $: {
+    if (count > 10) console.warn('Too high');
+  }
+</script>
+<button on:click={() => count++}>{count} / {double}</button>
+```
+
+## Rules
+
+- `$state()` marks reactive state. `$derived()` replaces `$:` for computed values. `$effect()` replaces `$: { ... }` for side effects.
+- `$state`, `$derived`, `$effect`, `$props`, `$bindable`, and `$inspect` are compiler syntax. Do not import them.
+- Import only real Svelte utilities, such as `tick`, `untrack`, `mount`, or `unmount`.
+- `onclick={handler}`, not `on:click={handler}`.
+- No event modifiers. `on:click|preventDefault={handler}` becomes `onclick={(e) => { e.preventDefault(); handler(e); }}`.
+- Props use `$props()`. Bindable props use `$bindable()`.
+- Do not add SvelteKit routing, layouts, or load functions. This UI is Vite plus Svelte 5.

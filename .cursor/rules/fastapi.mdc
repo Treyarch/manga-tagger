@@ -1,0 +1,37 @@
+---
+description: FastAPI layout for the local manga-tagger API. Use when adding or editing routes, Pydantic models, or the app factory.
+globs: src/manga_tagger/api/**/*.py
+alwaysApply: false
+---
+
+# FastAPI layout
+
+The HTTP API lives only in `src/manga_tagger/api/`. Archives, the SQLite index, and catalog providers live in `src/manga_tagger/` and must import and run with no FastAPI import. Tests call that core directly.
+
+```text
+src/manga_tagger/         core: archives, index, providers
+src/manga_tagger/api/      FastAPI app, routers, Pydantic models, HTTP error mapping
+ui/                        Vite + Svelte 5
+tests/                     hermetic unit tests
+```
+
+## Boundaries
+
+- A router parses input, calls one core function, and returns a Pydantic model. Declare `response_model`.
+- Do not open archives, call catalog sites, or query SQLite inside a router.
+- Core raises its own errors. Map them to HTTP status codes in `api/`. Core does not import `HTTPException`, `Request`, or `Response`.
+- Pydantic models stay in `api/`. They are not the ComicInfo or index types.
+
+## Process
+
+- One `FastAPI` app, started by the desktop process next to the pywebview window.
+- Bind `127.0.0.1` on a port chosen at startup. The port is not a configuration key.
+- Dependencies come from `pyproject.toml` via uv. Python 3.12 or newer.
+- No Flask, SQLAlchemy, Alembic, Poetry, authentication, or user accounts. The index uses the standard-library `sqlite3` module, outside the routers.
+
+```python
+@router.post("/example", response_model=ExampleResponse)
+async def example(body: ExampleRequest) -> ExampleResponse:
+    result = await core_operation(body.query)
+    return ExampleResponse.from_result(result)
+```

@@ -1,0 +1,83 @@
+---
+description: Python style for the manga-tagger core. FastAPI layout is in fastapi.mdc. Do not add Flask.
+globs: **/*.py, src/**/*.py, tests/**/*.py
+alwaysApply: false
+---
+# Python Best Practices
+
+## Project Structure
+- Use src-layout: `src/manga_tagger/` for core, `src/manga_tagger/api/` for FastAPI
+- Place tests in `tests/` parallel to `src/`
+- Configuration is the TOML file described in `docs/00-project-overview.md`
+- Dependencies live in `pyproject.toml` and install with uv
+
+## Code Style
+- Follow Black code formatting
+- Use isort for import sorting
+- Follow PEP 8 naming conventions:
+  - snake_case for functions and variables
+  - PascalCase for classes
+  - UPPER_CASE for constants
+- Maximum line length of 88 characters (Black default)
+- Use absolute imports over relative imports
+
+## Type Hints
+- Use type hints for all function parameters and returns
+- Prefer `X | None` over `Optional[X]`
+- Use `TypeVar` for generic types
+- Use `Protocol` for duck typing
+
+## Database
+- Use the standard-library `sqlite3` module for the library index
+- Do not add SQLAlchemy or Alembic
+- Keep queries in the index module, not in FastAPI routers
+
+## Testing
+- Use pytest
+- Tests are hermetic: no network, no real sleep, no developer config, index, or library
+- Archive tests use fixtures under `tests/`
+- Call core functions directly. Do not open the pywebview window in tests
+
+## Security
+- The API binds to `127.0.0.1` only
+- There are no accounts, sessions, or multi-user access
+- Do not write an archive until the user saves
+
+## Performance
+- Do not add a cache layer beyond the thumbnail cache in the project overview
+- Implement database query optimization
+- Use proper connection pooling
+- Implement proper pagination
+- Use background tasks for heavy operations
+- Monitor application performance
+
+## Error Handling
+- Create custom exception classes
+- Use proper try-except blocks
+- Implement proper logging
+- Return proper error responses
+- Handle edge cases properly
+- Use proper error messages
+
+## Documentation
+- Use Google-style docstrings
+- Document all public APIs
+- Keep README.md updated
+- Use proper inline comments
+- Generate API documentation
+- Document environment setup
+
+## Development Workflow
+- Use uv to create the environment and run commands
+- Implement pre-commit hooks
+- Use proper Git workflow
+- Follow semantic versioning
+- Use proper CI/CD practices
+- Implement proper logging
+
+## Dependencies
+- Declare dependencies in `pyproject.toml`
+- Install and run the project with uv
+- Separate dev dependencies
+- Pin versions
+- Check for security vulnerabilities
