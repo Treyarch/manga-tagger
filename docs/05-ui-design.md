@@ -1,0 +1,198 @@
+---
+description: Nautilus-like light and dark window, with a header bar, places sidebar, volume list or cover grid, inspector, Lucide icons, and a small set of local Tailwind components.
+status: proposed
+---
+
+# UI design
+
+This specification owns how the window looks: layout, color, type, icons, light and dark theme, and the shared controls. It implements none of the archive, index, or provider behavior.
+
+[04-application-shell.md](04-application-shell.md) owns the process, the local API, pywebview, and what selection, search, scrape, and save do. That document places those actions into the header, sidebar, list, and inspector described here. This document does not decide their behavior.
+
+The UI is Svelte 5, as locked in [00-project-overview.md](00-project-overview.md). The package lives in `ui/` and is created when this specification is implemented.
+
+## Reference
+
+The visual reference is GNOME Files (Nautilus).
+
+- One header bar across the top of the window.
+- A places sidebar on the left.
+- A main pane that is either a file list or a cover grid.
+- Hairline separators, neutral surfaces, and a single blue accent.
+- Symbolic icons in the chrome, tinted with the current text color.
+- The same arrangement in light and in dark. Dark mode changes color only.
+
+The cover and the metadata form sit in a trailing inspector, the way a file manager keeps properties beside the files. Regions are panes separated by a hairline. They are not cards, and they do not stack on other cards.
+
+## Layout
+
+The window fills the webview. It does not sit in a centered page column. The header stays put. The sidebar, the main pane, and the inspector each scroll on their own.
+
+```text
++------------------------------------------------------------------+
+| Header bar                                                        |
++------------------+-------------------------------+---------------+
+| Places sidebar   | Volume list or cover grid     | Inspector     |
+|                  |                               | cover         |
+|                  |                               | form          |
++------------------+-------------------------------+---------------+
+```
+
+| Region | Size | Surface |
+| --- | --- | --- |
+| Header bar | 48px tall (`h-12`) | Same fill as the main pane, hairline along the bottom |
+| Places sidebar | 240px (`w-60`) | Window background |
+| Main pane | Remaining width | View background |
+| Inspector | 384px (`w-96`) | View background, hairline along its left edge |
+
+The sidebar lists library places. A row is an icon and a label, 36px tall. The selected place uses the selection wash.
+
+The main pane lists volumes. List is the default. Grid shows covers only. The switch is session state. It is not a configuration key. Switching back to list restores the list, and switching to grid restores the grid, for as long as the window is open.
+
+A list row is 36px tall (`h-9`): a 16px icon or thumbnail, a primary label, and muted secondary text on one line. The whole row takes the selection wash.
+
+A grid cell is a cover at a 2:3 aspect ratio with one truncated label under it. Selection is a 2px accent ring around the cover and the selection wash behind the label. A wash behind the cover image would be hidden by the image, so the ring is the selection on the cover itself.
+
+The inspector stacks, from the top: the cover, `object-contain`, on the view background; then the metadata fields. Each field is a label above its control. Labels use the muted text color. Fields stack with `gap-3`. The pane has no shadow and no inner card.
+
+An empty library, or an empty place, shows one sentence in the main pane, centered, in the muted color: `No volumes yet.` There is no illustration.
+
+## Color
+
+Use Tailwind's built-in `zinc` and `blue` scales so a control can keep the classes from the official Tailwind CSS examples. Do not add a custom palette, and do not add an accent picker.
+
+| Role | Light | Dark |
+| --- | --- | --- |
+| Window and sidebar | `zinc-100` | `zinc-950` |
+| Header, main pane, inspector | `white` | `zinc-900` |
+| Hairline | `zinc-200` | `zinc-800` |
+| Primary text | `zinc-900` | `zinc-100` |
+| Muted text | `zinc-500` | `zinc-400` |
+| Accent | `blue-600` | `blue-500` |
+| Selection wash | `blue-600/10` | `blue-500/15` |
+| Cover ring when selected | `blue-600` | `blue-500` |
+
+Text on a filled accent or danger button is `white` in both themes. A selected row keeps the primary text color. The wash shows the selection.
+
+## Type
+
+Use Tailwind's default `font-sans` stack. On Linux that resolves to the desktop UI font. Do not bundle a webfont.
+
+| Use | Classes |
+| --- | --- |
+| Labels, rows, header, fields | `text-sm` |
+| Field captions, grid captions, muted secondary text | `text-xs` plus the muted color |
+| Header place name | `text-sm font-medium` |
+
+## Theme
+
+`ui/src/app.css` contains:
+
+```css
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+```
+
+Dark mode is the `dark` class on an ancestor. Components use `dark:` variants for every color in the table above. There is no second stylesheet.
+
+`ui/src/lib/theme.ts` exports `resolveDark(theme: string, prefersDark: boolean): boolean`.
+
+| `theme` | `prefersDark` | `resolveDark` |
+| --- | --- | --- |
+| `light` | either | `false` |
+| `dark` | either | `true` |
+| `system` | `true` | `true` |
+| `system` | `false` | `false` |
+| any other string | either | same as `system` |
+
+The shell reads `theme` before the first paint and puts `dark` on `document.documentElement` when `resolveDark` is true. It removes that class when `resolveDark` is false. The first frame uses the resolved theme.
+
+The header bar has a quiet icon button that opens the menu with three choices: System, Light, and Dark. The icons are Lucide `Monitor`, `Sun`, and `Moon`. The current choice shows a check. Choosing one updates `theme` and applies the class immediately.
+
+While `theme` is `system`, the class follows later changes to `prefers-color-scheme` for the life of the window. A forced `light` or `dark` ignores those changes until the user picks System again.
+
+## Icons
+
+Icons are [Lucide](https://lucide.dev), package `lucide-svelte`. They are outline strokes, colored with `currentColor`, at the library's default stroke width.
+
+| Place | Size |
+| --- | --- |
+| Rows and menu items | 16px |
+| Header bar | 20px |
+
+The view switch uses `List` and `LayoutGrid`. The active view uses the selection wash on its button. Search uses `Search` as the leading icon inside the header field.
+
+Do not add a second icon set. Do not use filled or multicolor icons in the chrome.
+
+## Components
+
+Shared controls live in `ui/src/lib/components/`. Each one is a Svelte 5 component styled only with Tailwind utilities, in the shape of the simple official Tailwind CSS controls. Allowed UI dependencies for this specification are `svelte`, Vite, `tailwindcss`, `@tailwindcss/vite`, and `lucide-svelte`.
+
+Do not add Flowbite, daisyUI, Skeleton, shadcn-svelte, `@tailwindcss/forms`, or any other component kit.
+
+Every control shows a 2px accent focus ring on `:focus-visible` (`blue-600` in light, `blue-500` in dark).
+
+### Button
+
+`Button.svelte`. Variants:
+
+| Variant | Look |
+| --- | --- |
+| `primary` | Accent fill, white text |
+| `quiet` | Transparent, primary text, hover is a zinc wash (`zinc-200/70` light, `zinc-800` dark) |
+| `danger` | `red-600` fill, white text. Hover is `red-700` in both themes |
+
+The header icon button is `quiet`, 32px square (`size-8`), with a 20px icon. The default button height is 36px (`h-9`) and `text-sm`.
+
+### Text input
+
+`TextInput.svelte`. Height 36px, `text-sm`, `rounded-md`, hairline border, view background, muted placeholder. The header search field is this control at a compact width, with the `Search` icon inside the leading edge.
+
+### Select
+
+`Select.svelte`. Same height, radius, border, and background as the text input. It is a native `<select>`.
+
+### Menu
+
+`Menu.svelte`. The panel uses the view background, a hairline, `rounded-md`, and a small shadow. Items are 36px tall. Hover uses the selection wash. The checked item shows a 16px Lucide `Check`.
+
+### Dialog
+
+`Dialog.svelte`. A `zinc-900/40` backdrop. The panel is `max-w-md`, `rounded-lg`, the view background, a hairline, and `p-4`. The title is `text-sm font-medium`. Actions sit at the trailing edge: a `quiet` dismiss button, then either `primary` or `danger` for the confirm button.
+
+## Configuration
+
+This specification adds one key to the TOML file described in [00-project-overview.md](00-project-overview.md).
+
+| Key | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `theme` | string | `system` | `system` follows `prefers-color-scheme`. `light` forces the light surfaces. `dark` forces the dark surfaces. Any other value is treated as `system`. |
+
+The application shell reads and writes this key. This specification defines the values and the class they produce. A missing config file uses `system`, which is the project default for a missing file.
+
+View mode is not a key.
+
+## Testing
+
+Tests are hermetic. They do not open pywebview, do not take screenshots, do not use the network, and do not read the developer’s config, index, or library. `prefers-color-scheme` is a value passed into `resolveDark`, not a live media query in the test.
+
+Cover at least:
+
+- `resolveDark("light", true)` and `resolveDark("light", false)` are both false.
+- `resolveDark("dark", true)` and `resolveDark("dark", false)` are both true.
+- `resolveDark("system", true)` is true, and `resolveDark("system", false)` is false.
+- `resolveDark("nope", true)` is true, and `resolveDark("nope", false)` is false.
+- With a resolved dark theme, the shell root that sets the document class carries `dark`. With a resolved light theme, that element does not carry `dark`.
+
+## Acceptance criteria
+
+- The window is a header bar, a 240px places sidebar, a flexible main pane, and a 384px inspector, separated by hairlines. The header does not scroll away.
+- List is the view when the window opens. Rows are 36px. Grid cells show a 2:3 cover, a truncated label, and a 2px accent ring when selected. List selection is the accent wash on the row.
+- An empty main pane shows the sentence `No volumes yet.` and no illustration.
+- Light and dark use the color table in this document. Dark mode is the `dark` class. The layout does not change between themes.
+- `theme` defaults to `system`. `light` and `dark` force that theme. Any other value follows the system. The header menu can set each of the three values, and the class updates immediately. `system` keeps following `prefers-color-scheme`.
+- The resolved theme is applied before the first paint.
+- Icons are Lucide, `currentColor`, 16px in rows and menu items and 20px in the header. The view switch is `List` and `LayoutGrid`. The theme menu is `Monitor`, `Sun`, and `Moon`.
+- Buttons, text inputs, selects, menus, and dialogs are the local components in this document, styled with Tailwind utilities. The UI package does not depend on a third-party component kit.
+- Type is the default sans stack at `text-sm` for controls and rows, and `text-xs` for captions.
+- A keyboard focus ring is visible on the shared controls.

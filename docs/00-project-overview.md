@@ -141,6 +141,7 @@ Write these before the code they describe. Each one is a normal spec: YAML front
 | `02-library-index.md` | SQLite index, recursive scan, thumbnail cache, first paint |
 | `03-metadata-providers.md` | MangaDex, AniList, Jikan, Comic Vine, title language order, reading direction, accept-before-write |
 | `04-application-shell.md` | Single process, local FastAPI, pywebview, the one-screen layout, multi-volume selection |
+| `05-ui-design.md` | Nautilus-like light and dark theme, header bar, sidebar, list or cover grid, inspector, Lucide icons, local Tailwind components |
 
 ## Testing
 
