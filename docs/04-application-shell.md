@@ -1,6 +1,6 @@
 ---
 description: One desktop process serves a localhost API and a pywebview window, and wires places, selection, scrape, save, rename, and convert to the archive, index, and provider modules.
-status: proposed
+status: active
 ---
 
 # Application shell
@@ -130,7 +130,7 @@ List and grid thumbnails use `GET /api/thumbnail`, which calls `thumbnail_for` a
 
 `start(name, fn)` queues `fn` when no job is `queued` or `running`. Otherwise it raises `JobBusyError` and does not enqueue. The function receives `cancel`, a callable that returns true after a cancel request, and `progress(completed, total)`. `inline=True` runs the job to a terminal state on the caller thread before `start` returns. Tests use the inline runner. They do not call `time.sleep`.
 
-Search and load set `total` to 1 and `completed` to 0 until the request finishes, then `completed` is 1. Save and convert set `total` to the path count and increment `completed` after each path, including a failure or a skip. Rename sets `total` to the number of archives directly in the place and increments `completed` after each planned file. Scan sets `total` to the number of candidates found so far and `completed` to the number committed.
+Search and load set `total` to 1 and `completed` to 0 until the request finishes, then `completed` is 1. Save and convert set `total` to the path count and increment `completed` after each path, including a failure or a skip. Rename sets `total` to the number of archives directly in the place and increments `completed` after each planned file. Scan calls `progress(0, 0)` before the index scan and `progress(committed, committed)` when it returns. `committed` is the number of written, unchanged, and failed paths. The index scan has no per-candidate callback, so this job does not report candidates found so far.
 
 `cancel(id)` on a queued job sets `cancelled` and does not call `fn`. On a running job it sets the flag and does not abort the thread. A provider request that has already started is not aborted. `get` of an unknown id raises `JobNotFoundError`. `current` is the running job, or the queued job when none is running, or null when none has been started. The busy rule means there is at most one of those.
 
@@ -162,6 +162,7 @@ Archive, page, thumbnail, save, rename, and convert paths must be absolute. A re
 | `POST /api/jobs/load` | Body `{ "provider", "match_id", "filename_stem", "mode", "form" }` |
 | `POST /api/jobs/save` | Body `{ "paths", "patch", "mode" }` |
 | `POST /api/jobs/rename` | Body `{ "directory", "template" }` |
+| `POST /api/rename/preview` | Body `{ "directory", "template" }`. Returns `{ "entries": [{ "path", "output_path", "error_type", "error_message" }] }` from `plan_rename`. Does not rename. The same absolute-path and library-root checks as rename apply before `plan_rename` is called |
 | `POST /api/jobs/convert` | Body `{ "paths" }` |
 | `GET /api/jobs/current` | The running job, or the queued job, or JSON null |
 | `GET /api/jobs/{id}` | That job |
@@ -207,7 +208,7 @@ The result is `{ "entries": [...] }` in request order. The job succeeds when the
 
 ## Rename
 
-Rename is enabled when a place is selected, including when the volume selection is empty, and no job is `queued` or `running`. It renames every archive directly in that place, not only the selection. The dialog's text input starts as `{Series} v{Number:02}`. That string is not written to config. The dialog lists `plan_rename` before confirm. Each success is `{old name} → {new name}`. Each failure is `{old name}: {error_message}`. Dismiss writes nothing. Confirm enqueues the job with that template.
+Rename is enabled when a place is selected, including when the volume selection is empty, and no job is `queued` or `running`. It renames every archive directly in that place, not only the selection. The dialog's text input starts as `{Series} v{Number:02}`. That string is not written to config. The dialog lists `plan_rename` before confirm by calling `POST /api/rename/preview`. Each success is `{old name} → {new name}`. Each failure is `{old name}: {error_message}`. Dismiss writes nothing. Confirm enqueues the job with that template.
 
 The job checks cancel, then calls `rename_in_directory(directory, template)`. The directory is the selected place and must sit inside a library root. `rename_in_directory` has no cancel argument, so a call that has started runs until it returns. For each success the job calls `write_poster` on the new path, then `refresh_volume` on the new path and `forget_volume` on the old path when they differ. Cancel is checked between poster writes. A poster error does not undo the rename. That entry keeps `output_path` and also has `error_type` and `error_message`. A rename failure has `path`, `error_type`, and `error_message` and no `output_path`.
 

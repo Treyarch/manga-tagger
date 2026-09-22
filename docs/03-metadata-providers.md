@@ -1,6 +1,6 @@
 ---
 description: Search one catalog, pick a series title, and return a ComicInfo form patch without writing the archive.
-status: proposed
+status: active
 ---
 
 # Metadata providers

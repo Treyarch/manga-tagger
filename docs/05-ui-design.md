@@ -1,6 +1,6 @@
 ---
 description: Nautilus-like light and dark window, with a header bar, places sidebar, volume list or cover grid, inspector, Lucide icons, and a small set of local Tailwind components.
-status: proposed
+status: active
 ---
 
 # UI design

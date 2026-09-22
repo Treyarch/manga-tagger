@@ -1,6 +1,6 @@
 ---
 description: Read, preview, and atomically save ComicInfo.xml, apply shared series fields in a batch, and rename archives in place from a filename template.
-status: proposed
+status: active
 ---
 
 # Archives and ComicInfo

@@ -1,0 +1,682 @@
+<script lang="ts">
+  import { onMount, untrack } from "svelte";
+  import {
+    FileArchive,
+    Folder,
+    LayoutGrid,
+    List,
+    Monitor,
+    Moon,
+    Pencil,
+    RefreshCw,
+    Save,
+    ScanSearch,
+    Search,
+    Settings,
+    Sun,
+    X,
+  } from "lucide-svelte";
+  import { getJson, postJson, putConfig, type Config } from "./lib/api";
+  import Button from "./lib/components/Button.svelte";
+  import Dialog from "./lib/components/Dialog.svelte";
+  import Inspector from "./lib/components/Inspector.svelte";
+  import Menu from "./lib/components/Menu.svelte";
+  import RenameDialog from "./lib/components/RenameDialog.svelte";
+  import Select from "./lib/components/Select.svelte";
+  import SettingsDialog from "./lib/components/SettingsDialog.svelte";
+  import TextInput from "./lib/components/TextInput.svelte";
+  import Thumb from "./lib/components/Thumb.svelte";
+  import {
+    OFFERED_RENAME_TEMPLATE,
+    POLL_MS,
+    PROVIDERS,
+    cbrCount,
+    candidatesOf,
+    convertConfirmMessage,
+    editField,
+    entriesOf,
+    entryErrorLines,
+    filenameStem,
+    filterVolumes,
+    formFromVolumes,
+    formIsDirty,
+    formOf,
+    initialPageIndex,
+    isBusy,
+    jobLabel,
+    placeAfterLibrary,
+    renamePlanLines,
+    savePatch,
+    scanRootLines,
+    selectionAfterEntries,
+    selectionAfterFilter,
+    selectionFromClick,
+    selectionKey,
+    seriesForSearch,
+    shouldRefetchLibrary,
+    volumesInPlace,
+    type Candidate,
+    type InspectorForm,
+    type Job,
+    type Place,
+    type Selection,
+    type Volume,
+  } from "./lib/library";
+  import { applyDocumentClass, resolveDark } from "./lib/theme";
+
+  let { initialConfig }: { initialConfig: Config } = $props();
+
+  let config = $state(untrack(() => initialConfig));
+  let places = $state<Place[]>([]);
+  let volumes = $state<Volume[]>([]);
+  let selectedPlace = $state<string | null>(null);
+  let view = $state<"list" | "grid">("list");
+  let query = $state("");
+  let selection = $state<Selection>({ paths: [], anchor: null });
+  let form = $state<InspectorForm | null>(null);
+  let provider = $state("mangadex");
+  let headerJob = $state<Job | null>(null);
+  let candidates = $state<Candidate[]>([]);
+  let noMatches = $state(false);
+  let inspectorLines = $state<string[]>([]);
+  let pageIndex = $state<number | null>(null);
+  let pageAnchor = $state("");
+  let themeOpen = $state(false);
+  let settingsOpen = $state(false);
+  let renameOpen = $state(false);
+  let convertOpen = $state(false);
+  let renameTemplate = $state(OFFERED_RENAME_TEMPLATE);
+  let renameLines = $state<string[]>([]);
+  let renameError = $state("");
+  let activeId = $state<string | null>(null);
+  let newestSearchId = $state<string | null>(null);
+  let newestLoadId = $state<string | null>(null);
+  let loadSelectionKey = $state("");
+  let planToken = 0;
+  const settled = new Set<string>();
+
+  const inPlace = $derived(
+    selectedPlace === null ? [] : volumesInPlace(volumes, selectedPlace),
+  );
+  const visible = $derived(filterVolumes(inPlace, query));
+  const visiblePaths = $derived(visible.map((row) => row.path));
+  const selectedRows = $derived(
+    selection.paths.flatMap((path) => {
+      const row = volumes.find((item) => item.path === path);
+      return row ? [row] : [];
+    }),
+  );
+  const anchor = $derived(
+    volumes.find((row) => row.path === selection.anchor) ?? null,
+  );
+  const busy = $derived(isBusy(headerJob));
+  const formLocked = $derived(
+    headerJob !== null &&
+      isBusy(headerJob) &&
+      (headerJob.name === "Load" || headerJob.name === "Save"),
+  );
+  const selectedCbr = $derived(cbrCount(selectedRows));
+
+  function rowsFor(paths: string[]): Volume[] {
+    return paths.flatMap((path) => {
+      const row = volumes.find((item) => item.path === path);
+      return row ? [row] : [];
+    });
+  }
+
+  function rebuildForm() {
+    form = formFromVolumes(rowsFor(selection.paths));
+  }
+
+  function syncPage() {
+    const path = selection.anchor ?? "";
+    if (path === pageAnchor) return;
+    pageAnchor = path;
+    const row = volumes.find((item) => item.path === path) ?? null;
+    pageIndex = row ? initialPageIndex(row.cover_index, row.archive_page_count) : null;
+  }
+
+  function terminal(state: string): boolean {
+    return state === "succeeded" || state === "failed" || state === "cancelled";
+  }
+
+  async function loadShelf() {
+    const library = await getJson<{ places: Place[]; volumes: Volume[] }>(
+      "/api/library",
+    );
+    volumes = library.volumes;
+    places = library.places;
+    selectedPlace = placeAfterLibrary(selectedPlace, places);
+    selection = selectionAfterFilter(visiblePathsAfter(), selection);
+    rebuildForm();
+    syncPage();
+  }
+
+  function visiblePathsAfter(): string[] {
+    if (selectedPlace === null) return [];
+    return filterVolumes(volumesInPlace(volumes, selectedPlace), query).map(
+      (row) => row.path,
+    );
+  }
+
+  async function refreshLibrary(job: Job) {
+    const library = await getJson<{ places: Place[]; volumes: Volume[] }>(
+      "/api/library",
+    );
+    volumes = library.volumes;
+    places = library.places;
+    const nextPlace = placeAfterLibrary(selectedPlace, places);
+    const placeChanged = nextPlace !== selectedPlace;
+    selectedPlace = nextPlace;
+    if (placeChanged || job.name === "Rename") {
+      selection = { paths: [], anchor: null };
+    } else if (job.name === "Save" || job.name === "Convert") {
+      selection = selectionAfterEntries(
+        selection,
+        entriesOf(job.result),
+        new Set(volumes.map((row) => row.path)),
+      );
+    } else {
+      selection = selectionAfterFilter(visiblePathsAfter(), selection);
+    }
+    if (!(job.name === "Scan" && formIsDirty(form))) rebuildForm();
+    syncPage();
+    if (job.name === "Scan") {
+      const result = (job.result ?? {}) as {
+        skipped?: string[];
+        incomplete?: string[];
+      };
+      const lines = scanRootLines(result);
+      if (job.state === "failed" && job.error_message) lines.unshift(job.error_message);
+      inspectorLines = lines;
+    } else {
+      const lines = entryErrorLines(entriesOf(job.result));
+      inspectorLines =
+        lines.length === 0 && job.state === "failed" && job.error_message
+          ? [job.error_message]
+          : lines;
+    }
+  }
+
+  async function settle(job: Job) {
+    if (settled.has(job.id) || !terminal(job.state)) return;
+    settled.add(job.id);
+    if (job.name === "Search") {
+      if (job.id !== newestSearchId) return;
+      if (job.state === "failed") {
+        candidates = [];
+        noMatches = false;
+        inspectorLines = job.error_message ? [job.error_message] : [];
+        return;
+      }
+      if (job.state !== "succeeded") return;
+      const found = candidatesOf(job.result);
+      candidates = found;
+      noMatches = found.length === 0;
+      inspectorLines = [];
+      return;
+    }
+    if (job.name === "Load") {
+      if (job.id !== newestLoadId || job.state === "cancelled") return;
+      if (job.state === "failed") {
+        inspectorLines = job.error_message ? [job.error_message] : [];
+        return;
+      }
+      if (selectionKey(selection) !== loadSelectionKey) return;
+      const next = formOf(job.result);
+      if (next) form = next;
+      return;
+    }
+    if (shouldRefetchLibrary(job)) await refreshLibrary(job);
+  }
+
+  function watch(job: Job) {
+    activeId = job.id;
+    headerJob = isBusy(job) ? job : null;
+    if (!isBusy(job)) void settle(job);
+  }
+
+  async function poll() {
+    const current = await getJson<Job | null>("/api/jobs/current");
+    if (current && isBusy(current)) {
+      const job = await getJson<Job>(`/api/jobs/${current.id}`);
+      headerJob = isBusy(job) ? job : null;
+      activeId = job.id;
+      if (!isBusy(job)) await settle(job);
+      return;
+    }
+    headerJob = null;
+    if (activeId === null) return;
+    const id = activeId;
+    activeId = null;
+    const job = await getJson<Job>(`/api/jobs/${id}`);
+    await settle(job);
+  }
+
+  async function startJob(path: string, body?: unknown): Promise<Job> {
+    const job = await postJson<Job>(path, body);
+    watch(job);
+    return job;
+  }
+
+  function onQuery(value: string) {
+    query = value;
+    selection = selectionAfterFilter(visiblePathsAfter(), selection);
+    rebuildForm();
+    syncPage();
+  }
+
+  function onPlace(path: string) {
+    if (path === selectedPlace) return;
+    selectedPlace = path;
+    query = query;
+    selection = { paths: [], anchor: null };
+    candidates = [];
+    noMatches = false;
+    rebuildForm();
+    syncPage();
+  }
+
+  function onVolume(path: string, event: MouseEvent) {
+    const previous = selection.anchor;
+    selection = selectionFromClick(visiblePaths, selection, path, {
+      shift: event.shiftKey,
+      toggle: event.ctrlKey || event.metaKey,
+    });
+    if (selection.anchor !== previous) {
+      candidates = [];
+      noMatches = false;
+    }
+    rebuildForm();
+    syncPage();
+  }
+
+  function onEdit(key: string, value: string) {
+    if (form === null) return;
+    form = editField(form, key, value);
+  }
+
+  function setPage(index: number) {
+    const count = anchor?.archive_page_count ?? 0;
+    if (index < 0 || index >= count) return;
+    pageIndex = index;
+  }
+
+  async function scrape() {
+    if (anchor === null || busy) return;
+    candidates = [];
+    noMatches = false;
+    inspectorLines = [];
+    const job = await postJson<Job>("/api/jobs/search", {
+      provider,
+      series: seriesForSearch(form),
+      filename_stem: filenameStem(anchor.name),
+    });
+    newestSearchId = job.id;
+    watch(job);
+  }
+
+  async function chooseCandidate(id: string) {
+    if (anchor === null || form === null || busy) return;
+    loadSelectionKey = selectionKey(selection);
+    const job = await postJson<Job>("/api/jobs/load", {
+      provider,
+      match_id: id,
+      filename_stem: filenameStem(anchor.name),
+      mode: form.mode,
+      form,
+    });
+    newestLoadId = job.id;
+    watch(job);
+  }
+
+  async function save() {
+    if (form === null || selection.paths.length === 0 || busy) return;
+    inspectorLines = [];
+    await startJob("/api/jobs/save", {
+      paths: selection.paths,
+      patch: savePatch(form),
+      mode: form.mode,
+    });
+  }
+
+  async function rescan() {
+    if (busy) return;
+    await startJob("/api/jobs/scan");
+  }
+
+  async function refreshPlan() {
+    if (selectedPlace === null) return;
+    const token = ++planToken;
+    const template = renameTemplate;
+    try {
+      const result = await postJson<{ entries: Parameters<typeof renamePlanLines>[0] }>(
+        "/api/rename/preview",
+        { directory: selectedPlace, template },
+      );
+      if (token !== planToken) return;
+      renameLines = renamePlanLines(result.entries);
+      renameError = "";
+    } catch (exc) {
+      if (token !== planToken) return;
+      renameLines = [];
+      renameError = exc instanceof Error ? exc.message : "Could not plan the rename.";
+    }
+  }
+
+  function openRename() {
+    if (selectedPlace === null || busy) return;
+    renameTemplate = OFFERED_RENAME_TEMPLATE;
+    renameLines = [];
+    renameError = "";
+    renameOpen = true;
+    void refreshPlan();
+  }
+
+  async function confirmRename() {
+    if (selectedPlace === null) return;
+    renameOpen = false;
+    await startJob("/api/jobs/rename", {
+      directory: selectedPlace,
+      template: renameTemplate,
+    });
+  }
+
+  async function runConvert() {
+    convertOpen = false;
+    if (selection.paths.length === 0) return;
+    await startJob("/api/jobs/convert", { paths: selection.paths });
+  }
+
+  function requestConvert() {
+    if (selectedCbr === 0 || busy) return;
+    if (config.keep_cbr_original) void runConvert();
+    else convertOpen = true;
+  }
+
+  async function chooseTheme(theme: string) {
+    themeOpen = false;
+    const previous = config;
+    try {
+      config = await putConfig({ theme });
+      applyDocumentClass(
+        document.documentElement,
+        resolveDark(config.theme, window.matchMedia("(prefers-color-scheme: dark)").matches),
+      );
+    } catch {
+      config = previous;
+    }
+  }
+
+  async function cancelJob() {
+    if (headerJob === null) return;
+    const job = await postJson<Job>(`/api/jobs/${headerJob.id}/cancel`, {});
+    headerJob = isBusy(job) ? job : null;
+    if (terminal(job.state)) await settle(job);
+  }
+
+  function selected(path: string): boolean {
+    return selection.paths.includes(path);
+  }
+
+  onMount(() => {
+    void loadShelf();
+    void poll();
+    const timer = setInterval(() => {
+      void poll().catch(() => undefined);
+    }, POLL_MS);
+    const closeTheme = () => {
+      themeOpen = false;
+    };
+    window.addEventListener("click", closeTheme);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("click", closeTheme);
+    };
+  });
+
+  $effect(() => {
+    const theme = config.theme;
+    const queryMedia = window.matchMedia("(prefers-color-scheme: dark)");
+    const apply = () => {
+      applyDocumentClass(
+        document.documentElement,
+        resolveDark(theme, queryMedia.matches),
+      );
+    };
+    apply();
+    queryMedia.addEventListener("change", apply);
+    return () => queryMedia.removeEventListener("change", apply);
+  });
+</script>
+
+<div class="flex h-full flex-col bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100">
+  <header
+    class="flex h-12 shrink-0 items-center gap-1 border-b border-zinc-200 px-2 dark:border-zinc-800"
+  >
+    <div class="relative w-52 shrink-0">
+      <Search
+        size={20}
+        class="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-zinc-500 dark:text-zinc-400"
+      />
+      <TextInput
+        label="Filter"
+        extra="pl-9"
+        value={query}
+        onValue={onQuery}
+      />
+    </div>
+    <div class="w-40 shrink-0">
+      <Select
+        label="Provider"
+        value={provider}
+        options={PROVIDERS.map((item) => ({ value: item.id, label: item.label }))}
+        onValue={(next) => (provider = next)}
+      />
+    </div>
+    <Button icon label="Scrape" disabled={busy || anchor === null} onclick={scrape}>
+      <ScanSearch size={20} />
+    </Button>
+    <Button
+      icon
+      label="Save"
+      disabled={busy || selection.paths.length === 0}
+      onclick={save}
+    >
+      <Save size={20} />
+    </Button>
+    <Button icon label="Rename" disabled={busy || selectedPlace === null} onclick={openRename}>
+      <Pencil size={20} />
+    </Button>
+    <Button icon label="Convert" disabled={busy || selectedCbr === 0} onclick={requestConvert}>
+      <FileArchive size={20} />
+    </Button>
+    <Button icon label="Rescan" disabled={busy} onclick={rescan}>
+      <RefreshCw size={20} />
+    </Button>
+    <Button icon label="List" pressed={view === "list"} onclick={() => (view = "list")}>
+      <List size={20} />
+    </Button>
+    <Button icon label="Grid" pressed={view === "grid"} onclick={() => (view = "grid")}>
+      <LayoutGrid size={20} />
+    </Button>
+    {#if headerJob}
+      <span class="px-1 text-sm">{jobLabel(headerJob)}</span>
+      <Button icon label="Cancel" onclick={cancelJob}><X size={20} /></Button>
+    {/if}
+    <div class="relative ml-auto">
+      <Button
+        icon
+        label="Theme"
+        onclick={(event) => {
+          event.stopPropagation();
+          themeOpen = !themeOpen;
+        }}
+      >
+        {#if config.theme === "light"}
+          <Sun size={20} />
+        {:else if config.theme === "dark"}
+          <Moon size={20} />
+        {:else}
+          <Monitor size={20} />
+        {/if}
+      </Button>
+      {#if themeOpen}
+        <Menu
+          items={[
+            { id: "system", label: "System", checked: config.theme !== "light" && config.theme !== "dark" },
+            { id: "light", label: "Light", checked: config.theme === "light" },
+            { id: "dark", label: "Dark", checked: config.theme === "dark" },
+          ]}
+          onSelect={chooseTheme}
+        >
+          {#snippet icon(id)}
+            {#if id === "light"}
+              <Sun size={16} />
+            {:else if id === "dark"}
+              <Moon size={16} />
+            {:else}
+              <Monitor size={16} />
+            {/if}
+          {/snippet}
+        </Menu>
+      {/if}
+    </div>
+    <Button icon label="Settings" onclick={() => (settingsOpen = true)}>
+      <Settings size={20} />
+    </Button>
+  </header>
+  <div class="flex min-h-0 flex-1">
+    <nav class="w-60 shrink-0 overflow-y-auto bg-zinc-100 dark:bg-zinc-950">
+      {#each places as place (place.path)}
+        <button
+          type="button"
+          class="flex h-9 w-full items-center gap-2 px-2 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:focus-visible:ring-blue-500 {selectedPlace ===
+          place.path
+            ? 'bg-blue-600/10 dark:bg-blue-500/15'
+            : ''}"
+          onclick={() => onPlace(place.path)}
+        >
+          <Folder size={16} />
+          <span class="truncate">{place.label}</span>
+        </button>
+      {/each}
+    </nav>
+    <main class="min-w-0 flex-1 overflow-y-auto">
+      {#if visible.length === 0}
+        <div class="flex h-full items-center justify-center">
+          <p class="text-sm text-zinc-500 dark:text-zinc-400">No volumes yet.</p>
+        </div>
+      {:else if view === "list"}
+        <ul>
+          {#each visible as row (row.path)}
+            <li>
+              <button
+                type="button"
+                class="flex h-9 w-full items-center gap-2 px-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:focus-visible:ring-blue-500 {selected(
+                  row.path,
+                )
+                  ? 'bg-blue-600/10 dark:bg-blue-500/15'
+                  : ''}"
+                onclick={(event) => onVolume(row.path, event)}
+              >
+                <span class="flex size-4 shrink-0 items-center justify-center overflow-hidden">
+                  <Thumb path={row.path} failed={row.status === "failed"} fallback />
+                </span>
+                <span class="truncate text-sm">{row.name}</span>
+                {#if row.series.trim() !== ""}
+                  <span class="truncate text-xs text-zinc-500 dark:text-zinc-400"
+                    >{row.series}</span
+                  >
+                {/if}
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <ul class="grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-3 p-3">
+          {#each visible as row (row.path)}
+            <li>
+              <button
+                type="button"
+                class="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:focus-visible:ring-blue-500"
+                onclick={(event) => onVolume(row.path, event)}
+              >
+                <span
+                  class="block aspect-[2/3] overflow-hidden bg-zinc-100 dark:bg-zinc-950 {selected(
+                    row.path,
+                  )
+                    ? 'ring-2 ring-blue-600 dark:ring-blue-500'
+                    : ''}"
+                >
+                  {#if row.status !== "failed"}
+                    <Thumb path={row.path} failed={false} />
+                  {/if}
+                </span>
+                <span
+                  class="mt-1 block truncate text-xs {selected(row.path)
+                    ? 'bg-blue-600/10 dark:bg-blue-500/15'
+                    : ''}"
+                >
+                  {row.name}
+                </span>
+              </button>
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </main>
+    <aside
+      class="w-96 shrink-0 overflow-y-auto border-l border-zinc-200 dark:border-zinc-800"
+    >
+      <Inspector
+        {anchor}
+        {pageIndex}
+        {form}
+        {formLocked}
+        {busy}
+        lines={inspectorLines}
+        {noMatches}
+        {candidates}
+        onPage={setPage}
+        {onEdit}
+        onCandidate={chooseCandidate}
+      />
+    </aside>
+  </div>
+</div>
+
+{#if settingsOpen}
+  <SettingsDialog
+    {config}
+    onClose={() => (settingsOpen = false)}
+    onSaved={(next) => {
+      config = next;
+      settingsOpen = false;
+    }}
+  />
+{/if}
+{#if renameOpen}
+  <RenameDialog
+    template={renameTemplate}
+    lines={renameLines}
+    error={renameError}
+    onTemplate={(value) => {
+      renameTemplate = value;
+      void refreshPlan();
+    }}
+    onDismiss={() => (renameOpen = false)}
+    onConfirm={confirmRename}
+  />
+{/if}
+{#if convertOpen}
+  <Dialog
+    title="Convert"
+    confirmLabel="Convert"
+    confirmVariant="danger"
+    onDismiss={() => (convertOpen = false)}
+    onConfirm={runConvert}
+  >
+    <p class="text-sm">{convertConfirmMessage(selectedCbr)}</p>
+  </Dialog>
+{/if}

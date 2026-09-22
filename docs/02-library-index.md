@@ -1,6 +1,6 @@
 ---
 description: SQLite library index, recursive scan of cbz and cbr roots, on-demand cover thumbnails, and a shelf that paints from the index.
-status: proposed
+status: active
 ---
 
 # Library index
