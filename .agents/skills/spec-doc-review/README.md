@@ -34,11 +34,11 @@ suitability before implementation is very important.
 - Does the document clearly specify what is to be implemented?
   - If it mentions error handling, are the specific error types mentioned?
   - Are the error cases clearly specified?
-- Does the spec doc introduce new configuration properties for the game ("Configuration" section)?
+- Does the spec doc introduce new configuration properties ("Configuration" section)?
   - Are they named?
   - Is the new top-level configuration key named? Does it conflict with any known existing top-level key names?
   - Are the expected value(s) clearly defined?
-  - Does the document specify a sensible default value to be used if the game config file is missing?
+  - Does the document specify a sensible default value to be used if the config file is missing?
 - Does the document describe specific test cases ("Testing" section)?
 - Does the document have sensible acceptance criteria ("Acceptance criteria" section)?
 - Does the document contradict itself?
@@ -52,15 +52,11 @@ that would allow you to succeed.
 
 ## What NOT to do
 
-We are NOT modifying the game's code during a spec doc review. We are NOT implementing the spec doc
+We are NOT modifying application code during a spec doc review. We are NOT implementing the spec doc
 until the user provides approval.
 
 It is acceptable to write code to test the feasibility of an approach, or to verify specific behavior.
-**Don't modify tracked files**. Run scratch scripts from outside the project directory with `PYTHONPATH`
-set to the project's absolute directory + `src`, and `import dtd.*` read-only.
-
-Never modify the actual `~/.DustToDominion/` directory contents. You can redirect this with
-`DUST_TO_DOMINION_HOME` pointing to any temporary readable/writable directory.
+**Don't modify tracked files**. Run scratch scripts from outside the project directory.
 
 Do NOT automatically apply your suggestions to the document! 
 Your primary goal is to provide feedback on the document to the user.

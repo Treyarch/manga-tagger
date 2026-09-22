@@ -28,10 +28,11 @@ tests/                     hermetic unit tests
 - Bind `127.0.0.1` on a port chosen at startup. The port is not a configuration key.
 - Dependencies come from `pyproject.toml` via uv. Python 3.12 or newer.
 - No Flask, SQLAlchemy, Alembic, Poetry, authentication, or user accounts. The index uses the standard-library `sqlite3` module, outside the routers.
+- Route functions are sync `def`. Archive and SQLite calls are synchronous. Do not declare those routes `async def`.
 
 ```python
 @router.post("/example", response_model=ExampleResponse)
-async def example(body: ExampleRequest) -> ExampleResponse:
-    result = await core_operation(body.query)
+def example(body: ExampleRequest) -> ExampleResponse:
+    result = core_operation(body.query)
     return ExampleResponse.from_result(result)
 ```

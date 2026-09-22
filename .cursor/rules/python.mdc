@@ -31,6 +31,7 @@ alwaysApply: false
 - Use the standard-library `sqlite3` module for the library index
 - Do not add SQLAlchemy or Alembic
 - Keep queries in the index module, not in FastAPI routers
+- Open one connection per call, then close it. Do not share connections or keep a pool
 
 ## Testing
 - Use pytest
@@ -45,39 +46,21 @@ alwaysApply: false
 
 ## Performance
 - Do not add a cache layer beyond the thumbnail cache in the project overview
-- Implement database query optimization
-- Use proper connection pooling
-- Implement proper pagination
-- Use background tasks for heavy operations
-- Monitor application performance
+- Return the library list in one query. Do not add pagination
+- Scrapes, saves, converts, and rescans run as background jobs in the application shell
 
 ## Error Handling
-- Create custom exception classes
-- Use proper try-except blocks
-- Implement proper logging
-- Return proper error responses
-- Handle edge cases properly
-- Use proper error messages
+- Use the exception types named in the specs
+- Do not add a logging framework
 
 ## Documentation
-- Use Google-style docstrings
-- Document all public APIs
-- Keep README.md updated
-- Use proper inline comments
-- Generate API documentation
-- Document environment setup
+- Use Google-style docstrings on public functions
+- Do not add a generated API docs site
 
 ## Development Workflow
 - Use uv to create the environment and run commands
-- Implement pre-commit hooks
-- Use proper Git workflow
-- Follow semantic versioning
-- Use proper CI/CD practices
-- Implement proper logging
 
 ## Dependencies
 - Declare dependencies in `pyproject.toml`
 - Install and run the project with uv
 - Separate dev dependencies
-- Pin versions
-- Check for security vulnerabilities

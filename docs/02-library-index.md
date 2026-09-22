@@ -157,7 +157,7 @@ A save, a rename, or a convert calls `refresh_volume` on the output path and `fo
 
 `thumbnail_for(db_path, cache_dir, path)` returns the path of a JPEG in `cache_dir` for an `ok` row. A missing row or a `failed` row returns no path and writes nothing. A missing `cache_dir` is created.
 
-The image is the cover page at `cover_index`. The read is that one archive member. The width is 256 pixels. The height keeps the cover's aspect ratio, rounded to the nearest integer. A cover already narrower than 256 pixels is not enlarged. Pillow encodes JPEG at quality 80. These values are not TOML keys.
+The image is the cover page at `cover_index`. The read is that one archive member. The width is 256 pixels. The height keeps the cover's aspect ratio, rounded to the nearest integer. A cover already narrower than 256 pixels is not enlarged. A cover with an alpha channel is composited onto white before encoding. A cover without alpha is encoded as it is. Pillow encodes JPEG at quality 80. These values are not TOML keys.
 
 The filename is `{digest}-{mtime_ns}-{size}.jpg`. `digest` is the SHA-256 hex digest of the resolved path encoded as UTF-8. A new size or mtime names a different file. Thumbnail files in `cache_dir` that start with `{digest}-` and are not the current name are removed before the call returns.
 
@@ -180,7 +180,7 @@ Archive failures during `scan` and `refresh_volume` are stored on the row. They 
 
 This specification adds no configuration keys.
 
-The database file and the thumbnail directory are the index and thumbnail-cache paths in [00-project-overview.md](00-project-overview.md). The application shell passes those paths in. Tests pass temporary paths. Thumbnail width 256 and JPEG quality 80 are not TOML keys.
+The database file and the thumbnail directory are the index and thumbnail-cache paths in [00-project-overview.md](00-project-overview.md). The application shell passes those paths in. Tests pass temporary paths. Thumbnail width 256, JPEG quality 80, and the white matte are not TOML keys.
 
 ## Testing
 
@@ -199,7 +199,7 @@ Cover at least:
 - Cancel after the first committed file keeps that row, leaves a deleted file's previous row in place, and does not drop rows for a root removed from the list.
 - A finished scan deletes a removed file and its thumbnail, deletes rows whose root is no longer in the list, and keeps rows for a root that is not an existing directory. A finished scan with an empty root list deletes every row. A directory that cannot be listed does not prune that root.
 - `refresh_volume` updates one file after its ComicInfo changes and does not walk a sibling. `forget_volume` removes the row and the thumbnail. A missing path returns no row.
-- `thumbnail_for` reads only the cover page, writes a JPEG 256 pixels wide, and leaves the archive bytes unchanged. It does not write `{stem}-poster.jpg`. A cover narrower than 256 pixels is not enlarged. A second call for the same size and mtime does not open the archive. A `failed` row returns no path. `list_volumes` creates no thumbnail.
+- `thumbnail_for` reads only the cover page, writes a JPEG 256 pixels wide, and leaves the archive bytes unchanged. It does not write `{stem}-poster.jpg`. A cover narrower than 256 pixels is not enlarged. A cover with an alpha channel encodes on white. The test may decode that JPEG. A second call for the same size and mtime does not open the archive. A `failed` row returns no path. `list_volumes` creates no thumbnail.
 - When `unar` is absent, a `.cbr` row is `failed` with `error_type` `MissingUnarError` and a message that names `unar`, and a `.cbz` row is `ok`.
 - `user_version` 2 raises `IndexVersionError`. The version stays 2 and a sentinel row is still present.
 
@@ -212,5 +212,5 @@ Cover at least:
 - Each file is committed on its own. Cancel keeps those rows and prunes nothing.
 - A finished scan drops files that disappeared and drops roots that are no longer in the list, including a finished scan of an empty root list. A root that is not an existing directory keeps its rows. A root whose directory cannot be listed is not pruned.
 - `refresh_volume` updates one archive. `forget_volume` drops one path and its thumbnail. The module does not watch the filesystem and does not start a thread.
-- A thumbnail is built when asked, from the cover page only, as a 256-pixel-wide JPEG at quality 80, by rename inside the cache directory. The sibling poster is left alone. A scan does not build thumbnails.
+- A thumbnail is built when asked, from the cover page only, as a 256-pixel-wide JPEG at quality 80 on a white matte when the cover has an alpha channel, by rename inside the cache directory. The sibling poster is left alone. A scan does not build thumbnails.
 - A database whose `user_version` is neither 0 nor 1 is refused. The schema is not rewritten and existing rows stay.

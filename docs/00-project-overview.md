@@ -8,7 +8,7 @@ This file is the project guideline. It has no YAML frontmatter, as required by [
 
 The app replaces the day-to-day tagging flow of ComicTagger for a library of a few hundred volumes. ComicTagger is built around a blocking identify dialog and around Comic Vine, and it spends too much time opening archives for what should be a metadata edit. Manga Tagger is manga-first, writes only what changed, and keeps the window responsive.
 
-The library lives as `.cbz` and `.cbr` files in folders the user chooses. Organizing a series means those archives carry consistent tags, names, and cover posters so Bookshelf can group them. The app is not a reader: a cover or a page is shown only to check the volume being tagged. It does not talk to Jellyfin, Komga, Kavita, or any other server.
+The library lives as `.cbz` and `.cbr` files in folders the user chooses. Organizing a series means those archives carry consistent tags and names so Bookshelf can group them by ComicInfo `Series`. A sibling `{stem}-poster.jpg` is the primary image Jellyfin uses when several books share a folder. The app is not a reader: a cover or a page is shown only to check the volume being tagged. It does not talk to Jellyfin, Komga, Kavita, or any other server.
 
 ## Product bar
 
@@ -49,9 +49,9 @@ Version 1 does three jobs:
 
 Each archive is one tankōbon. The volume number is stored in ComicInfo `Number`. `Volume` is not filled automatically.
 
-The user can select one volume or several. Accepting a match loads one shared form and does not change any archive. Saving one volume writes the fields that form shows, including `Number` when the form has it, and keeps every other XML element. Saving several volumes writes only the shared series fields: `Series`, `Publisher`, `LanguageISO`, `Genre`, `Writer`, `Penciller`, `Inker`, and `CoverArtist`. It does not change `Number`, `Volume`, `Title`, or any other element. One file failing during that save does not stop the other selected files, and files already written stay written.
+The user can select one volume or several. Accepting a match loads the form and does not change any archive. Saving one volume writes the fields the user edited or a load set, and keeps every other XML element. An unchanged save does not rewrite the archive. Saving several volumes writes the shared series fields that are dirty: `Series`, `Publisher`, `LanguageISO`, `Genre`, `Manga`, `Writer`, `Penciller`, `Inker`, and `CoverArtist`. It also writes each file's `Number` from that file's filename when the name has a volume marker. It does not change `Volume`, `Title`, or any other element. A file whose patch is empty is not rewritten. One file failing during that save does not stop the other selected files, and files already written stay written.
 
-The user can rename the archives sitting directly in one opened series folder. The template offered is `{Series} v{Volume:02}`, which turns `Volume` `1` into `Claymore v01.cbz`. The extension stays `.cbz` or `.cbr`. The file stays in that folder. A sibling `{stem}-poster.jpg` is the cover scaled to 600 pixels wide.
+The user can rename the archives sitting directly in one opened series folder. The dialog shows each old name and new name before anything is renamed. The template offered is `{Series} v{Number:02}`, which turns `Number` `1` into `Claymore v01.cbz`. `Number` `1.5` stays `1.5`. The extension stays `.cbz` or `.cbr`. The file stays in that folder. A successful save or a successful rename writes a sibling `{stem}-poster.jpg`, the cover scaled to 600 pixels wide on a white background.
 
 Title text uses the first language the catalog actually has, in this order: French, then English, then the original title.
 
@@ -119,6 +119,7 @@ On Linux, unset XDG variables mean `~/.config`, `~/.local/share`, and `~/.cache`
 | `keep_cbr_original` | boolean | `false` | When `false`, delete the `.cbr` after its `.cbz` has been written and read back. When `true`, keep the `.cbr` next to the new `.cbz`. |
 | `comicvine_api_key` | string | `""` | Comic Vine API key. Empty disables that provider. The other three providers need no key. |
 | `title_languages` | list of strings | `["fr", "en"]` | Title preference order. Each entry is a language the catalog may have. The original title is used when none of them exist. |
+| `theme` | string | `system` | `system` follows `prefers-color-scheme`. `light` and `dark` force that theme. Any other value is treated as `system`. Defined in [05-ui-design.md](05-ui-design.md). |
 
 Unknown keys are ignored. The feature specification that introduces a key must document it here or in its own Configuration section before that specification becomes `active`.
 
@@ -169,13 +170,13 @@ All resolved. Recorded here so they are not re-opened in feature specs.
 - **What is the UI?** A Svelte web UI inside a pywebview window. Chosen for a real web frontend and a single desktop window, without shipping Chromium.
 - **Which language?** Python 3.12. The library is a few hundred volumes, so the speed goal is avoiding full extracts and recompression, not a native rewrite.
 - **What must v1 do?** Edit ComicInfo, scrape the four catalogs, preview pages, apply shared series fields to every volume in the current selection, and rename archives in place from a filename template.
-- **How does a batch save work?** One shared form is reviewed, then a multi-volume save writes only `Series`, `Publisher`, `LanguageISO`, `Genre`, `Writer`, `Penciller`, `Inker`, and `CoverArtist` to each selected file. A single selected volume may also take `Number` and the other form fields. This is still a confirmed save, not an unattended auto-tag.
-- **How does rename work?** The template offered is `{Series} v{Volume:02}`. Each archive directly in the opened folder gets a new filename from its own ComicInfo. `{Volume}` is the `Volume` element, not `Number`. `:02` zero-pads an integer to at least two digits. The file is not moved to another directory. The cover is also written beside it as `{stem}-poster.jpg` at 600 pixels wide.
+- **How does a batch save work?** One shared form is reviewed, then a multi-volume save writes the dirty shared fields `Series`, `Publisher`, `LanguageISO`, `Genre`, `Manga`, `Writer`, `Penciller`, `Inker`, and `CoverArtist` to each selected file. Each file also takes `Number` from its own filename when that name has a volume marker. `Volume` is not filled. A single selected volume writes the fields the user edited or a load set. An unchanged save does not rewrite the archive. This is still a confirmed save, not an unattended auto-tag.
+- **How does rename work?** The dialog shows the planned names first. The template offered is `{Series} v{Number:02}`. Each archive directly in the opened folder gets a new filename from its own ComicInfo. `{Number}` is the `Number` element, not `Volume`. `:02` zero-pads an integer to at least two digits. A fractional number such as `1.5` is kept as written and is not padded. The file is not moved to another directory. A successful save or rename also writes `{stem}-poster.jpg` at 600 pixels wide.
 - **What is one file?** One tankōbon. ComicInfo `Number` is the volume number. `Volume` is not auto-filled.
 - **Which catalogs?** MangaDex, AniList, MyAnimeList via Jikan, and Comic Vine when an API key is set.
 - **Which title?** French, then English, then the original. The order is `title_languages`, default `["fr", "en"]`, with the original title as the fallback.
 - **Which reading direction?** Right to left for MangaDex, AniList, and MyAnimeList. Left to right for Comic Vine. The form can change it before save.
-- **What happens when ComicInfo already exists?** The match loads the form. Disk changes only on save. A single-volume save writes the form fields and keeps every other XML element. A multi-volume save writes only the shared series fields.
+- **What happens when ComicInfo already exists?** The match loads the form. Disk changes only on save. A single-volume save writes the fields the user edited or a load set, plus `Number` from the filename when that field was not edited and the stored value differs. A multi-volume save writes the dirty shared fields, including `Manga`, and each file's `Number` from its filename. `Volume` is not filled. An unchanged save does not rewrite the archive.
 - **What happens to `.cbr`?** Convert to `.cbz` on save or explicit convert. Delete the `.cbr` after a verified write unless `keep_cbr_original` is true.
 - **Which files are scanned?** `.cbz` and `.cbr` only, recursively inside each library root. Symlinks that leave the root are ignored.
 - **Where does the search text come from?** Existing `Series`, or the filename without its extension when `Series` is empty.

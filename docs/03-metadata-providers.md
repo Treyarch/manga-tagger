@@ -45,7 +45,9 @@ On the tag-stripped stem, the first matching suffix wins. Matching is case-insen
 
 The number token is digits with an optional fractional part: `\d+(?:\.\d+)?`. Order 6 requires a separator. A stem that is only digits does not match it.
 
-`vol` is tried before bare `v`, and `tome` before bare `t`, so `vol.2` and `tome 3` are not read as `v` or `t`. A chapter marker such as `c01` is not a volume marker. It matches none of these suffixes.
+Before that table, a chapter suffix at the end of the tag-stripped stem is removed and does not set a number. Matching is case-insensitive and must end at the end of the stem. Separators are the same. The suffix is: separator or start, then `chapter`, `chapitre`, `chap`, or `ch`, optional `.`, optional separators, then the number token. Longer words are tried first, so `chapter 12` is not read as `ch`. The query remainder drops that suffix the same way a volume suffix is dropped, and `parse_number` returns `None`. The volume table is not applied to what remains.
+
+`vol` is tried before bare `v`, and `tome` before bare `t`, so `vol.2` and `tome 3` are not read as `v` or `t`. A marker such as `c01` has no chapter word and no separator before the digits, so it matches nothing.
 
 The stored number drops leading zeros on the integer part. `01` becomes `1`. `1.5` stays `1.5`. `1.50` stays `1.50`. `0` and `00` stay `0`. `0.5` stays `0.5`.
 
@@ -62,6 +64,9 @@ The query remainder is the tag-stripped stem without that matched suffix, includ
 | `20th Century Boys v01` | `20th Century Boys` | `1` |
 | `v01` | `""` | `1` |
 | `Claymore` | `Claymore` | `None` |
+| `Claymore Chapter 12` | `Claymore` | `None` |
+| `Claymore Chapitre 03` | `Claymore` | `None` |
+| `Claymore Ch.12` | `Claymore` | `None` |
 
 `build_query("20th Century Boys", "20th Century Boys v01")` returns `20th Century Boys`. `parse_number("20th Century Boys v01")` returns `1`.
 
@@ -82,7 +87,7 @@ At most 10 hits are requested. That limit is a constant. A hit with no usable ti
 
 `load` adds `Number` when `parse_number(filename_stem)` returns a string. It never adds `Volume`, `Pages`, `PageCount`, `AgeRating`, `CommunityRating`, or `Notes`. `Series` and `Title` are the same preferred title. A record with no usable title raises `ProviderResponseError` and does not return a partial patch.
 
-The patch is what one accepted match loads into the form. It may include `Title`, `Number`, `Summary`, `Manga`, `Web`, `Year`, `Month`, and `Day`. Those are not batch-save fields. This module does not call `save_comic_info` or `save_many`. The application shell decides which keys a later save writes.
+The patch is what one accepted match loads into the form. It may include `Title`, `Number`, `Summary`, `Manga`, `Web`, `Year`, `Month`, and `Day`. `Manga` is a shared save field. `Title`, `Number`, `Summary`, `Web`, and dates are not. On a multi-volume save the shell ignores `Number` from this patch and writes each file's `Number` from that file's filename. This module does not call `save_comic_info` or `save_many`. The application shell decides which keys a later save writes.
 
 `match_id` must be non-blank and must not contain `/`, `?`, `#`, or whitespace. AniList, Jikan, and Comic Vine ids must also be decimal digits with no sign and no leading zero unless the id is `0`. A bad id raises `ProviderResponseError` before any request. The Comic Vine URL adds the `4050-` prefix. The stored id does not include it.
 
@@ -116,6 +121,8 @@ MangaDex, AniList, and Jikan set `Manga` to `YesAndRightToLeft`. Comic Vine sets
 ## Shared field rules
 
 Several names are joined with `, ` in API order. A blank name is skipped. The same name is not repeated in one field.
+
+A credit token matches as a whole word. The role text is split on every character that is not a Unicode letter or digit. Comparison is case-insensitive. `art` matches `Art` and `Story & Art`. It does not match `partial`, `starting`, or `artist`.
 
 Summary text is plain. The module does not render Markdown. Given a string, it unescapes HTML entities, replaces U+00A0 with a normal space, removes tags matching `<[^>]*>`, collapses whitespace to a single space, and trims. An empty result omits `Summary`. A non-string omits it.
 
@@ -200,8 +207,8 @@ HTTP 200 with a non-empty `errors` array raises `ProviderResponseError`. Search 
 | `Genre` | `genres` joined in list order |
 | `Summary` | `description`, HTML-stripped. AniList has one description, not one per language |
 | `Year`, `Month`, `Day` | `startDate` components that are integers |
-| `Writer` | Staff whose `role`, compared case-insensitively, contains `story` or `creator` |
-| `Penciller`, `CoverArtist` | Staff whose `role` contains `art` or `illustrat`. Both keys receive that same list |
+| `Writer` | Staff whose role has the whole word `story` or `creator` |
+| `Penciller`, `CoverArtist` | Staff whose role has the whole word `art`, `artist`, `illustration`, or `illustrator`. Both keys receive that same list |
 | `Web` | `siteUrl` |
 | `Manga` | `YesAndRightToLeft` |
 
@@ -221,8 +228,8 @@ Search reads `data` as a list. Load reads `data` as one object. A missing load `
 | `Genre` | `genres[].name` in list order. Themes, demographics, and explicit genres are not included |
 | `Summary` | `synopsis`, HTML-stripped |
 | `Year`, `Month`, `Day` | `published.prop.from` components that are not null. A missing `published`, `prop`, or `from` omits all three |
-| `Writer` | `authors` whose `type`, compared case-insensitively, contains `story` |
-| `Penciller`, `CoverArtist` | `authors` whose `type` contains `art`. Both keys receive that same list |
+| `Writer` | `authors` whose `type` has the whole word `story` |
+| `Penciller`, `CoverArtist` | `authors` whose `type` has the whole word `art` or `artist`. Both keys receive that same list |
 | `Web` | `url` |
 | `Manga` | `YesAndRightToLeft` |
 
@@ -287,11 +294,11 @@ Tests are hermetic. They do not use the network, do not sleep, and do not read t
 
 Cover at least:
 
-- The query and number table above, including `Foo (Bar) v01` keeping `(Bar)`, and `build_query("20th Century Boys", "20th Century Boys v01")` leaving the series text intact while `parse_number` returns `1`.
+- The query and number table above, including `Foo (Bar) v01` keeping `(Bar)`, `build_query("20th Century Boys", "20th Century Boys v01")` leaving the series text intact while `parse_number` returns `1`, and `Claymore Chapter 12`, `Claymore Chapitre 03`, and `Claymore Ch.12` returning query `Claymore` and number `None`.
 - `search` with query `""` or `"   "` returns `[]` and the transport sees no request, including for `comicvine` with a blank key.
 - A MangaDex fixture whose `title` has `fr` and `en` yields `Series` and `Title` `fr` when `title_languages` is `["fr", "en"]`, and `LanguageISO` `fr`. With only `ja` under `originalLanguage`, the title is that Japanese title and `LanguageISO` is `ja`. `Manga` is `YesAndRightToLeft`. A genre tag is included and a theme tag is not. An author is `Writer`. An artist is both `Penciller` and `CoverArtist`. No artist omits both, and the author is not copied. `Publisher` is absent. `Volume` is absent.
-- An AniList fixture with `english` and `native`, and `title_languages` `["fr", "en"]`, uses the English title and `LanguageISO` `en`. A fixture with only `native` and `countryOfOrigin` `JP` uses the native title and `LanguageISO` `ja`. A romaji-only fixture omits `LanguageISO`. A staff role `Story & Art` fills `Writer`, `Penciller`, and `CoverArtist`. `Publisher` is absent. `Manga` is `YesAndRightToLeft`.
-- A Jikan fixture with title types `French` and `English` uses the French title and `LanguageISO` `fr`. `serializations[0].name` is `Publisher`. `genres` are joined in order and a theme is not included. `published.prop.from` of year `2001`, month `6`, day `null` sets `Year` `2001` and `Month` `6` and omits `Day`. An author type `Story & Art` fills `Writer`, `Penciller`, and `CoverArtist`.
+- An AniList fixture with `english` and `native`, and `title_languages` `["fr", "en"]`, uses the English title and `LanguageISO` `en`. A fixture with only `native` and `countryOfOrigin` `JP` uses the native title and `LanguageISO` `ja`. A romaji-only fixture omits `LanguageISO`. A staff role `Story & Art` fills `Writer`, `Penciller`, and `CoverArtist`. A role `Partial coloring` fills none of those credit fields. A role `Artist` fills `Penciller` and `CoverArtist` and does not fill `Writer`. `Publisher` is absent. `Manga` is `YesAndRightToLeft`.
+- A Jikan fixture with title types `French` and `English` uses the French title and `LanguageISO` `fr`. `serializations[0].name` is `Publisher`. `genres` are joined in order and a theme is not included. `published.prop.from` of year `2001`, month `6`, day `null` sets `Year` `2001` and `Month` `6` and omits `Day`. An author type `Story & Art` fills `Writer`, `Penciller`, and `CoverArtist`. An author type `Partial` fills none of those credit fields.
 - A Comic Vine load sets `Manga` to `No`, omits `LanguageISO`, uses `description` over `deck`, and maps `writer, artist` to `Writer` and `Penciller` but not `CoverArtist`. A role `cover` sets `CoverArtist`. A blank `api_key` raises `ProviderUnavailableError`, the message says the Comic Vine API key is not set, and the transport sees no request. A JSON `status_code` other than `1` raises `ProviderResponseError`.
 - `load` with filename stem `Claymore v02` includes `Number` `2` and does not include `Volume`. `load` with stem `Claymore` omits `Number`. `Title` equals `Series`.
 - Summary `<p>Hello&nbsp;there</p>` becomes `Hello there`.

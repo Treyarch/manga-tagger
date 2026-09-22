@@ -1,6 +1,6 @@
 # [AGENTS.md](http://AGENTS.md)
 
-Manga Tagger is a simple and clean app to easily rename, scrappe, tag and organise Mangas collections. This is a **spec-driven project**: `docs/README.md` and `docs/00-project-overview.md` define the workflow. Read them before writing code.
+Manga Tagger is a simple and clean app to easily rename, scrape, tag and organise Mangas collections. This is a **spec-driven project**: `docs/README.md` and `docs/00-project-overview.md` define the workflow. Read them before writing code.
 
 ## Spec workflow
 

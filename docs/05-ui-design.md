@@ -49,9 +49,9 @@ The sidebar lists library places. A row is an icon and a label, 36px tall. The s
 
 The main pane lists volumes. List is the default. Grid shows covers only. The switch is session state. It is not a configuration key. Switching back to list restores the list, and switching to grid restores the grid, for as long as the window is open.
 
-A list row is 36px tall (`h-9`): a 16px icon or thumbnail, a primary label, and muted secondary text on one line. The whole row takes the selection wash.
+A list row is 36px tall (`h-9`): a 16px icon or thumbnail, the filename as the primary label, and the series as muted secondary text on the same line when that series is non-blank. The whole row takes the selection wash.
 
-A grid cell is a cover at a 2:3 aspect ratio with one truncated label under it. Selection is a 2px accent ring around the cover and the selection wash behind the label. A wash behind the cover image would be hidden by the image, so the ring is the selection on the cover itself.
+A grid cell is a cover at a 2:3 aspect ratio with the filename as one truncated label under it. Selection is a 2px accent ring around the cover and the selection wash behind the label. A wash behind the cover image would be hidden by the image, so the ring is the selection on the cover itself.
 
 The inspector stacks, from the top: the cover, `object-contain`, on the view background; then the metadata fields. Each field is a label above its control. Labels use the muted text color. Fields stack with `gap-3`. The pane has no shadow and no inner card.
 
@@ -82,7 +82,6 @@ Use Tailwind's default `font-sans` stack. On Linux that resolves to the desktop 
 | --- | --- |
 | Labels, rows, header, fields | `text-sm` |
 | Field captions, grid captions, muted secondary text | `text-xs` plus the muted color |
-| Header place name | `text-sm font-medium` |
 
 ## Theme
 
@@ -148,6 +147,14 @@ The header icon button is `quiet`, 32px square (`size-8`), with a 20px icon. The
 
 `TextInput.svelte`. Height 36px, `text-sm`, `rounded-md`, hairline border, view background, muted placeholder. The header search field is this control at a compact width, with the `Search` icon inside the leading edge.
 
+### Textarea
+
+`Textarea.svelte`. Same border, radius, background, and `text-sm` as the text input. At least four rows. `Summary` and `Notes` use it.
+
+### Checkbox
+
+`Checkbox.svelte`. A native checkbox with a `text-sm` label beside it. The settings row `Keep the original CBR` uses it.
+
 ### Select
 
 `Select.svelte`. Same height, radius, border, and background as the text input. It is a native `<select>`.
@@ -187,12 +194,12 @@ Cover at least:
 ## Acceptance criteria
 
 - The window is a header bar, a 240px places sidebar, a flexible main pane, and a 384px inspector, separated by hairlines. The header does not scroll away.
-- List is the view when the window opens. Rows are 36px. Grid cells show a 2:3 cover, a truncated label, and a 2px accent ring when selected. List selection is the accent wash on the row.
+- List is the view when the window opens. Rows are 36px. A list row shows the filename, and the series in muted text when it is set. Grid cells show a 2:3 cover, the filename as a truncated label, and a 2px accent ring when selected. List selection is the accent wash on the row.
 - An empty main pane shows the sentence `No volumes yet.` and no illustration.
 - Light and dark use the color table in this document. Dark mode is the `dark` class. The layout does not change between themes.
 - `theme` defaults to `system`. `light` and `dark` force that theme. Any other value follows the system. The header menu can set each of the three values, and the class updates immediately. `system` keeps following `prefers-color-scheme`.
 - The resolved theme is applied before the first paint.
 - Icons are Lucide, `currentColor`, 16px in rows and menu items and 20px in the header. The view switch is `List` and `LayoutGrid`. The theme menu is `Monitor`, `Sun`, and `Moon`.
-- Buttons, text inputs, selects, menus, and dialogs are the local components in this document, styled with Tailwind utilities. The UI package does not depend on a third-party component kit.
+- Buttons, text inputs, textareas, checkboxes, selects, menus, and dialogs are the local components in this document, styled with Tailwind utilities. The UI package does not depend on a third-party component kit.
 - Type is the default sans stack at `text-sm` for controls and rows, and `text-xs` for captions.
 - A keyboard focus ring is visible on the shared controls.
