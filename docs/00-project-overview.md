@@ -33,6 +33,7 @@ Later specifications turn these into concrete behavior. They must not trade them
 | Window | [pywebview](https://pywebview.flowrl.com/), loading the local UI. WebKitGTK on Linux |
 | Index | SQLite, via the standard-library `sqlite3` module |
 | XML | `lxml` |
+| Cover poster | [Pillow](https://python-pillow.org/). Writes a sibling JPEG beside the archive. The thumbnail cache is separate |
 | RAR read | The `unar` executable on `PATH` |
 | Process | One desktop process. It starts the API and the window. The user does not start a server |
 
@@ -42,13 +43,15 @@ The API is FastAPI. Do not add Flask. Do not add Electron, a bundled Chromium, o
 
 Version 1 does three jobs:
 
-1. **ComicInfo.** Read and edit `ComicInfo.xml` inside an archive. Preserve XML elements the app does not edit.
+1. **ComicInfo.** Read and edit `ComicInfo.xml` inside an archive, and rename that archive in place from those tags. Preserve XML elements the app does not edit.
 2. **Scrape.** Search MangaDex, AniList, MyAnimeList (through Jikan), and Comic Vine. An accepted match loads the form. Save is what writes the archive.
 3. **Preview.** Show the cover and individual pages by reading those entries from the archive.
 
 Each archive is one tankōbon. The volume number is stored in ComicInfo `Number`. `Volume` is not filled automatically.
 
-The user can select one volume or several. Accepting a match loads one shared form and does not change any archive. Save writes the fields that form shows into every selected file and keeps every other XML element in each file. With one volume selected, the match may fill `Number` on the form, and save writes it. With several volumes selected, save does not change `Number` on any of them. One file failing during that save does not stop the other selected files, and files already written stay written.
+The user can select one volume or several. Accepting a match loads one shared form and does not change any archive. Saving one volume writes the fields that form shows, including `Number` when the form has it, and keeps every other XML element. Saving several volumes writes only the shared series fields: `Series`, `Publisher`, `LanguageISO`, `Genre`, `Writer`, `Penciller`, `Inker`, and `CoverArtist`. It does not change `Number`, `Volume`, `Title`, or any other element. One file failing during that save does not stop the other selected files, and files already written stay written.
+
+The user can rename the archives sitting directly in one opened series folder. The template offered is `{Series} v{Volume:02}`, which turns `Volume` `1` into `Claymore v01.cbz`. The extension stays `.cbz` or `.cbr`. The file stays in that folder. A sibling `{stem}-poster.jpg` is the cover scaled to 600 pixels wide.
 
 Title text uses the first language the catalog actually has, in this order: French, then English, then the original title.
 
@@ -61,7 +64,7 @@ Saving metadata for a `.cbr`, or an explicit convert action, produces a `.cbz` b
 - A reading mode. Preview exists to check tags and page order.
 - Clients for Komga, Kavita, or similar servers.
 - Writing RAR, or any workflow that keeps the canonical file as `.cbr` after a successful convert.
-- Renaming files from metadata, and moving volumes into a series/volume folder layout.
+- Moving volumes into a series/volume folder layout. Renaming a file in place is in scope.
 - Loose page-image folders, PDF, and archives other than `.cbz` and `.cbr`.
 - Unattended auto-tagging. A scrape proposes a match. A person accepts it, reviews the form, and saves.
 - Accounts, sync, or multi-user access.
@@ -134,7 +137,7 @@ Write these before the code they describe. Each one is a normal spec: YAML front
 
 | Document | Covers |
 | --- | --- |
-| `01-archives-and-comicinfo.md` | Partial read, preview, ComicInfo edit, `Number` as the volume, atomic CBZ save, batch save that leaves each `Number` alone, CBR convert |
+| `01-archives-and-comicinfo.md` | Partial read, preview, ComicInfo edit, `Number` as the volume, atomic CBZ save, batch save of shared series fields, in-place filename template, CBR convert |
 | `02-library-index.md` | SQLite index, recursive scan, thumbnail cache, first paint |
 | `03-metadata-providers.md` | MangaDex, AniList, Jikan, Comic Vine, title language order, reading direction, accept-before-write |
 | `04-application-shell.md` | Single process, local FastAPI, pywebview, the one-screen layout, multi-volume selection |
@@ -164,13 +167,14 @@ All resolved. Recorded here so they are not re-opened in feature specs.
 
 - **What is the UI?** A Svelte web UI inside a pywebview window. Chosen for a real web frontend and a single desktop window, without shipping Chromium.
 - **Which language?** Python 3.12. The library is a few hundred volumes, so the speed goal is avoiding full extracts and recompression, not a native rewrite.
-- **What must v1 do?** Edit ComicInfo, scrape the four catalogs, preview pages, and apply one accepted match to every volume in the current selection.
-- **How does a batch save work?** One shared form is reviewed, then save writes those fields to each selected file. A single selected volume may take `Number` from the match. Several selected volumes keep the `Number` each file already has. This is still a confirmed save, not an unattended auto-tag.
+- **What must v1 do?** Edit ComicInfo, scrape the four catalogs, preview pages, apply shared series fields to every volume in the current selection, and rename archives in place from a filename template.
+- **How does a batch save work?** One shared form is reviewed, then a multi-volume save writes only `Series`, `Publisher`, `LanguageISO`, `Genre`, `Writer`, `Penciller`, `Inker`, and `CoverArtist` to each selected file. A single selected volume may also take `Number` and the other form fields. This is still a confirmed save, not an unattended auto-tag.
+- **How does rename work?** The template offered is `{Series} v{Volume:02}`. Each archive directly in the opened folder gets a new filename from its own ComicInfo. `{Volume}` is the `Volume` element, not `Number`. `:02` zero-pads an integer to at least two digits. The file is not moved to another directory. The cover is also written beside it as `{stem}-poster.jpg` at 600 pixels wide.
 - **What is one file?** One tankōbon. ComicInfo `Number` is the volume number. `Volume` is not auto-filled.
 - **Which catalogs?** MangaDex, AniList, MyAnimeList via Jikan, and Comic Vine when an API key is set.
 - **Which title?** French, then English, then the original. The order is `title_languages`, default `["fr", "en"]`, with the original title as the fallback.
 - **Which reading direction?** Right to left for MangaDex, AniList, and MyAnimeList. Left to right for Comic Vine. The form can change it before save.
-- **What happens when ComicInfo already exists?** The match loads the form. Disk changes only on save. Save writes the form fields and keeps every other XML element.
+- **What happens when ComicInfo already exists?** The match loads the form. Disk changes only on save. A single-volume save writes the form fields and keeps every other XML element. A multi-volume save writes only the shared series fields.
 - **What happens to `.cbr`?** Convert to `.cbz` on save or explicit convert. Delete the `.cbr` after a verified write unless `keep_cbr_original` is true.
 - **Which files are scanned?** `.cbz` and `.cbr` only, recursively inside each library root. Symlinks that leave the root are ignored.
 - **Where does the search text come from?** Existing `Series`, or the filename without its extension when `Series` is empty.

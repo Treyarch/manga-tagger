@@ -1,0 +1,8 @@
+# Local library and reference archives. Synthetic fixtures under tests/fixtures/ stay tracked.
+*.cbz
+*.cbr
+!tests/fixtures/**/*.cbz
+!tests/fixtures/**/*.cbr
+
+# Reference series folder, including poster images.
+src/Claymore/
