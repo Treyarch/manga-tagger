@@ -1,6 +1,6 @@
 # Project overview
 
-Manga Tagger is a Linux-first desktop app for tagging a personal manga library in place. It edits `ComicInfo.xml` inside each archive, fills that metadata from public catalog sites, and previews pages without unpacking the book. Other readers and servers pick the files up from disk afterward.
+Manga Tagger is a Linux-first desktop app whose only job is to organize and tag a personal manga library. It edits `ComicInfo.xml` inside each archive, renames files from those tags, and fills metadata from public catalog sites. It does not read the books. Reading happens in the Jellyfin Bookshelf plugin, which opens `.cbz` and `.cbr` files the way other comic readers do and uses `ComicInfo.xml` for the series. The app writes those files on disk and does not call Jellyfin.
 
 This file is the project guideline. It has no YAML frontmatter, as required by [docs/README.md](README.md). It does not by itself authorize implementation. Feature work starts from the planned specifications listed below, and those specifications must follow this document.
 
@@ -8,7 +8,7 @@ This file is the project guideline. It has no YAML frontmatter, as required by [
 
 The app replaces the day-to-day tagging flow of ComicTagger for a library of a few hundred volumes. ComicTagger is built around a blocking identify dialog and around Comic Vine, and it spends too much time opening archives for what should be a metadata edit. Manga Tagger is manga-first, writes only what changed, and keeps the window responsive.
 
-The library lives as `.cbz` and `.cbr` files in folders the user chooses. The app does not become the reader, and it does not talk to Komga, Kavita, or any other server.
+The library lives as `.cbz` and `.cbr` files in folders the user chooses. Organizing a series means those archives carry consistent tags, names, and cover posters so Bookshelf can group them. The app is not a reader: a cover or a page is shown only to check the volume being tagged. It does not talk to Jellyfin, Komga, Kavita, or any other server.
 
 ## Product bar
 
@@ -45,7 +45,7 @@ Version 1 does three jobs:
 
 1. **ComicInfo.** Read and edit `ComicInfo.xml` inside an archive, and rename that archive in place from those tags. Preserve XML elements the app does not edit.
 2. **Scrape.** Search MangaDex, AniList, MyAnimeList (through Jikan), and Comic Vine. An accepted match loads the form. Save is what writes the archive.
-3. **Preview.** Show the cover and individual pages by reading those entries from the archive.
+3. **Check a page.** Show the cover and individual pages while tagging, by reading those entries from the archive. This is a check of the file, not a reading mode.
 
 Each archive is one tankōbon. The volume number is stored in ComicInfo `Number`. `Volume` is not filled automatically.
 
@@ -61,8 +61,8 @@ Saving metadata for a `.cbr`, or an explicit convert action, produces a `.cbz` b
 
 ## Out of scope
 
-- A reading mode. Preview exists to check tags and page order.
-- Clients for Komga, Kavita, or similar servers.
+- Reading manga or comics. Bookshelf is the reader. A cover or a page in this app exists only to check tags and page order.
+- A Jellyfin client, and clients for Komga, Kavita, or any other server. Bookshelf reads the files from disk.
 - Writing RAR, or any workflow that keeps the canonical file as `.cbr` after a successful convert.
 - Moving volumes into a series/volume folder layout. Renaming a file in place is in scope.
 - Loose page-image folders, PDF, and archives other than `.cbz` and `.cbr`.
@@ -180,4 +180,6 @@ All resolved. Recorded here so they are not re-opened in feature specs.
 - **Which files are scanned?** `.cbz` and `.cbr` only, recursively inside each library root. Symlinks that leave the root are ignored.
 - **Where does the search text come from?** Existing `Series`, or the filename without its extension when `Series` is empty.
 - **How big is the library?** A few hundred volumes. The performance rules still forbid work that grows with the whole archive when only metadata or one page is needed.
-- **Does the app own the library?** No. It updates files on disk. Readers and servers are out of scope.
+- **What is the app for?** Organize and tag series. It does not read them.
+- **Who reads the files?** The Jellyfin Bookshelf plugin. It reads `.cbz` and `.cbr` like other comic readers and uses `ComicInfo.xml`. The app only prepares the files on disk and does not call Jellyfin.
+- **Does the app own the library?** No. It updates files on disk. Reading, and any server client, are out of scope.
