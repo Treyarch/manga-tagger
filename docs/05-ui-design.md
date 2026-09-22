@@ -45,7 +45,7 @@ The window fills the webview. It does not sit in a centered page column. The hea
 | Main pane | Remaining width | View background |
 | Inspector | 384px (`w-96`) | View background, hairline along its left edge |
 
-The sidebar lists library places. A row is an icon and a label, 36px tall. The selected place uses the selection wash.
+The sidebar lists library places. The first row is 36px: muted caption text `Places` on the leading edge, and a quiet icon button at the trailing edge, Lucide `FolderPlus`, accessible name `Add folder`. A place row is an icon and a label, 36px tall. The selected place uses the selection wash. Dragging a folder over the sidebar uses that same wash on the sidebar. When there are no places, one muted line under the button reads `Drop a folder here.` A failed add shows one line under the button. The main pane still says `No volumes yet.`
 
 The main pane lists volumes. List is the default. Grid shows covers only. The switch is session state. It is not a configuration key. Switching back to list restores the list, and switching to grid restores the grid, for as long as the window is open.
 
@@ -104,7 +104,7 @@ Dark mode is the `dark` class on an ancestor. Components use `dark:` variants fo
 | `system` | `false` | `false` |
 | any other string | either | same as `system` |
 
-The shell reads `theme` before the first paint and puts `dark` on `document.documentElement` when `resolveDark` is true. It removes that class when `resolveDark` is false. The first frame uses the resolved theme.
+The shell reads `theme` before the first paint and puts `dark` on `document.documentElement` when `resolveDark` is true. It removes that class when `resolveDark` is false. The first frame uses the resolved theme. When `dark` is present, the document sets `color-scheme: dark` so native controls such as the provider `<select>` popup use the dark system palette. Without `dark`, it sets `color-scheme: light`.
 
 The header bar has a quiet icon button that opens the menu with three choices: System, Light, and Dark. The icons are Lucide `Monitor`, `Sun`, and `Moon`. The current choice shows a check. Choosing one updates `theme` and applies the class immediately.
 
@@ -157,7 +157,7 @@ The header icon button is `quiet`, 32px square (`size-8`), with a 20px icon. The
 
 ### Select
 
-`Select.svelte`. Same height, radius, border, and background as the text input. It is a native `<select>`.
+`Select.svelte`. Same height, radius, border, and background as the text input. It is a native `<select>`. Its open list follows the document `color-scheme`, so it is dark when the window is dark.
 
 ### Menu
 
@@ -195,11 +195,12 @@ Cover at least:
 
 - The window is a header bar, a 240px places sidebar, a flexible main pane, and a 384px inspector, separated by hairlines. The header does not scroll away.
 - List is the view when the window opens. Rows are 36px. A list row shows the filename, and the series in muted text when it is set. Grid cells show a 2:3 cover, the filename as a truncated label, and a 2px accent ring when selected. List selection is the accent wash on the row.
-- An empty main pane shows the sentence `No volumes yet.` and no illustration.
-- Light and dark use the color table in this document. Dark mode is the `dark` class. The layout does not change between themes.
+- An empty main pane shows the sentence `No volumes yet.` and no illustration. An empty sidebar shows `Drop a folder here.` under the Add folder button.
+- The first sidebar row is the muted caption `Places`, then Add folder, Lucide `FolderPlus`, 16px, trailing in a 36px row. A drag over the sidebar uses the selection wash.
+- Light and dark use the color table in this document. Dark mode is the `dark` class. The layout does not change between themes. With `dark`, native selects use a dark popup through `color-scheme: dark`.
 - `theme` defaults to `system`. `light` and `dark` force that theme. Any other value follows the system. The header menu can set each of the three values, and the class updates immediately. `system` keeps following `prefers-color-scheme`.
 - The resolved theme is applied before the first paint.
-- Icons are Lucide, `currentColor`, 16px in rows and menu items and 20px in the header. The view switch is `List` and `LayoutGrid`. The theme menu is `Monitor`, `Sun`, and `Moon`.
+- Icons are Lucide, `currentColor`, 16px in rows and menu items and 20px in the header. The view switch is `List` and `LayoutGrid`. The theme menu is `Monitor`, `Sun`, and `Moon`. Add folder is `FolderPlus`. Close is `X` at the trailing edge of the header.
 - Buttons, text inputs, textareas, checkboxes, selects, menus, and dialogs are the local components in this document, styled with Tailwind utilities. The UI package does not depend on a third-party component kit.
 - Type is the default sans stack at `text-sm` for controls and rows, and `text-xs` for captions.
 - A keyboard focus ring is visible on the shared controls.

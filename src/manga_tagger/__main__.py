@@ -6,7 +6,7 @@ from pathlib import Path
 
 from manga_tagger.api import create_app, enqueue_startup_scan, serve
 from manga_tagger.config import ConfigError, app_paths, load_config
-from manga_tagger.window import open_window
+from manga_tagger.window import destroy_window, open_window, pick_folder
 
 
 def main() -> None:
@@ -18,7 +18,14 @@ def main() -> None:
         sys.stderr.write(f"{exc}\n")
         raise SystemExit(1) from exc
     ui_dir = Path(__file__).resolve().parents[2] / "ui" / "dist"
-    app = create_app(config, paths.index, paths.thumbnails, ui_dir=ui_dir)
+    app = create_app(
+        config,
+        paths.index,
+        paths.thumbnails,
+        ui_dir=ui_dir,
+        pick_folder=pick_folder,
+        destroy_window=destroy_window,
+    )
     port, close = serve(app)
     try:
         enqueue_startup_scan(app)

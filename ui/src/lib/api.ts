@@ -19,11 +19,16 @@ export type Config = {
 };
 
 async function parse<T>(response: Response): Promise<T> {
-  if (response.ok) return (await response.json()) as T;
+  if (response.ok) {
+    if (response.status === 204) return undefined as T;
+    const text = await response.text();
+    if (text === "") return undefined as T;
+    return JSON.parse(text) as T;
+  }
   let error_type = "Error";
   let error_message = response.statusText;
   try {
-    const body = (await response.json()) as {
+    const body = JSON.parse(await response.text()) as {
       error_type?: string;
       error_message?: string;
     };

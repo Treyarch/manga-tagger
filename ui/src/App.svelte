@@ -3,6 +3,7 @@
   import {
     FileArchive,
     Folder,
+    FolderPlus,
     LayoutGrid,
     List,
     Monitor,
@@ -37,6 +38,7 @@
     entriesOf,
     entryErrorLines,
     filenameStem,
+    folderDropRequest,
     filterVolumes,
     formFromVolumes,
     formIsDirty,
@@ -79,6 +81,8 @@
   let candidates = $state<Candidate[]>([]);
   let noMatches = $state(false);
   let inspectorLines = $state<string[]>([]);
+  let folderError = $state("");
+  let dragDepth = $state(0);
   let pageIndex = $state<number | null>(null);
   let pageAnchor = $state("");
   let themeOpen = $state(false);
@@ -419,6 +423,41 @@
     return selection.paths.includes(path);
   }
 
+  async function addRoots(paths: string[]) {
+    if (paths.length === 0) {
+      folderError = "Drop a folder.";
+      return;
+    }
+    try {
+      const result = await postJson<{
+        config: Config;
+        added: string[];
+        job: Job | null;
+      }>("/api/library/roots", { paths });
+      config = result.config;
+      folderError = result.added.length === 0 ? "Drop a folder." : "";
+      if (result.job) watch(result.job);
+    } catch (exc) {
+      folderError = exc instanceof Error ? exc.message : "Could not add that folder.";
+    }
+  }
+
+  async function addFolder() {
+    folderError = "";
+    try {
+      const chosen = await postJson<{ path: string | null }>("/api/dialogs/folder");
+      if (!chosen.path) return;
+      await addRoots([chosen.path]);
+    } catch (exc) {
+      folderError = exc instanceof Error ? exc.message : "Could not add that folder.";
+    }
+  }
+
+  function onFoldersDropped(event: Event) {
+    const detail = event instanceof CustomEvent ? event.detail : null;
+    void addRoots(folderDropRequest(detail).paths);
+  }
+
   onMount(() => {
     void loadShelf();
     void poll();
@@ -429,9 +468,11 @@
       themeOpen = false;
     };
     window.addEventListener("click", closeTheme);
+    window.addEventListener("folders-dropped", onFoldersDropped);
     return () => {
       clearInterval(timer);
       window.removeEventListener("click", closeTheme);
+      window.removeEventListener("folders-dropped", onFoldersDropped);
     };
   });
 
@@ -545,9 +586,51 @@
     <Button icon label="Settings" onclick={() => (settingsOpen = true)}>
       <Settings size={20} />
     </Button>
+    <Button
+      icon
+      label="Close"
+      onclick={() => {
+        void postJson("/api/window/close").catch(() => undefined);
+      }}
+    >
+      <X size={20} />
+    </Button>
   </header>
   <div class="flex min-h-0 flex-1">
-    <nav class="w-60 shrink-0 overflow-y-auto bg-zinc-100 dark:bg-zinc-950">
+    <nav
+      id="places"
+      class="w-60 shrink-0 overflow-y-auto {dragDepth > 0
+        ? 'bg-blue-600/10 dark:bg-blue-500/15'
+        : 'bg-zinc-100 dark:bg-zinc-950'}"
+      ondragenter={(event) => {
+        event.preventDefault();
+        dragDepth += 1;
+      }}
+      ondragover={(event) => {
+        event.preventDefault();
+      }}
+      ondragleave={() => {
+        dragDepth = Math.max(0, dragDepth - 1);
+      }}
+      ondrop={(event) => {
+        event.preventDefault();
+        dragDepth = 0;
+      }}
+    >
+      <div class="flex h-9 items-center gap-1 px-2">
+        <span class="min-w-0 flex-1 truncate text-xs text-zinc-500 dark:text-zinc-400"
+          >Places</span
+        >
+        <Button icon label="Add folder" onclick={() => void addFolder()}>
+          <FolderPlus size={16} />
+        </Button>
+      </div>
+      {#if folderError}
+        <p class="px-2 pb-1 text-xs text-zinc-900 dark:text-zinc-100">{folderError}</p>
+      {/if}
+      {#if places.length === 0}
+        <p class="px-2 text-xs text-zinc-500 dark:text-zinc-400">Drop a folder here.</p>
+      {/if}
       {#each places as place (place.path)}
         <button
           type="button"
@@ -651,8 +734,16 @@
     {config}
     onClose={() => (settingsOpen = false)}
     onSaved={(next) => {
+      const rootsChanged =
+        next.library_roots.length !== config.library_roots.length ||
+        next.library_roots.some((root, index) => root !== config.library_roots[index]);
       config = next;
       settingsOpen = false;
+      if (rootsChanged) {
+        void getJson<Job | null>("/api/jobs/current").then((current) => {
+          if (current) watch(current);
+        });
+      }
     }}
   />
 {/if}

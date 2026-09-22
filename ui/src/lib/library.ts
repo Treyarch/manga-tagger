@@ -388,6 +388,17 @@ export function isAbsolutePath(value: string): boolean {
   return /^[A-Za-z]:[\\/]/.test(value);
 }
 
+export function folderDropRequest(detail: unknown): { paths: string[] } {
+  if (typeof detail !== "object" || detail === null || !("paths" in detail)) {
+    return { paths: [] };
+  }
+  const paths = (detail as { paths: unknown }).paths;
+  if (!Array.isArray(paths)) return { paths: [] };
+  return {
+    paths: paths.filter((path): path is string => typeof path === "string" && path !== ""),
+  };
+}
+
 export function parseRootLines(text: string): { roots: string[]; error: string | null } {
   const roots = text
     .split(/\r?\n/)

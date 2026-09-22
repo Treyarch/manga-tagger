@@ -17,6 +17,7 @@ from manga_tagger.api.models import (
     ConfigModel,
     ConfigPut,
     ConvertRequest,
+    FolderDialogModel,
     JobModel,
     LibraryResponse,
     LoadRequest,
@@ -24,6 +25,8 @@ from manga_tagger.api.models import (
     RenamePreviewEntry,
     RenamePreviewResponse,
     RenameRequest,
+    RootsRequest,
+    RootsResponse,
     SaveRequest,
     SearchRequest,
     VolumeModel,
@@ -50,6 +53,7 @@ from manga_tagger.providers import build_query, load, parse_number, search
 from manga_tagger.shell import (
     NoThumbnailError,
     ShellError,
+    accept_root_paths,
     default_client,
     ensure_inside,
     load_library,
@@ -65,6 +69,14 @@ from manga_tagger.shell import (
     thumbnail_bytes,
     validate_save,
 )
+
+
+class DialogUnavailableError(Exception):
+    """This process has no folder dialog."""
+
+
+class WindowUnavailableError(Exception):
+    """This process cannot close the desktop window."""
 
 
 @dataclass
@@ -100,6 +112,8 @@ class AppState:
     ui_dir: Path | None
     runner: JobRunner
     services: Services
+    pick_folder: Callable[[], str | None] | None = None
+    destroy_window: Callable[[], None] | None = None
 
 
 def default_services() -> Services:
@@ -132,6 +146,8 @@ def create_app(
     ui_dir: Path | None = None,
     runner: JobRunner | None = None,
     services: Services | None = None,
+    pick_folder: Callable[[], str | None] | None = None,
+    destroy_window: Callable[[], None] | None = None,
 ) -> FastAPI:
     """Build the local API.
 
@@ -143,6 +159,8 @@ def create_app(
         runner: Background jobs. The default is one worker thread.
         services: Callables the routes hand to the shell. Omitted services are
             the real archive, index, and provider operations.
+        pick_folder: Native folder dialog. Omitted, the dialog route is 503.
+        destroy_window: Closes the desktop window. Omitted, close is 503.
 
     Returns:
         The FastAPI app. Routes do not open archives, query SQLite, or call
@@ -156,6 +174,8 @@ def create_app(
         ui_dir=None if ui_dir is None else Path(ui_dir),
         runner=runner if runner is not None else JobRunner(),
         services=services if services is not None else default_services(),
+        pick_folder=pick_folder,
+        destroy_window=destroy_window,
     )
     app.state.box = state
     _register_errors(app)
@@ -241,6 +261,8 @@ def _register_errors(app: FastAPI) -> None:
         (NoThumbnailError, 404),
         (JobNotFoundError, 404),
         (JobBusyError, 409),
+        (DialogUnavailableError, 503),
+        (WindowUnavailableError, 503),
     ):
         app.add_exception_handler(exception_type, error(status))
 
@@ -303,6 +325,46 @@ def _register_routes(app: FastAPI) -> None:
         if "library_roots" in updates:
             _start_scan(state)
         return ConfigModel(**updated.to_dict())
+
+    @app.post("/api/dialogs/folder", response_model=FolderDialogModel)
+    def post_folder_dialog() -> FolderDialogModel:
+        state = _state(app)
+        if state.pick_folder is None:
+            raise DialogUnavailableError("Folder dialog is unavailable.")
+        chosen = state.pick_folder()
+        if not chosen:
+            return FolderDialogModel(path=None)
+        return FolderDialogModel(path=chosen)
+
+    @app.post("/api/window/close", status_code=204)
+    def post_window_close() -> Response:
+        state = _state(app)
+        if state.destroy_window is None:
+            raise WindowUnavailableError("Window close is unavailable.")
+        state.destroy_window()
+        return Response(status_code=204)
+
+    @app.post("/api/library/roots", response_model=RootsResponse)
+    def post_library_roots(body: RootsRequest) -> RootsResponse:
+        state = _state(app)
+        if not isinstance(body.paths, list):
+            raise ConfigError("paths must be a list")
+        roots, added = accept_root_paths(state.config.library_roots, body.paths)
+        if added and state.runner.current() is not None:
+            raise JobBusyError("a job is already queued or running")
+        job = None
+        if added:
+            updated = apply_put(state.config, {"library_roots": roots})
+            save_config(state.config.path, updated)
+            state.config = updated
+            job = JobModel.from_job(_start_scan(state))
+        else:
+            updated = state.config
+        return RootsResponse(
+            config=ConfigModel(**updated.to_dict()),
+            added=added,
+            job=job,
+        )
 
     @app.post("/api/jobs/scan", response_model=JobModel)
     def post_scan() -> JobModel:

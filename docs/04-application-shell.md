@@ -21,7 +21,7 @@ Archive bytes and ComicInfo stay in [01-archives-and-comicinfo.md](01-archives-a
 | `src/manga_tagger/api/` | FastAPI app, Pydantic models, and HTTP errors. Routers validate input, call `shell` or `jobs`, and return models. They do not open archives, query SQLite, or call catalogs |
 | `src/manga_tagger/window.py` | The only module that imports pywebview |
 | `src/manga_tagger/__main__.py` | Load config, bind the server, enqueue the startup scan, open the window, then shut down |
-| `ui/` | The client. `fetch` on the API origin. No pywebview JavaScript bridge |
+| `ui/` | The client. `fetch` on the API origin. It does not call a pywebview JavaScript API |
 
 `config.py`, `shell.py`, `jobs.py`, and `api/` do not import pywebview. Tests do not import `window.py` or `__main__.py`.
 
@@ -144,7 +144,7 @@ Header text for a `queued` or `running` job is `Scan`, `Search`, `Load`, `Save`,
 
 `serve(app)` binds `127.0.0.1` and port `0`, so the port is chosen by the operating system. The host is not configurable. `serve` returns the chosen port and a `close()` that stops the server. The UI origin is `http://127.0.0.1:{port}/`.
 
-`create_app` takes the in-memory config, the index path, the thumbnail directory, the UI directory or null, an optional runner, and optional service callables. Omitted services are the archive, index, and provider operations this document names. The default runner is one worker thread.
+`create_app` takes the in-memory config, the index path, the thumbnail directory, the UI directory or null, an optional runner, optional service callables, an optional `pick_folder`, and an optional `destroy_window`. Omitted services are the archive, index, and provider operations this document names. The default runner is one worker thread. An omitted `pick_folder` makes `POST /api/dialogs/folder` return 503. An omitted `destroy_window` makes `POST /api/window/close` return 503.
 
 JSON errors are `{ "error_type", "error_message" }`. Expected client errors are HTTP 400, including an archive exception raised by `GET /api/page` or `GET /api/thumbnail`. An unknown job id is HTTP 404. A thumbnail that `thumbnail_for` does not create is HTTP 404 with `error_type` `NoThumbnailError`.
 
@@ -157,6 +157,9 @@ Archive, page, thumbnail, save, rename, and convert paths must be absolute. A re
 | `GET /api/thumbnail?path=` | The cached cover JPEG, building it on demand through `thumbnail_for` |
 | `GET /api/config` | The five known keys |
 | `PUT /api/config` | A partial object of those keys. Returns the full config. Roots in the body enqueue a scan after a successful write |
+| `POST /api/dialogs/folder` | Calls the injected `pick_folder`. Returns `{ "path" }` or `{ "path": null }` when the dialog is cancelled. No picker is HTTP 503 |
+| `POST /api/window/close` | Calls the injected `destroy_window`. Returns an empty 204. No closer is HTTP 503 |
+| `POST /api/library/roots` | Body `{ "paths": [...] }`. Appends existing directories that are not already roots. Returns the full config, `added`, and the scan `job` when a root was added |
 | `POST /api/jobs/scan` | Enqueues `scan` |
 | `POST /api/jobs/search` | Body `{ "provider", "series", "filename_stem" }` |
 | `POST /api/jobs/load` | Body `{ "provider", "match_id", "filename_stem", "mode", "form" }` |
@@ -237,11 +240,15 @@ When the result names a skipped root, the inspector shows `{path} was skipped.` 
 
 ## Header and settings
 
-Leading to trailing, the header contains: the filter field, the provider select, Scrape (`ScanSearch`), Save (`Save`), Rename (`Pencil`), Convert (`FileArchive`), Rescan (`RefreshCw`), the list and grid switch, the job name and Cancel (`X`) while a job is queued or running, the theme menu, and Settings (`Settings`). The filter field, view switch, and theme menu are the controls in the UI specification. The controls this specification adds are quiet header icon buttons with those accessible names, except the provider select, which is the select component.
+Leading to trailing, the header contains: the filter field, the provider select, Scrape (`ScanSearch`), Save (`Save`), Rename (`Pencil`), Convert (`FileArchive`), Rescan (`RefreshCw`), the list and grid switch, the job name and Cancel (`X`) while a job is queued or running, the theme menu, Settings (`Settings`), and Close (`X`). The filter field, view switch, and theme menu are the controls in the UI specification. The controls this specification adds are quiet header icon buttons with those accessible names, except the provider select, which is the select component. Close sits at the trailing edge. It calls `POST /api/window/close`, which destroys the pywebview window. That ends the process the same way the window chrome close does. No closer returns 503.
 
 Choosing a theme calls `PUT /api/config` with that `theme` value. On success the class updates from the UI specification's `resolveDark`. That change does not rescan. A failed write leaves the previous theme in memory and does not change the class.
 
 A place row uses Lucide `Folder`.
+
+The first sidebar row is Add folder. It calls `POST /api/dialogs/folder`. A cancelled dialog does nothing. A returned path is sent to `POST /api/library/roots`. That route calls `accept_root_paths`. Relative paths, files, and paths that are not directories are dropped. A directory already in `library_roots` is not added again. The current roots stay. When `added` is non-empty, the route writes `library_roots` and enqueues one scan. When `added` is empty, it does not write and does not enqueue. A job that is queued or running makes a request that would add a root return 409 `JobBusyError` and write nothing. The client stores the returned config. When `added` is non-empty, the response includes the scan job and the client watches it the same way a Rescan does, so the shelf refreshes when the scan finishes. When `added` is empty, `job` is null. A path that was not a directory shows `Drop a folder.` A 409 or 503 shows `error_message` under the button.
+
+Dropping a folder on the sidebar does not call into Python from the client. `window.py` reads the native drop on `#places` and dispatches a `folders-dropped` window event whose `detail.paths` are absolute paths. The client posts those paths to `POST /api/library/roots`.
 
 Settings is a dialog. It edits library roots, one absolute path per line, the Comic Vine key, `keep_cbr_original` as a checkbox labeled `Keep the original CBR`, and `title_languages` as comma-separated codes in order. It does not edit `theme`. Dismiss writes nothing. Save drops blank root lines. If a non-blank root line is not absolute, the dialog does not send the request and shows `Paths must be absolute.` A successful save calls `PUT /api/config`.
 
@@ -255,7 +262,7 @@ Per-file errors and provider errors are listed at the top of the inspector, abov
 | `ShellError` | A relative archive path, a bad page index, or a `one` save whose path count is not 1. Nothing is read or written |
 | `OutsideLibraryError` | A resolved path is outside every current library root. Nothing is read or written |
 | `JobNotFoundError` | `GET` or cancel names an id this process did not start |
-| `JobBusyError` | `start` while a job is `queued` or `running`, including a `PUT` that would enqueue a scan. Nothing is enqueued |
+| `JobBusyError` | `start` while a job is `queued` or `running`, including a `PUT` that would enqueue a scan and a `POST /api/library/roots` that would add a root. Nothing is enqueued |
 | `JobCancelled` | The job saw cancel before the next file, poster, or provider request. Partial entries stay on the job |
 | `NoThumbnailError` | `thumbnail_for` returns no path |
 | `BatchFieldError` | A save patch contains a key the mode does not allow. Nothing is written |
@@ -292,6 +299,7 @@ Cover at least:
 - A rename preview calls `plan_rename` and does not call `rename_in_directory`. A rename job calls `rename_in_directory` on the place and calls `write_poster` on each success path. A convert job skips a `.cbz` and calls `convert_cbr` for a `.cbr`. It does not call `write_poster`.
 - `serve` binds `127.0.0.1`, returns a non-zero port, and `close()` stops it. A missing UI directory makes `GET /` return the plain sentence `UI build is missing.` and leaves `GET /api/library` working.
 - Cancel of a queued job does not call its function. `start` while a job is `queued` or `running` raises `JobBusyError` and does not call the new function. The inline runner does not sleep. A running save reports `completed` and `total`.
+- `accept_root_paths` keeps a directory, ignores a file and a relative path, and does not duplicate a root. `POST /api/dialogs/folder` returns the injected path, and null when the picker cancels. With no picker the route is 503. `POST /api/library/roots` writes a new directory and enqueues one scan. The same route while a job is queued returns 409 and does not write. `POST /api/window/close` calls the injected destroyer and returns 204. With no destroyer the route is 503.
 
 ## Acceptance criteria
 
@@ -304,13 +312,14 @@ Cover at least:
 - Rename shows the planned names, then runs on the selected place with the offered template `{Series} v{Number:02}`, then `write_poster` on each success. Convert asks before deleting `.cbr` files, turns selected `.cbr` files into `.cbz`, and skips `.cbz`. A path outside the library is rejected before any read or write.
 - Scrapes, saves, converts, and rescans are jobs on one worker. A new job is refused while one is queued or running. The header shows `completed/total`. The user can cancel that job. A finished scan names a skipped or incomplete root in the inspector. Closing the window asks the worker to stop and does not leave a truncated archive from this process killing a write.
 - The startup scan is enqueued only after the server is bound, and only when `library_roots` is non-empty. The first library response does not wait for it.
+- Add folder asks for one directory and appends it to `library_roots`, then scans. A drop on the sidebar does the same. Existing roots stay. Settings can still replace the list.
 
 ## Open questions
 
 All resolved. Recorded here so they are not re-opened.
 
 - **What is a place?** The directory that directly contains indexed volumes. The sidebar lists those folders. A library root is a place only when a volume sits directly in it. Rename applies to the selected place.
-- **How does the window call the API?** `fetch` on the API origin. There is no pywebview JavaScript bridge.
+- **How does the window call the API?** `fetch` on the API origin. The client does not call a pywebview JavaScript API. `window.py` may dispatch `folders-dropped` after a native drop. The client posts those paths with `fetch`.
 - **How does the UI hear about background work?** It polls the job every 500 milliseconds. A second job is refused while one is queued or running. Tests use an inline runner and do not sleep.
 - **Where is the page preview?** The inspector image is one page of the anchor volume. Thumbnails are a separate request.
 - **What does the header search field do?** It filters the selected place by series, title, or filename. The provider select and Scrape are a different action.

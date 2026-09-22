@@ -90,6 +90,50 @@ class Selection:
     anchor: str | None
 
 
+def accept_root_paths(
+    current: Sequence[str], candidates: Sequence[object]
+) -> tuple[list[str], list[str]]:
+    """Append existing directories that are not already roots.
+
+    Relative paths, files, non-strings, and duplicates are dropped. Current
+    roots stay, including a root that is not a directory. Added paths are
+    ``resolve`` results, the same form config stores.
+
+    Args:
+        current: Roots already saved.
+        candidates: Paths from the folder dialog or a drop.
+
+    Returns:
+        The full root list, then the paths that were added.
+    """
+    kept: list[str] = []
+    seen: set[str] = set()
+    for item in current:
+        path = Path(item)
+        if not path.is_absolute():
+            continue
+        resolved = str(path.resolve())
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        kept.append(resolved)
+    added: list[str] = []
+    for item in candidates:
+        if not isinstance(item, str):
+            continue
+        path = Path(item)
+        if not path.is_absolute():
+            continue
+        resolved = path.resolve()
+        key = str(resolved)
+        if key in seen or not resolved.is_dir():
+            continue
+        seen.add(key)
+        kept.append(key)
+        added.append(key)
+    return kept, added
+
+
 def volumes_for_roots(rows: Sequence[object], roots: Sequence[str]) -> list[object]:
     """Keep rows whose path is a root or a file inside a root.
 

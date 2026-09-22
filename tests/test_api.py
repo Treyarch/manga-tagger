@@ -155,6 +155,107 @@ def test_config_put_keeps_unknown_keys_and_rejects_a_busy_rescan(
     assert scans == []
 
 
+def test_folder_dialog_and_root_append(tmp_path: Path) -> None:
+    folder = tmp_path / "Claymore"
+    folder.mkdir()
+    note = tmp_path / "note.txt"
+    note.write_text("x", encoding="utf-8")
+    scans: list[object] = []
+    chosen: dict[str, str | None] = {"path": str(folder)}
+
+    def pick() -> str | None:
+        return chosen["path"]
+
+    path = tmp_path / "config.toml"
+    app = create_app(
+        load_config(path),
+        tmp_path / "index.db",
+        tmp_path / "covers",
+        runner=JobRunner(inline=True),
+        services=replace(default_services(), scan=_scan_recorder(scans)),
+        pick_folder=pick,
+    )
+    with TestClient(app) as client:
+        picked = client.post("/api/dialogs/folder")
+        assert picked.status_code == 200
+        assert picked.json()["path"] == str(folder)
+        chosen["path"] = None
+        cancelled = client.post("/api/dialogs/folder")
+        assert cancelled.json()["path"] is None
+        bad = client.post("/api/library/roots", json={"paths": str(folder)})
+        assert bad.status_code == 400
+        assert bad.json()["error_type"] == "ConfigError"
+        added = client.post(
+            "/api/library/roots",
+            json={"paths": [str(folder), str(note), "relative", str(folder)]},
+        )
+        assert added.status_code == 200
+        body = added.json()
+        resolved = str(folder.resolve())
+        assert body["added"] == [resolved]
+        assert body["config"]["library_roots"] == [resolved]
+        assert body["job"] is not None
+        assert body["job"]["name"] == "Scan"
+        skipped = client.post("/api/library/roots", json={"paths": [str(note)]})
+        assert skipped.json()["added"] == []
+        assert skipped.json()["job"] is None
+    assert scans == ["scan"]
+    assert resolved in path.read_text(encoding="utf-8")
+
+    bare = create_app(
+        load_config(tmp_path / "bare.toml"),
+        tmp_path / "bare.db",
+        tmp_path / "bare-covers",
+        runner=JobRunner(inline=True),
+        services=replace(default_services(), scan=_scan_recorder([])),
+    )
+    with TestClient(bare) as client:
+        unavailable = client.post("/api/dialogs/folder")
+        assert unavailable.status_code == 503
+        assert unavailable.json()["error_type"] == "DialogUnavailableError"
+        closed = client.post("/api/window/close")
+        assert closed.status_code == 503
+        assert closed.json()["error_type"] == "WindowUnavailableError"
+
+    closed_calls: list[str] = []
+    with_close = create_app(
+        load_config(tmp_path / "close.toml"),
+        tmp_path / "close.db",
+        tmp_path / "close-covers",
+        runner=JobRunner(inline=True),
+        services=replace(default_services(), scan=_scan_recorder([])),
+        destroy_window=lambda: closed_calls.append("close"),
+    )
+    with TestClient(with_close) as client:
+        done = client.post("/api/window/close")
+        assert done.status_code == 204
+        assert done.content == b""
+    assert closed_calls == ["close"]
+
+    other = tmp_path / "Other"
+    other.mkdir()
+    busy_path = tmp_path / "busy.toml"
+    held = JobRunner(hold=True)
+    busy = create_app(
+        load_config(busy_path),
+        tmp_path / "busy.db",
+        tmp_path / "busy-covers",
+        runner=held,
+        services=replace(default_services(), scan=_scan_recorder([])),
+        pick_folder=pick,
+    )
+    with TestClient(busy) as client:
+        started = client.post("/api/jobs/scan")
+        assert started.status_code == 200
+        refused = client.post("/api/library/roots", json={"paths": [str(other)]})
+        assert refused.status_code == 409
+        assert refused.json()["error_type"] == "JobBusyError"
+    held.shutdown()
+    assert not busy_path.exists() or str(other.resolve()) not in busy_path.read_text(
+        encoding="utf-8"
+    )
+
+
 def test_save_title_on_many_is_rejected(tmp_path: Path) -> None:
     calls: list[str] = []
 

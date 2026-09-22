@@ -14,6 +14,7 @@ from manga_tagger.providers import parse_number
 from manga_tagger.shell import (
     FORM_FIELDS,
     SHARED_FIELDS,
+    accept_root_paths,
     default_client,
     edit_field,
     filter_volumes,
@@ -46,6 +47,24 @@ def test_imports_do_not_load_webview() -> None:
 
     assert manga_tagger.api and manga_tagger.config
     assert "webview" not in sys.modules
+
+
+def test_accept_root_paths_keeps_a_directory(tmp_path: Path) -> None:
+    folder = tmp_path / "Claymore"
+    folder.mkdir()
+    note = tmp_path / "note.txt"
+    note.write_text("x", encoding="utf-8")
+    current = "/already"
+    roots, added = accept_root_paths(
+        [current],
+        [str(folder), str(note), "relative", str(folder), 3],
+    )
+    resolved = str(folder.resolve())
+    assert added == [resolved]
+    assert roots == [current, resolved]
+    again, extra = accept_root_paths(roots, [str(folder)])
+    assert extra == []
+    assert again == roots
 
 
 def test_places_filter_and_selection() -> None:

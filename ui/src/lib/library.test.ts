@@ -10,6 +10,7 @@ import {
   formFromVolumes,
   initialPageIndex,
   jobLabel,
+  folderDropRequest,
   parseRootLines,
   placeAfterLibrary,
   renamePlanLines,
@@ -185,6 +186,14 @@ describe("jobs and dialogs", () => {
       new Set(["/books/a-new.cbz"]),
     );
     expect(next).toEqual({ paths: ["/books/a-new.cbz"], anchor: "/books/a-new.cbz" });
+  });
+
+  it("turns a folder drop into a roots request", () => {
+    expect(folderDropRequest({ paths: ["/books", "", 3, "/other"] })).toEqual({
+      paths: ["/books", "/other"],
+    });
+    expect(folderDropRequest(null)).toEqual({ paths: [] });
+    expect(folderDropRequest({ paths: "nope" })).toEqual({ paths: [] });
   });
 
   it("rejects a relative settings root and keeps absolute ones", () => {

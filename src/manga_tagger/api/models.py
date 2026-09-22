@@ -151,6 +151,20 @@ class ConvertRequest(BaseModel):
     paths: list[str]
 
 
+class FolderDialogModel(BaseModel):
+    """The directory from the native folder dialog. ``path`` is null on cancel."""
+
+    path: str | None
+
+
+class RootsRequest(BaseModel):
+    """Body for ``POST /api/library/roots``. ``paths`` is checked in the route."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    paths: Any = None
+
+
 class JobModel(BaseModel):
     """One background job."""
 
@@ -175,3 +189,14 @@ class JobModel(BaseModel):
             completed=job.completed,
             total=job.total,
         )
+
+
+class RootsResponse(BaseModel):
+    """The config after an append, plus the directories that were new.
+
+    ``job`` is the enqueued scan when ``added`` is non-empty, otherwise null.
+    """
+
+    config: ConfigModel
+    added: list[str]
+    job: JobModel | None = None
