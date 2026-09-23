@@ -41,7 +41,7 @@ The window fills the webview. It does not sit in a centered page column. The chr
 +------------------------------------------------------------------+
 ```
 
-The header bar is three zones in one 48px row: a leading product brand, a centered action cluster, and trailing theme/settings/close. It is a CSS grid `grid-cols-[1fr_auto_1fr]`. The brand sits `justify-self-start` in the first column. The action cluster (provider select, scrape and write actions, view switch, and the job label with Cancel when a job is busy) sits in the middle column. Theme, Settings, and Close sit `justify-self-end` in the third column. Equal `1fr` side columns keep the action cluster optically centered on wide windows. The bar does not wrap to a second row.
+The header bar is three zones in one 48px row: a leading product brand, a centered action cluster, and trailing theme/settings/close. It is a CSS grid `grid-cols-[1fr_auto_1fr]`. The brand sits `justify-self-start` in the first column. The action cluster (provider select, scrape and write actions, view switch, and—for Save, Rename, Convert, and Scan only—the job label with Cancel when that job is busy) sits in the middle column. Search and Load do not add header job chrome. Theme, Settings, and Close sit `justify-self-end` in the third column. Equal `1fr` side columns keep the action cluster optically centered on wide windows. The bar does not wrap to a second row.
 
 The product brand is a mini SVG logo (closed tankōbon with a tag notch, about 20px, `currentColor` with the accent on the spine) beside the wordmark `Manga Tagger`. It is not a button.
 
@@ -181,13 +181,13 @@ When a button has an accessible name and no visible text (icon buttons), that na
 
 ### Dialog
 
-`Dialog.svelte`. A centered modal over the window with a `zinc-900/40` backdrop at `z-30` (below toasts). The panel is `max-w-md`, `rounded-lg`, and `p-4`. The title is `text-sm font-medium`.
+`Dialog.svelte`. A centered modal over the window with a `zinc-900/40` backdrop at `z-30` (below toasts). The panel is `max-w-md`, `rounded-lg`, and `p-4`. The title row is obvious: the Lucide icon of the control that opened the dialog (20px, `currentColor`, decorative) sits before a `text-base font-bold` title. Settings uses `Settings`, Rename uses `Pencil`, Convert uses `FileArchive`, and Matches uses `ScanSearch` (the Scrape control). A quiet icon button with Lucide `X` sits at the trailing edge of that row; its accessible name is `Close`, and it dismisses the same way Cancel does.
 
 Light mode uses a white fill, a `zinc-200` hairline, and `shadow-md` so the panel lifts off the panes the same way a toast does. Dark mode does not reuse the pane fill: it uses a `zinc-800` fill, a `zinc-600` border, and `shadow-lg` with a dark black wash so the dialog reads clearly against `zinc-900` panes and `zinc-950` chrome.
 
 Enter: fade in and fly upward about 20px over ~400ms with a slight overshoot (`backOut`). Exit: fade out and drift downward over ~220ms. Backdrop click does not dismiss.
 
-Actions sit at the trailing edge: a `quiet` dismiss button labeled `Cancel`. When the dialog has a confirm action, a `primary` or `danger` confirm button follows. Picker dialogs (scrape Matches) omit the confirm button; only Cancel remains. `MatchesDialog.svelte` uses this dismiss-only footer and lists scrape candidate rows (`title`, optional muted `detail`) in the body. Match rows are not shown in the inspector.
+Actions sit at the trailing edge: a `quiet` dismiss button labeled `Cancel`. When the dialog has a confirm action, a `primary` or `danger` confirm button follows. Picker dialogs (scrape Matches) omit the confirm button; only Cancel remains. `MatchesDialog.svelte` uses this dismiss-only footer. While a Search is queued or running, the body shows muted `Searching…` with a spinning Lucide `LoaderCircle` (20px) and `aria-busy`. When candidates arrive, that body is replaced by the candidate rows (`title`, optional muted `detail`). Match rows are not shown in the inspector. In-progress scrape status is not a toast.
 
 ### Toast
 
@@ -240,8 +240,8 @@ The product brand (SVG logo and wordmark) is presentational chrome. It is covere
 - The resolved theme is applied before the first paint.
 - Icons are Lucide, `currentColor`, 16px in rows and menu items and 20px in the header. The view switch is `List` / `List view` and `LayoutGrid` / `Grid view`. The theme menu is `Monitor`, `Sun`, and `Moon`. Add folder is `FolderPlus`. Close is `X` at the trailing edge of the header. Icon buttons expose their accessible name as a native `title` so a short hover shows that label.
 - Buttons, text inputs, textareas, checkboxes, selects, menus, dialogs, and toasts are the local components in this document, styled with Tailwind utilities. The UI package does not depend on a third-party component kit.
-- Dialogs are centered over the window with a dimmed backdrop. Their panels use the same raised surface as toasts (white / `zinc-800` in dark, hairline, shadow) and fade in with a short upward overshoot. Settings, Rename, Convert, and Matches share that chrome. Matches is dismiss-only; the other three keep Cancel plus a confirm action.
-- Action toasts appear in a top-right stack, fade in downward with a short overshoot, and disappear after 5 seconds or on click. In dark mode they use a raised `zinc-800` surface and a stronger shadow so they stand apart from the panes. They summarize scrape, load, save, rename, convert, and scan outcomes. Scrape match count, no matches, and provider errors are toast-only. Detailed per-file save/rename/convert errors and scan-root lines stay in the inspector.
+- Dialogs are centered over the window with a dimmed backdrop. Their panels use the same raised surface as toasts (white / `zinc-800` in dark, hairline, shadow) and fade in with a short upward overshoot. The title is bold with the opening control's Lucide icon ahead of it, and a Close `X` at the trailing edge of the title row. Settings, Rename, Convert, and Matches share that chrome. Matches is dismiss-only; while searching it shows `Searching…` with a spinner, then the candidate list. The other three keep Cancel plus a confirm action.
+- Action toasts appear in a top-right stack, fade in downward with a short overshoot, and disappear after 5 seconds or on click. In dark mode they use a raised `zinc-800` surface and a stronger shadow so they stand apart from the panes. They summarize scrape, load, save, rename, convert, and scan outcomes only—not in-progress search. Scrape match count, no matches, and provider errors are toast-only. Detailed per-file save/rename/convert errors and scan-root lines stay in the inspector.
 - Type is the default sans stack at `text-sm` for controls and rows, and `text-xs` for captions. The product wordmark alone uses the bundled Dela Gothic One face via `.font-brand`.
 - The header is three zones: leading brand (mini SVG + `Manga Tagger`), centered action cluster, trailing Theme / Settings / Close. The brand is readable in light and dark.
 - A keyboard focus ring is visible on the shared controls.

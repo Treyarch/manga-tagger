@@ -1,5 +1,6 @@
 <script lang="ts">
   import { untrack } from "svelte";
+  import { Settings } from "lucide-svelte";
   import Checkbox from "./Checkbox.svelte";
   import Dialog from "./Dialog.svelte";
   import Textarea from "./Textarea.svelte";
@@ -44,6 +45,9 @@
 </script>
 
 <Dialog title="Settings" confirmLabel="Save" onDismiss={onClose} onConfirm={save}>
+  {#snippet icon()}
+    <Settings size={20} />
+  {/snippet}
   <div class="flex flex-col gap-3">
     <label class="flex flex-col gap-1">
       <span class="text-xs text-zinc-500 dark:text-zinc-400">Library roots</span>

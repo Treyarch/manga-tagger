@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Pencil } from "lucide-svelte";
   import Dialog from "./Dialog.svelte";
   import TextInput from "./TextInput.svelte";
 
@@ -20,6 +21,9 @@
 </script>
 
 <Dialog title="Rename" confirmLabel="Rename" {onDismiss} {onConfirm}>
+  {#snippet icon()}
+    <Pencil size={20} />
+  {/snippet}
   <div class="flex flex-col gap-3">
     <TextInput label="Template" value={template} onValue={onTemplate} />
     {#if error}

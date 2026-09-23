@@ -110,6 +110,18 @@
     volumes.find((row) => row.path === selection.anchor) ?? null,
   );
   const busy = $derived(isBusy(headerJob));
+  const searching = $derived(
+    headerJob !== null && isBusy(headerJob) && headerJob.name === "Search",
+  );
+  const matchesOpen = $derived(searching || candidates.length > 0);
+  const headerChromeJob = $derived(
+    headerJob !== null &&
+      isBusy(headerJob) &&
+      headerJob.name !== "Search" &&
+      headerJob.name !== "Load"
+      ? headerJob
+      : null,
+  );
   const formLocked = $derived(
     headerJob !== null &&
       isBusy(headerJob) &&
@@ -197,9 +209,9 @@
     settled.add(job.id);
     if (job.name === "Search") {
       if (job.id !== newestSearchId) return;
-      if (job.state === "failed") {
+      if (job.state === "failed" || job.state === "cancelled") {
         candidates = [];
-        toastFrom(job);
+        if (job.state === "failed") toastFrom(job);
         return;
       }
       if (job.state !== "succeeded") return;
@@ -381,6 +393,11 @@
     }
   }
 
+  async function dismissMatches() {
+    if (searching) await cancelJob();
+    candidates = [];
+  }
+
   async function cancelJob() {
     if (headerJob === null) return;
     const job = await postJson<Job>(`/api/jobs/${headerJob.id}/cancel`, {});
@@ -509,8 +526,8 @@
       <Button icon label="Grid view" pressed={view === "grid"} onclick={() => (view = "grid")}>
         <LayoutGrid size={20} />
       </Button>
-      {#if headerJob}
-        <span class="px-1 text-sm">{jobLabel(headerJob)}</span>
+      {#if headerChromeJob}
+        <span class="px-1 text-sm">{jobLabel(headerChromeJob)}</span>
         <Button icon label="Cancel" onclick={cancelJob}><X size={20} /></Button>
       {/if}
     </div>
@@ -726,11 +743,12 @@
   </div>
 </div>
 
-{#if candidates.length > 0}
+{#if matchesOpen}
   <MatchesDialog
     {candidates}
+    {searching}
     {busy}
-    onDismiss={() => (candidates = [])}
+    onDismiss={dismissMatches}
     onCandidate={chooseCandidate}
   />
 {/if}
@@ -773,6 +791,9 @@
     onDismiss={() => (convertOpen = false)}
     onConfirm={runConvert}
   >
+    {#snippet icon()}
+      <FileArchive size={20} />
+    {/snippet}
     <p class="text-sm">{convertConfirmMessage(selectedCbr)}</p>
   </Dialog>
 {/if}

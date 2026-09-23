@@ -1,11 +1,13 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import { X } from "lucide-svelte";
   import { fly } from "svelte/transition";
   import { backOut, cubicIn } from "svelte/easing";
   import Button from "./Button.svelte";
 
   let {
     title,
+    icon,
     confirmLabel,
     confirmVariant = "primary",
     onDismiss,
@@ -13,6 +15,7 @@
     children,
   }: {
     title: string;
+    icon?: Snippet;
     confirmLabel?: string;
     confirmVariant?: "primary" | "danger";
     onDismiss: () => void;
@@ -33,9 +36,20 @@
     in:fly={{ y: 20, duration: 400, easing: backOut, opacity: 0 }}
     out:fly={{ y: 12, duration: 220, easing: cubicIn, opacity: 0 }}
   >
-    <h2 id="dialog-title" class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-      {title}
-    </h2>
+    <div class="flex items-center gap-2">
+      <h2
+        id="dialog-title"
+        class="flex min-h-8 min-w-0 flex-1 items-center gap-2 text-base font-bold leading-none text-zinc-900 dark:text-zinc-100"
+      >
+        {#if icon}
+          <span class="inline-flex shrink-0" aria-hidden="true">{@render icon()}</span>
+        {/if}
+        {title}
+      </h2>
+      <Button icon label="Close" onclick={onDismiss}>
+        <X size={20} />
+      </Button>
+    </div>
     <div class="mt-3">
       {@render children?.()}
     </div>
