@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   POLL_MS,
   FORM_FIELDS,
+  candidatesOf,
   convertConfirmMessage,
   editField,
   entryErrorLines,
@@ -311,5 +312,46 @@ describe("jobs and dialogs", () => {
     expect(
       placeAfterLibrary("/books", [{ path: "/books", label: "books" }]),
     ).toBe("/books");
+  });
+
+  it("maps search candidates from the job result", () => {
+    expect(
+      candidatesOf({
+        candidates: [
+          {
+            id: "1",
+            title: "Claymore",
+            year: 2001,
+            credit: "Yagi",
+            count: 27,
+            summary: "A story.",
+            cover: "https://example.com/c.jpg",
+          },
+          null,
+          { title: "Bare" },
+        ],
+      }),
+    ).toEqual([
+      {
+        id: "1",
+        title: "Claymore",
+        year: "2001",
+        credit: "Yagi",
+        count: "27",
+        summary: "A story.",
+        cover: "https://example.com/c.jpg",
+      },
+      {
+        id: "",
+        title: "Bare",
+        year: "",
+        credit: "",
+        count: "",
+        summary: "",
+        cover: "",
+      },
+    ]);
+    expect(candidatesOf(null)).toEqual([]);
+    expect(candidatesOf({ candidates: "nope" })).toEqual([]);
   });
 });

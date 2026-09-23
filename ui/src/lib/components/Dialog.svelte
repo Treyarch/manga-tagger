@@ -8,20 +8,26 @@
   let {
     title,
     icon,
+    size = "md",
     confirmLabel,
     confirmVariant = "primary",
+    confirmDisabled = false,
     onDismiss,
     onConfirm,
     children,
   }: {
     title: string;
     icon?: Snippet;
+    size?: "md" | "xl";
     confirmLabel?: string;
     confirmVariant?: "primary" | "danger";
+    confirmDisabled?: boolean;
     onDismiss: () => void;
     onConfirm?: () => void;
     children?: Snippet;
   } = $props();
+
+  const width = $derived(size === "xl" ? "max-w-4xl" : "max-w-md");
 </script>
 
 <div
@@ -29,7 +35,7 @@
   role="presentation"
 >
   <div
-    class="w-full max-w-md rounded-lg border border-zinc-200 bg-white p-4 shadow-md dark:border-zinc-600 dark:bg-zinc-800 dark:shadow-lg dark:shadow-black/50"
+    class="w-full {width} rounded-lg border border-zinc-200 bg-white p-4 shadow-md dark:border-zinc-600 dark:bg-zinc-800 dark:shadow-lg dark:shadow-black/50"
     role="dialog"
     aria-modal="true"
     aria-labelledby="dialog-title"
@@ -56,7 +62,11 @@
     <div class="mt-4 flex justify-end gap-2">
       <Button variant="quiet" onclick={onDismiss}>Cancel</Button>
       {#if confirmLabel !== undefined && onConfirm}
-        <Button variant={confirmVariant} onclick={onConfirm}>{confirmLabel}</Button>
+        <Button
+          variant={confirmVariant}
+          disabled={confirmDisabled}
+          onclick={onConfirm}>{confirmLabel}</Button
+        >
       {/if}
     </div>
   </div>

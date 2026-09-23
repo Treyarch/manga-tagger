@@ -10,7 +10,7 @@ from manga_tagger.providers.http import send
 from manga_tagger.providers.service_types import Candidate
 from manga_tagger.providers.text import (
     catalog_id,
-    detail_text,
+    count_text,
     first_url,
     has_word,
     jikan_title,
@@ -18,6 +18,7 @@ from manga_tagger.providers.text import (
     nonblank,
     plain_summary,
     put,
+    year_text,
 )
 
 _SEARCH_URL = "https://api.tenrai.org/v1/manga"
@@ -132,7 +133,10 @@ def _candidate(item: object, languages: Sequence[str]) -> Candidate | None:
     return Candidate(
         id=identity,
         title=title,
-        detail=detail_text(year, credit),
+        year=year_text(year),
+        credit=nonblank(credit) or "",
+        count=count_text(item.get("volumes"), item.get("chapters")),
+        summary=plain_summary(item.get("synopsis")) or "",
         cover=_cover_url(item),
     )
 

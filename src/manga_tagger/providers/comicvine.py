@@ -10,13 +10,14 @@ from manga_tagger.providers.http import send
 from manga_tagger.providers.service_types import Candidate
 from manga_tagger.providers.text import (
     catalog_id,
-    detail_text,
+    count_text,
     first_url,
     join_names,
     nonblank,
     plain_summary,
     put,
     role_pieces,
+    year_text,
 )
 
 _SEARCH_URL = "https://comicvine.gamespot.com/api/search/"
@@ -48,7 +49,11 @@ def search(
             ("resources", "volume"),
             ("query", query),
             ("limit", str(RESULT_LIMIT)),
-            ("field_list", "id,name,start_year,publisher,image"),
+            (
+                "field_list",
+                "id,name,start_year,publisher,image,"
+                "count_of_issues,deck,description",
+            ),
         ],
         cancel=cancel,
     )
@@ -151,11 +156,23 @@ def _candidate(item: object) -> Candidate | None:
     image = item.get("image")
     cover = ""
     if isinstance(image, dict):
-        cover = first_url(image.get("thumb_url"), image.get("small_url"))
+        cover = first_url(
+            image.get("super_url"),
+            image.get("medium_url"),
+            image.get("small_url"),
+            image.get("thumb_url"),
+        )
     return Candidate(
         id=identity,
         title=title,
-        detail=detail_text(item.get("start_year"), credit),
+        year=year_text(item.get("start_year")),
+        credit=nonblank(credit) or "",
+        count=count_text(item.get("count_of_issues")),
+        summary=(
+            plain_summary(item.get("deck"))
+            or plain_summary(item.get("description"))
+            or ""
+        ),
         cover=cover,
     )
 

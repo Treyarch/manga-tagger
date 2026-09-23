@@ -398,7 +398,10 @@ def test_search_and_load_do_not_write() -> None:
         class Hit:
             id = "1"
             title = "Claymore"
-            detail = "2001, Yagi"
+            year = "2001"
+            credit = "Yagi"
+            count = "27"
+            summary = "A claymore story."
             cover = "https://example.com/cover.jpg"
 
         return [Hit()]
@@ -419,7 +422,10 @@ def test_search_and_load_do_not_write() -> None:
         {
             "id": "1",
             "title": "Claymore",
-            "detail": "2001, Yagi",
+            "year": "2001",
+            "credit": "Yagi",
+            "count": "27",
+            "summary": "A claymore story.",
             "cover": "https://example.com/cover.jpg",
         }
     ]

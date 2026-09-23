@@ -10,7 +10,7 @@ from manga_tagger.providers.service_types import Candidate
 from manga_tagger.providers.text import (
     anilist_title,
     catalog_id,
-    detail_text,
+    count_text,
     first_url,
     has_word,
     integer_text,
@@ -18,6 +18,7 @@ from manga_tagger.providers.text import (
     nonblank,
     plain_summary,
     put,
+    year_text,
 )
 
 _URL = "https://graphql.anilist.co"
@@ -31,8 +32,11 @@ query ($search: String) {
     media(search: $search, type: MANGA, sort: SEARCH_MATCH) {
       id
       title { romaji english native }
-      coverImage { medium }
+      coverImage { large }
       startDate { year }
+      volumes
+      chapters
+      description
       staff(perPage: 1, sort: RELEVANCE) {
         edges { node { name { full } } }
       }
@@ -184,11 +188,14 @@ def _candidate(item: object, languages: Sequence[str]) -> Candidate | None:
     cover_image = item.get("coverImage")
     cover = ""
     if isinstance(cover_image, dict):
-        cover = first_url(cover_image.get("medium"))
+        cover = first_url(cover_image.get("large"))
     return Candidate(
         id=identity,
         title=title,
-        detail=detail_text(year, _first_staff_name(item)),
+        year=year_text(year),
+        credit=nonblank(_first_staff_name(item)) or "",
+        count=count_text(item.get("volumes"), item.get("chapters")),
+        summary=plain_summary(item.get("description")) or "",
         cover=cover,
     )
 

@@ -295,7 +295,10 @@ def test_search_and_load_jobs(tmp_path: Path) -> None:
         class Hit:
             id = "9"
             title = "Claymore"
-            detail = ""
+            year = ""
+            credit = ""
+            count = ""
+            summary = ""
             cover = ""
 
         return [Hit()]

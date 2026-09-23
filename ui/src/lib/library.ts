@@ -193,7 +193,16 @@ export type WorkEntry = {
   skipped?: boolean;
 };
 
-export type Candidate = { id: string; title: string; detail: string; cover: string };
+export type Candidate = {
+  id: string;
+  title: string;
+  year: string;
+  credit: string;
+  count: string;
+  summary: string;
+  cover: string;
+};
+
 
 /** Same-origin img src for a candidate cover. MangaDex CDN is proxied. */
 export function matchCoverSrc(cover: string): string {
@@ -589,14 +598,20 @@ export function candidatesOf(result: unknown): Candidate[] {
     const row = item as {
       id?: unknown;
       title?: unknown;
-      detail?: unknown;
+      year?: unknown;
+      credit?: unknown;
+      count?: unknown;
+      summary?: unknown;
       cover?: unknown;
     };
     return [
       {
         id: String(row.id ?? ""),
         title: String(row.title ?? ""),
-        detail: String(row.detail ?? ""),
+        year: String(row.year ?? ""),
+        credit: String(row.credit ?? ""),
+        count: String(row.count ?? ""),
+        summary: String(row.summary ?? ""),
         cover: String(row.cover ?? ""),
       },
     ];

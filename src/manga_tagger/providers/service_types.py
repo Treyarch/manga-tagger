@@ -11,11 +11,17 @@ class Candidate:
         id: Catalog id. Decimal digits for AniList, Jikan, and Comic Vine.
             A MangaDex UUID for MangaDex.
         title: Preferred series title.
-        detail: Year and first credit joined with ``", "``, or ``""``.
+        year: Start or publish year, or ``""``.
+        credit: First author, staff, or publisher name, or ``""``.
+        count: Issue or volume count, or ``""``.
+        summary: Plain synopsis or deck, or ``""``.
         cover: Absolute HTTPS cover URL, or ``""`` when missing.
     """
 
     id: str
     title: str
-    detail: str
+    year: str
+    credit: str
+    count: str
+    summary: str
     cover: str

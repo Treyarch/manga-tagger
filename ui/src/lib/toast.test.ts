@@ -34,7 +34,19 @@ describe("jobToastMessage", () => {
         job({
           name: "Search",
           state: "succeeded",
-          result: { candidates: [{ id: "a", title: "A", detail: "" }] },
+          result: {
+            candidates: [
+              {
+                id: "a",
+                title: "A",
+                year: "",
+                credit: "",
+                count: "",
+                summary: "",
+                cover: "",
+              },
+            ],
+          },
         }),
       ),
     ).toEqual({ message: "Found 1 matches.", tone: "ok" });

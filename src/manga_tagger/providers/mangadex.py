@@ -10,12 +10,13 @@ from manga_tagger.providers.http import send
 from manga_tagger.providers.service_types import Candidate
 from manga_tagger.providers.text import (
     catalog_id,
-    detail_text,
+    count_text,
     integer_text,
     join_names,
     nonblank,
     plain_summary,
     put,
+    year_text,
 )
 
 _BASE = "https://api.mangadex.org"
@@ -139,7 +140,10 @@ def _candidate(item: object, languages: Sequence[str]) -> Candidate | None:
     return Candidate(
         id=identity,
         title=title,
-        detail=detail_text(integer_text(attributes.get("year")), credit),
+        year=year_text(integer_text(attributes.get("year"))),
+        credit=nonblank(credit) or "",
+        count=count_text(attributes.get("lastVolume")),
+        summary=plain_summary(_description(attributes, languages)) or "",
         cover=_cover_url(identity, relationships),
     )
 

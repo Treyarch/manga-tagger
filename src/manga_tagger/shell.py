@@ -494,7 +494,10 @@ def run_search(
             {
                 "id": item.id,
                 "title": item.title,
-                "detail": item.detail,
+                "year": item.year,
+                "credit": item.credit,
+                "count": item.count,
+                "summary": item.summary,
                 "cover": item.cover,
             }
             for item in found

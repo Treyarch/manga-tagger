@@ -117,6 +117,11 @@ def test_mangadex_search_request_and_detail() -> None:
                 "attributes": {
                     "title": {"fr": "Titre", "en": "Title"},
                     "year": 2001,
+                    "lastVolume": "27",
+                    "description": {
+                        "fr": "<p>Une histoire.</p>",
+                        "en": "<p>A story.</p>",
+                    },
                     "originalLanguage": "ja",
                 },
                 "relationships": [
@@ -148,7 +153,10 @@ def test_mangadex_search_request_and_detail() -> None:
         Candidate(
             id=MD_ID,
             title="Titre",
-            detail="2001, Norihiro Yagi",
+            year="2001",
+            credit="Norihiro Yagi",
+            count="27",
+            summary="Une histoire.",
             cover=(
                 f"https://uploads.mangadex.org/covers/{MD_ID}/cover-file.jpg.256.jpg"
             ),
@@ -156,7 +164,10 @@ def test_mangadex_search_request_and_detail() -> None:
         Candidate(
             id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
             title="Bare",
-            detail="",
+            year="",
+            credit="",
+            count="",
+            summary="",
             cover="",
         ),
     ]
@@ -494,9 +505,12 @@ def test_anilist_native_romaji_and_search() -> None:
                             "native": "ネイティブ",
                         },
                         "coverImage": {
-                            "medium": "https://example.com/anilist-cover.jpg"
+                            "large": "https://example.com/anilist-cover.jpg"
                         },
                         "startDate": {"year": 2004},
+                        "volumes": 27,
+                        "chapters": 155,
+                        "description": "<p>Claymore summary</p>",
                         "staff": {"edges": [{"node": {"name": {"full": "Staff One"}}}]},
                     }
                 ]
@@ -515,14 +529,20 @@ def test_anilist_native_romaji_and_search() -> None:
         Candidate(
             id="42",
             title="Claymore EN",
-            detail="2004, Staff One",
+            year="2004",
+            credit="Staff One",
+            count="27",
+            summary="Claymore summary",
             cover="https://example.com/anilist-cover.jpg",
         )
     ]
     payload = json.loads(seen[0].content)
     assert "perPage: 10" in payload["query"]
     assert "SEARCH_MATCH" in payload["query"]
-    assert "coverImage { medium }" in payload["query"]
+    assert "coverImage { large }" in payload["query"]
+    assert "volumes" in payload["query"]
+    assert "chapters" in payload["query"]
+    assert "description" in payload["query"]
     assert payload["variables"] == {"search": "Claymore"}
     assert seen[0].headers["user-agent"] == "manga-tagger"
 
@@ -628,6 +648,9 @@ def test_jikan_search_original_title_and_unique_names() -> None:
                     "prop": {"from": {"year": 2001, "month": 6, "day": None}}
                 },
                 "authors": [{"name": "Tsugumi Ohba", "type": "Story"}],
+                "volumes": 12,
+                "chapters": 108,
+                "synopsis": "<p>Death Note synopsis</p>",
                 "images": {
                     "jpg": {
                         "image_url": "https://example.com/large.jpg",
@@ -646,7 +669,10 @@ def test_jikan_search_original_title_and_unique_names() -> None:
         Candidate(
             id="26",
             title="Titre FR",
-            detail="2001, Tsugumi Ohba",
+            year="2001",
+            credit="Tsugumi Ohba",
+            count="12",
+            summary="Death Note synopsis",
             cover="https://example.com/large.jpg",
         )
     ]
@@ -782,9 +808,14 @@ def test_comicvine_search_deck_and_year_string() -> None:
                 "name": "Sandman",
                 "start_year": "1989",
                 "publisher": {"name": "DC Comics"},
+                "count_of_issues": 75,
+                "deck": "Dream of the Endless.",
+                "description": "<p>Longer</p>",
                 "image": {
                     "thumb_url": "https://example.com/thumb.jpg",
                     "small_url": "https://example.com/small.jpg",
+                    "medium_url": "https://example.com/medium.jpg",
+                    "super_url": "https://example.com/super.jpg",
                 },
             },
             {"id": 8, "name": "  "},
@@ -803,8 +834,11 @@ def test_comicvine_search_deck_and_year_string() -> None:
         Candidate(
             id="12345",
             title="Sandman",
-            detail="1989, DC Comics",
-            cover="https://example.com/thumb.jpg",
+            year="1989",
+            credit="DC Comics",
+            count="75",
+            summary="Dream of the Endless.",
+            cover="https://example.com/super.jpg",
         )
     ]
     request = seen[0]
@@ -813,7 +847,7 @@ def test_comicvine_search_deck_and_year_string() -> None:
     assert request.url.params.get("query") == "Sandman"
     assert request.url.params.get("limit") == "10"
     assert request.url.params.get("field_list") == (
-        "id,name,start_year,publisher,image"
+        "id,name,start_year,publisher,image,count_of_issues,deck,description"
     )
     assert "4050-" not in found[0].id
 

@@ -748,6 +748,7 @@
     {candidates}
     {searching}
     {busy}
+    {provider}
     onDismiss={dismissMatches}
     onCandidate={chooseCandidate}
   />

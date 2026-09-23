@@ -76,16 +76,22 @@ def integer_text(value: object) -> str | None:
     return str(value)
 
 
-def detail_text(year: object, credit: object) -> str:
-    """Join the year and the first credit that the search payload has."""
-    parts: list[str] = []
-    rendered_year = _detail_year(year)
-    if rendered_year:
-        parts.append(rendered_year)
-    rendered_credit = nonblank(credit)
-    if rendered_credit:
-        parts.append(rendered_credit)
-    return ", ".join(parts)
+def year_text(year: object) -> str:
+    """Return a year string from a search payload value, or ``""``."""
+    return _detail_year(year) or ""
+
+
+def count_text(*values: object) -> str:
+    """Return the first usable issue or volume count, or ``""``."""
+    for value in values:
+        if isinstance(value, bool):
+            continue
+        if isinstance(value, int):
+            return str(value)
+        text = nonblank(value)
+        if text is not None and text.isdigit():
+            return text
+    return ""
 
 
 def catalog_id(value: object) -> str | None:
