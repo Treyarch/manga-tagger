@@ -17,7 +17,6 @@ from manga_tagger.shell import (
     accept_root_paths,
     default_client,
     edit_field,
-    filter_volumes,
     form_from_volumes,
     merge_load_patch,
     places_from_volumes,
@@ -68,7 +67,7 @@ def test_accept_root_paths_keeps_a_directory(tmp_path: Path) -> None:
     assert again == roots
 
 
-def test_places_filter_and_selection() -> None:
+def test_places_and_selection() -> None:
     claymore_a = _volume("/books/Claymore/a.cbz", series="Claymore")
     claymore_b = _volume("/books/Claymore/b.cbz", status="failed")
     other = _volume("/books/Other/Claymore/c.cbz", series="Other")
@@ -103,10 +102,6 @@ def test_places_filter_and_selection() -> None:
     original = [claymore_a]
     assert volumes_for_roots(original, []) == []
     assert original == [claymore_a]
-
-    filtered = filter_volumes([claymore_a, other], "clay")
-    assert filtered == [claymore_a]
-    assert filter_volumes([claymore_a, other], "   ") == [claymore_a, other]
 
     visible = ["a", "b", "c"]
     selection = select_plain(visible, "a")

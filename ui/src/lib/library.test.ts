@@ -8,7 +8,6 @@ import {
   entryErrorLines,
   fieldLabel,
   filenameStem,
-  filterVolumes,
   formFromVolumes,
   groupVolumesBySeries,
   initialPageIndex,
@@ -72,7 +71,7 @@ function volume(path: string, extra: Partial<Volume> = {}): Volume {
 }
 
 describe("shelf and selection", () => {
-  it("keeps a place's direct volumes and filters by series", () => {
+  it("keeps a place's direct volumes and shelves by place", () => {
     const rows = [
       volume("/books/Claymore/a.cbz", { series: "Claymore" }),
       volume("/books/Claymore/extra/v01.cbz", { series: "Claymore" }),
@@ -89,11 +88,6 @@ describe("shelf and selection", () => {
     expect(volumesForShelf(rows, "/books/Claymore").map((row) => row.name)).toEqual([
       "a.cbz",
     ]);
-    expect(filterVolumes(rows, "clay").map((row) => row.series)).toEqual([
-      "Claymore",
-      "Claymore",
-    ]);
-    expect(filterVolumes(rows, "   ")).toHaveLength(3);
   });
 
   it("groups blank series first, then named series alphabetically", () => {

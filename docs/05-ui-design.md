@@ -124,7 +124,7 @@ Icons are [Lucide](https://lucide.dev), package `lucide-svelte`. They are outlin
 | Rows and menu items | 16px |
 | Header bar | 20px |
 
-The view switch uses Lucide `List` and `LayoutGrid`, with accessible names `List view` and `Grid view`. The active view uses the selection wash on its button. Search uses `Search` as the leading icon inside the header field.
+The view switch uses Lucide `List` and `LayoutGrid`, with accessible names `List view` and `Grid view`. The active view uses the selection wash on its button.
 
 Do not add a second icon set. Do not use filled or multicolor icons in the chrome.
 
@@ -152,7 +152,7 @@ When a button has an accessible name and no visible text (icon buttons), that na
 
 ### Text input
 
-`TextInput.svelte`. Height 36px, `text-sm`, `rounded-md`, hairline border, view background, muted placeholder. The header search field is this control at a compact width, with the `Search` icon inside the leading edge.
+`TextInput.svelte`. Height 36px, `text-sm`, `rounded-md`, hairline border, view background, muted placeholder. Settings, rename, and inspector fields use it.
 
 ### Textarea
 

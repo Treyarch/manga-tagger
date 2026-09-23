@@ -12,7 +12,6 @@
     RefreshCw,
     Save,
     ScanSearch,
-    Search,
     Settings,
     Sun,
     X,
@@ -25,7 +24,6 @@
   import RenameDialog from "./lib/components/RenameDialog.svelte";
   import Select from "./lib/components/Select.svelte";
   import SettingsDialog from "./lib/components/SettingsDialog.svelte";
-  import TextInput from "./lib/components/TextInput.svelte";
   import Thumb from "./lib/components/Thumb.svelte";
   import ToastHost from "./lib/components/ToastHost.svelte";
   import { jobToastMessage, pushToast } from "./lib/toast";
@@ -41,7 +39,6 @@
     entryErrorLines,
     filenameStem,
     folderDropRequest,
-    filterVolumes,
     groupVolumesBySeries,
     formFromVolumes,
     formIsDirty,
@@ -75,7 +72,6 @@
   let volumes = $state<Volume[]>([]);
   let selectedPlace = $state<string | null>(null);
   let view = $state<"list" | "grid">("list");
-  let query = $state("");
   let selection = $state<Selection>({ paths: [], anchor: null });
   let form = $state<InspectorForm | null>(null);
   let provider = $state("mangadex");
@@ -99,7 +95,7 @@
   const settled = new Set<string>();
 
   const shelf = $derived(volumesForShelf(volumes, selectedPlace));
-  const groups = $derived(groupVolumesBySeries(filterVolumes(shelf, query)));
+  const groups = $derived(groupVolumesBySeries(shelf));
   const visible = $derived(groups.flatMap((group) => group.volumes));
   const visiblePaths = $derived(visible.map((row) => row.path));
   const selectedRows = $derived(
@@ -147,7 +143,7 @@
 
   function visiblePathsAfter(): string[] {
     return groupVolumesBySeries(
-      filterVolumes(volumesForShelf(volumes, selectedPlace), query),
+      volumesForShelf(volumes, selectedPlace),
     ).flatMap((group) => group.volumes.map((row) => row.path));
   }
 
@@ -252,12 +248,6 @@
     const job = await postJson<Job>(path, body);
     watch(job);
     return job;
-  }
-
-  function onQuery(value: string) {
-    query = value;
-    selection = selectionAfterFilter(visiblePathsAfter(), selection);
-    rebuildForm();
   }
 
   function onPlace(path: string) {
@@ -473,18 +463,6 @@
   <header
     class="flex h-12 shrink-0 items-center gap-1 border border-zinc-200 bg-white px-2 dark:border-zinc-800 dark:bg-zinc-900"
   >
-    <div class="relative w-52 shrink-0">
-      <Search
-        size={20}
-        class="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-zinc-500 dark:text-zinc-400"
-      />
-      <TextInput
-        label="Filter"
-        extra="pl-9"
-        value={query}
-        onValue={onQuery}
-      />
-    </div>
     <div class="w-40 shrink-0">
       <Select
         label="Provider"

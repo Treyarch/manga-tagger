@@ -204,26 +204,6 @@ def volumes_for_shelf(
     return volumes_in_place(rows, place_path)
 
 
-def filter_volumes(rows: Sequence[object], query: str) -> list[object]:
-    """Keep rows whose series, title, or filename contains ``query``.
-
-    A blank query returns every row. Matching uses Unicode casefold.
-    """
-    needle = query.strip().casefold()
-    if needle == "":
-        return list(rows)
-    kept: list[object] = []
-    for row in rows:
-        haystacks = (
-            str(getattr(row, "series", "") or "").casefold(),
-            str(getattr(row, "title", "") or "").casefold(),
-            str(getattr(row, "name", "") or "").casefold(),
-        )
-        if any(needle in hay for hay in haystacks):
-            kept.append(row)
-    return kept
-
-
 def select_plain(visible: Sequence[str], path: str) -> Selection:
     """Select only ``path`` and make it the anchor."""
     return Selection(paths=(path,), anchor=path)

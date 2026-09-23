@@ -32,7 +32,7 @@ One row is one resolved archive path. The row stores file facts, scan status, an
 
 The ComicInfo columns are `title`, `series`, `number`, `volume`, `publisher`, `page_count`, `language_iso`, `age_rating`, `manga`, `genre`, `summary`, `web`, `community_rating`, `notes`, `year`, `month`, `day`, `writer`, `penciller`, `inker`, and `cover_artist`. `page_count` is the `PageCount` element text. `archive_page_count` is the number of page images. They are stored as read and are not required to match.
 
-`list_volumes` returns these fields, including failed rows. The form, and a search over series, title, or filename, can use the row without opening the archive.
+`list_volumes` returns these fields, including failed rows. The form can use the row without opening the archive.
 
 ## Database
 

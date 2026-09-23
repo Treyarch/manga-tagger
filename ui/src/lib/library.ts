@@ -242,16 +242,6 @@ export function volumesForShelf(
   return volumesInPlace(rows, placePath);
 }
 
-export function filterVolumes(rows: Volume[], query: string): Volume[] {
-  const needle = casefold(query.trim());
-  if (needle === "") return rows.slice();
-  return rows.filter((row) =>
-    [row.series, row.title, row.name].some((value) =>
-      casefold(value).includes(needle),
-    ),
-  );
-}
-
 export type SeriesGroup = { series: string; volumes: Volume[] };
 
 /** Groups by trimmed series: blank first, then case-folded series name. */

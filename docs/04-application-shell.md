@@ -5,7 +5,7 @@ status: active
 
 # Application shell
 
-This specification owns the desktop process, the TOML config file, the local API, background jobs, and what selection, filtering, scrape, save, rename, and convert do. It implements performance rules 1, 5, 7, and 8 from [00-project-overview.md](00-project-overview.md): a page read is one archive member, the first paint is the index, scrape and save and convert and rescan are cancellable background work, and a network result never writes an archive.
+This specification owns the desktop process, the TOML config file, the local API, background jobs, and what selection, scrape, save, rename, and convert do. It implements performance rules 1, 5, 7, and 8 from [00-project-overview.md](00-project-overview.md): a page read is one archive member, the first paint is the index, scrape and save and convert and rescan are cancellable background work, and a network result never writes an archive.
 
 The Svelte client that performs these actions lives in `ui/` and uses the layout and components from [05-ui-design.md](05-ui-design.md). This specification places actions in that header, places sidebar, volume pane, and inspector. It does not define color, type, or component styling.
 
@@ -16,7 +16,7 @@ Archive bytes and ComicInfo stay in [01-archives-and-comicinfo.md](01-archives-a
 | Module | Role |
 | --- | --- |
 | `src/manga_tagger/config.py` | Resolve paths and read or write the TOML file. The only module that touches that file |
-| `src/manga_tagger/shell.py` | Pure place, filter, selection, and form functions, plus the job bodies. No FastAPI and no pywebview |
+| `src/manga_tagger/shell.py` | Pure place, selection, and form functions, plus the job bodies. No FastAPI and no pywebview |
 | `src/manga_tagger/jobs.py` | One worker, first in first out. No FastAPI and no pywebview |
 | `src/manga_tagger/api/` | FastAPI app, Pydantic models, and HTTP errors. Routers validate input, call `shell` or `jobs`, and return models. They do not open archives, query SQLite, or call catalogs |
 | `src/manga_tagger/window.py` | The only module that imports pywebview |
@@ -74,17 +74,13 @@ The selected place is session state. It is not a config key. `null` means no fol
 
 `volumes_for_shelf(rows, place_path)` returns `volumes_in_place(rows, place_path)` when `place_path` is a string. When `place_path` is `null`, it returns every row ordered by the `name` column, ascending, by Unicode code point. `failed` rows are included.
 
-The main pane lists `volumes_for_shelf` for the current place selection. An empty library, a selected place with no rows, no volumes under the roots, or a filter with no hits shows the sentence `No volumes yet.`
+The main pane lists `volumes_for_shelf` for the current place selection. An empty library, a selected place with no rows, or no volumes under the roots shows the sentence `No volumes yet.`
 
 List view groups those rows by `series` after trim. Blank-series volumes come first with no header. Named series follow in case-folded alphabetical order, each with a muted series header above its volumes. A volume under a named series shows a tree marker before the thumbnail. A volume row's only text label is `name`. A grid cell's label is `name`. Grid view does not show series headers. Visible list order for selection is that grouped order, flattened.
 
 `GET /api/library` calls `list_volumes`, then `volumes_for_roots` and `places_from_volumes`. The response `volumes` are every row kept for the current roots, not only the selected place. The client applies `volumes_for_shelf` locally. The request does not call `scan`, does not open an archive, and does not build a thumbnail.
 
-## Filter
-
-`filter_volumes(rows, query)` returns `rows` when `query` is blank after trim. Otherwise it keeps a row when Unicode casefold of `series`, `title`, or `name` contains the casefold of the trimmed query. The header search field runs this filter on the current shelf rows (the selected place, or every volume when no place is selected). It does not call a provider, does not scan, and does not change the selection's place.
-
-A selected path that the filter hides is removed from the selection. If the anchor was hidden, the anchor becomes the first remaining selected path in list order, or nothing.
+There is no library filter field in the header. The shelf shows every volume for the current place (or the whole library when no place is selected).
 
 ## Selection
 
@@ -97,6 +93,8 @@ The selection is session state on the client. `shell.py` is the contract. The cl
 `select_toggle(visible, selection, path)` adds `path` when it was not selected and removes it when it was. Adding the first selected path makes it the anchor. Adding another path leaves the anchor. Removing the anchor makes the anchor the first remaining selected path in `visible` order, or nothing when the selection is empty.
 
 A plain click calls `select_plain`. Shift-click calls `select_range`. Ctrl-click calls `select_toggle`. On macOS, Command-click is the same toggle. The preview is always the anchor.
+
+`selection_after_filter(visible, selection)` drops selected paths that are no longer in `visible` (for example after a library refresh). If the anchor was dropped, the anchor becomes the first remaining selected path in list order, or nothing.
 
 ## Form
 
@@ -255,7 +253,7 @@ When the result names a skipped root, the inspector shows `{path} was skipped.` 
 
 ## Header and settings
 
-Leading to trailing, the header contains: the filter field, the provider select, Scrape (`ScanSearch`), Save (`Save`), Rename file(s) (`Pencil`), Convert CBR (`FileArchive`), Scan library (`RefreshCw`), the list and grid switch, the job name and Cancel (`X`) while a job is queued or running, the theme menu, Settings (`Settings`), and Close (`X`). The filter field, view switch, and theme menu are the controls in the UI specification. The controls this specification adds are quiet header icon buttons with those accessible names, except the provider select, which is the select component. Close sits at the trailing edge. It calls `POST /api/window/close`, which destroys the pywebview window. That ends the process the same way the window chrome close does. No closer returns 503.
+Leading to trailing, the header contains: the provider select, Scrape (`ScanSearch`), Save (`Save`), Rename file(s) (`Pencil`), Convert CBR (`FileArchive`), Scan library (`RefreshCw`), the list and grid switch, the job name and Cancel (`X`) while a job is queued or running, the theme menu, Settings (`Settings`), and Close (`X`). The view switch and theme menu are the controls in the UI specification. The controls this specification adds are quiet header icon buttons with those accessible names, except the provider select, which is the select component. Close sits at the trailing edge. It calls `POST /api/window/close`, which destroys the pywebview window. That ends the process the same way the window chrome close does. No closer returns 503.
 
 Choosing a theme calls `PUT /api/config` with that `theme` value. On success the class updates from the UI specification's `resolveDark`. That change does not rescan. A failed write leaves the previous theme in memory and does not change the class.
 
@@ -301,7 +299,7 @@ Cover at least:
 - `load_config` on a missing path returns the five defaults and does not create the file. A relative `library_roots` entry is absent from the result and the file bytes are unchanged. An unknown key is still present after a `PUT` that changes `theme`. Invalid TOML raises `ConfigError` and the message includes the path.
 - `app_paths("linux", {}, home)` uses `home/.config`, `home/.local/share`, and `home/.cache`. A set absolute `XDG_CONFIG_HOME` replaces only the config root. A relative `XDG_DATA_HOME` is ignored. `darwin` and `win32` use their table, including the `APPDATA` fallback under `home`.
 - Two volumes in `/books/Claymore` and one in `/books/Other/Claymore` produce two places. The colliding labels are `books / Claymore` and `Other / Claymore`. `/books/Claymore/extra/v01.cbz` is a place `/books/Claymore/extra` and is not listed for `/books/Claymore`. A volume directly in `/books` makes `/books` a place. Empty roots return no volumes and do not delete a row that is already in the index. `volumes_for_shelf` with `null` returns every row ordered by `name`. A missing place selection stays `null` after a library refresh; a place that left the list becomes `null`.
-- `filter_volumes` with `clay` keeps a row whose `series` is `Claymore` and drops an unrelated row. A blank query returns every row. Hiding the anchor assigns the anchor to the first remaining selected path.
+- `selection_after_filter` drops a path that left `visible`. Hiding the anchor assigns the anchor to the first remaining selected path.
 - `select_plain`, `select_range`, and `select_toggle` follow the selection section, including a range that keeps the anchor and a toggle that removes it.
 - `form_from_volumes` on one row includes `Number` as `{ "value", "dirty" }` with `dirty` false, and omits `Pages`. When that row's `page_count` is blank and `archive_page_count` is `42`, `PageCount` is `{ "value": "42", "dirty": false }`. When `page_count` is `10`, `PageCount` stays `10`. On two rows it includes only `SHARED_FIELDS`, including `AgeRating` and `Manga`, marks a differing `Series` mixed, shows a shared `Publisher`, and sets every `dirty` flag false.
 - `fieldLabel` maps each `FORM_FIELDS` key to its caption: `PageCount` to `Page count`, `LanguageISO` to `Language`, `AgeRating` to `Age rating`, `CommunityRating` to `Community rating`, and `CoverArtist` to `Cover artist`.
@@ -322,7 +320,7 @@ Cover at least:
 
 - One process loads config, binds `127.0.0.1` on an ephemeral port, and opens the pywebview window on that origin. The port is not config. Tests do not open the window.
 - The shelf is `GET /api/library`. That response does not scan, open an archive, or build a thumbnail. A missing config file is the defaults, is not created, and paints no volumes.
-- A place is a directory that directly contains indexed volumes. With no place selected, the main pane lists every volume under the current roots, ordered by name and grouped by series alphabetically. With a place selected, it lists that place's volumes only. List view groups by series with a muted header above shared volumes; a volume row shows the filename only. A grid cell shows the filename. Nested volumes are a different place. The header field filters `series`, `title`, and filename, and does not scrape.
+- A place is a directory that directly contains indexed volumes. With no place selected, the main pane lists every volume under the current roots, ordered by name and grouped by series alphabetically. With a place selected, it lists that place's volumes only. List view groups by series with a muted header above shared volumes; a volume row shows the filename only. A grid cell shows the filename. Nested volumes are a different place. There is no library filter field in the header.
 - One selected volume shows that volume's form and one preview page. Several selected volumes show one shared form for `Series`, `Publisher`, `LanguageISO`, `AgeRating`, `Genre`, `Manga`, `Writer`, `Penciller`, `Inker`, and `CoverArtist`. Field captions are the readable names (`Language`, `Cover artist`, and the rest), not the ComicInfo element names. A field is written only after the user edits it or a load sets it, except each file's `Number`, which a save takes from that file's filename when the stored number differs, and each file's `PageCount`, which a save takes from `archive_page_count` when ComicInfo `page_count` is blank. The form shows that archive count in `Page count` when ComicInfo left it blank. An override or a value already in ComicInfo is left alone. An unchanged save does not rewrite the archive. The preview follows the anchor.
 - Search and load fill the form and do not write an archive. A load marks the fields it sets dirty, including `Manga` on a shared form. A blank Comic Vine key fails before a request.
 - Save writes through `save_comic_info` and does not call `save_many`. One volume writes dirty fields, `Number` from the filename when that field was not edited and the stored value differs, and `PageCount` from `archive_page_count` when that field was not in the patch and ComicInfo left it blank. Several volumes write the dirty shared fields, including `Manga`, each file's `Number` from its filename, and each file's blank `PageCount` from its archive count. `Volume` is not written. Cancel stops before the next file. A failed file does not stop the rest, and files already written stay written. A successful save writes the sibling poster.
@@ -339,4 +337,4 @@ All resolved. Recorded here so they are not re-opened.
 - **How does the window call the API?** `fetch` on the API origin. The client does not call a pywebview JavaScript API. `window.py` may dispatch `folders-dropped` after a native drop. The client posts those paths with `fetch`.
 - **How does the UI hear about background work?** It polls the job every 500 milliseconds. A second job is refused while one is queued or running. Tests use an inline runner and do not sleep.
 - **Where is the page preview?** The inspector image is one page of the anchor volume. Thumbnails are a separate request.
-- **What does the header search field do?** It filters the current shelf (selected place, or the whole library) by series, title, or filename. The provider select and Scrape are a different action.
+- **Is there a library filter in the header?** No. Series count stays small enough that the shelf lists every volume for the current place. The provider select and Scrape search catalogs, not the local shelf.
