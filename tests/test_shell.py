@@ -135,7 +135,40 @@ def test_form_and_merge() -> None:
     assert one["mode"] == "one"
     assert list(one["values"]) == list(FORM_FIELDS)
     assert one["values"]["Number"] == {"value": "4", "dirty": False}
+    assert one["values"]["PageCount"] == {"value": "1", "dirty": False}
     assert "Pages" not in one["values"]
+
+    blank_pages = form_from_volumes(
+        [
+            _volume(
+                "/books/a.cbz",
+                number="4",
+                page_count="",
+                archive_page_count=42,
+            )
+        ]
+    )
+    assert blank_pages is not None
+    assert blank_pages["values"]["PageCount"] == {"value": "42", "dirty": False}
+
+    kept = form_from_volumes(
+        [
+            _volume(
+                "/books/a.cbz",
+                page_count="10",
+                archive_page_count=42,
+            )
+        ]
+    )
+    assert kept is not None
+    assert kept["values"]["PageCount"] == {"value": "10", "dirty": False}
+
+    no_archive = form_from_volumes(
+        [_volume("/books/a.cbz", page_count="", archive_page_count=None)]
+    )
+    assert no_archive is not None
+    assert no_archive["values"]["PageCount"] == {"value": "", "dirty": False}
+
     edited = edit_field(one, "Number", "9")
     assert edited["values"]["Number"] == {"value": "9", "dirty": True}
 
@@ -223,6 +256,46 @@ def test_one_save_number_rules(tmp_path: Path) -> None:
     )
     assert recorder.saves == []
     assert result == {"entries": []}
+
+    recorder = _Recorder()
+    run_save(
+        **_save_kwargs(
+            recorder,
+            paths=["/books/Claymore v02.cbz"],
+            patch={},
+            mode="one",
+            volumes=[
+                _volume(
+                    "/books/Claymore v02.cbz",
+                    number="2",
+                    page_count="",
+                    archive_page_count=42,
+                )
+            ],
+        )
+    )
+    assert recorder.saves == [
+        ("/books/Claymore v02.cbz", {"PageCount": "42"}, False)
+    ]
+
+    recorder = _Recorder()
+    run_save(
+        **_save_kwargs(
+            recorder,
+            paths=["/books/Claymore.cbz"],
+            patch={"PageCount": ""},
+            mode="one",
+            volumes=[
+                _volume(
+                    "/books/Claymore.cbz",
+                    number="1",
+                    page_count="",
+                    archive_page_count=42,
+                )
+            ],
+        )
+    )
+    assert recorder.saves == [("/books/Claymore.cbz", {"PageCount": ""}, False)]
 
 
 def test_many_save_per_file_number(tmp_path: Path) -> None:
@@ -528,7 +601,7 @@ def _volume(path: str, **overrides: object) -> Volume:
         "number": "",
         "volume": "",
         "publisher": "",
-        "page_count": "",
+        "page_count": "1",
         "language_iso": "",
         "age_rating": "",
         "manga": "",

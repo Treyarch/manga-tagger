@@ -280,10 +280,14 @@ def form_from_volumes(rows: Sequence[object]) -> dict[str, object] | None:
     if not rows:
         return None
     if len(rows) == 1:
-        values = {
-            name: {"value": _field_text(rows[0], name), "dirty": False}
-            for name in FORM_FIELDS
-        }
+        values = {}
+        for name in FORM_FIELDS:
+            value = _field_text(rows[0], name)
+            if name == "PageCount":
+                filled = _page_count_fill(rows[0])
+                if filled is not None:
+                    value = filled
+            values[name] = {"value": value, "dirty": False}
         return {"mode": "one", "values": values}
     values: dict[str, dict[str, object]] = {}
     for name in SHARED_FIELDS:
@@ -748,18 +752,39 @@ def _file_patch(
     file_patch = dict(patch)
     if mode == "one":
         if "Number" in file_patch:
-            return file_patch, True
+            write_number = True
+        else:
+            parsed = parse_number(stem)
+            if parsed is not None and parsed != stored:
+                file_patch["Number"] = parsed
+                write_number = True
+            else:
+                write_number = False
+    else:
+        file_patch.pop("Number", None)
+        file_patch.pop("Volume", None)
         parsed = parse_number(stem)
         if parsed is not None and parsed != stored:
             file_patch["Number"] = parsed
-            return file_patch, True
-        return file_patch, False
-    file_patch.pop("Number", None)
-    file_patch.pop("Volume", None)
-    parsed = parse_number(stem)
-    if parsed is not None and parsed != stored:
-        file_patch["Number"] = parsed
-    return file_patch, "Number" in file_patch
+        write_number = "Number" in file_patch
+    if "PageCount" not in file_patch:
+        filled = _page_count_fill(volume)
+        if filled is not None:
+            file_patch["PageCount"] = filled
+    return file_patch, write_number
+
+
+def _page_count_fill(volume: object | None) -> str | None:
+    """Return archive page count text when ComicInfo left PageCount blank."""
+    if volume is None:
+        return None
+    stored = str(getattr(volume, "page_count", "") or "").strip()
+    if stored:
+        return None
+    count = getattr(volume, "archive_page_count", None)
+    if not isinstance(count, int) or count <= 0:
+        return None
+    return str(count)
 
 
 def _after_success(

@@ -58,7 +58,7 @@ List view groups volumes by ComicInfo `Series`. A non-blank series is a group he
 
 A grid cell is a cover at a 2:3 aspect ratio with the filename as one truncated label under it. Selection is a 2px accent ring around the cover and the selection wash behind the label. A wash behind the cover image would be hidden by the image, so the ring is the selection on the cover itself.
 
-The inspector stacks, from the top: the cover, then the metadata fields. The cover sits in a fixed 320px-tall (`h-80`) frame the full inspector width; the image is centered with `object-contain` and does not change that frame's height when the page changes. Each field is a label above its control. Labels use the muted text color. Fields stack with `gap-3`. The pane has no shadow and no inner card.
+The inspector stacks, from the top: the cover, then the metadata fields. The cover sits in a fixed 320px-tall (`h-80`) frame the full inspector width; the image is centered with `object-contain` and does not change that frame's height when the page changes. Each field is a label above its control. Labels use the muted text color and the readable captions from [04-application-shell.md](04-application-shell.md) (`Page count`, `Language`, `Cover artist`, and the rest), not the raw ComicInfo element names. Fields stack with `gap-3`. The pane has no shadow and no inner card.
 
 An empty library, or an empty place, shows one sentence in the main pane, centered, in the muted color: `No volumes yet.` There is no illustration.
 
@@ -196,6 +196,7 @@ Cover at least:
 - `resolveDark("nope", true)` is true, and `resolveDark("nope", false)` is false.
 - With a resolved dark theme, the shell root that sets the document class carries `dark`. With a resolved light theme, that element does not carry `dark`.
 - Grouping by series puts blank-series volumes first with an empty `series` key, then named series in case-folded alphabetical order, preserving name order within each group.
+- Inspector field captions use the readable names from the shell form section, not camel-cased ComicInfo keys.
 
 ## Acceptance criteria
 

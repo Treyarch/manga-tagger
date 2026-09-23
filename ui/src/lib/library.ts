@@ -40,6 +40,35 @@ export const SHARED_FIELDS = [
   "CoverArtist",
 ] as const;
 
+/** Readable inspector captions for ComicInfo element keys. */
+export const FIELD_LABELS: Record<(typeof FORM_FIELDS)[number], string> = {
+  Title: "Title",
+  Series: "Series",
+  Number: "Number",
+  Volume: "Volume",
+  Publisher: "Publisher",
+  PageCount: "Page count",
+  LanguageISO: "Language",
+  AgeRating: "Age rating",
+  Manga: "Manga",
+  Genre: "Genre",
+  Summary: "Summary",
+  Web: "Web",
+  CommunityRating: "Community rating",
+  Notes: "Notes",
+  Year: "Year",
+  Month: "Month",
+  Day: "Day",
+  Writer: "Writer",
+  Penciller: "Penciller",
+  Inker: "Inker",
+  CoverArtist: "Cover artist",
+};
+
+export function fieldLabel(name: string): string {
+  return FIELD_LABELS[name as (typeof FORM_FIELDS)[number]] ?? name;
+}
+
 export const MANGA_OPTIONS = [
   "YesAndRightToLeft",
   "Yes",
@@ -47,6 +76,18 @@ export const MANGA_OPTIONS = [
   "YesAndLeftToRight",
   "",
 ] as const;
+
+const MANGA_LABELS: Record<(typeof MANGA_OPTIONS)[number], string> = {
+  YesAndRightToLeft: "Yes (right to left)",
+  Yes: "Yes",
+  No: "No",
+  YesAndLeftToRight: "Yes (left to right)",
+  "": "",
+};
+
+export function mangaLabel(token: string): string {
+  return MANGA_LABELS[token as (typeof MANGA_OPTIONS)[number]] ?? token;
+}
 
 export const PROVIDERS = [
   { id: "mangadex", label: "MangaDex" },
@@ -298,12 +339,25 @@ function fieldText(row: Volume, name: string): string {
   return String(value);
 }
 
+/** Archive page count text when ComicInfo left PageCount blank. */
+export function pageCountFill(row: Volume): string | null {
+  if (fieldText(row, "PageCount").trim() !== "") return null;
+  const count = row.archive_page_count;
+  if (count === null || count <= 0) return null;
+  return String(count);
+}
+
 export function formFromVolumes(rows: Volume[]): InspectorForm | null {
   if (rows.length === 0) return null;
   if (rows.length === 1) {
     const values: Record<string, Field> = {};
     for (const name of FORM_FIELDS) {
-      values[name] = { value: fieldText(rows[0], name), dirty: false };
+      let value = fieldText(rows[0], name);
+      if (name === "PageCount") {
+        const filled = pageCountFill(rows[0]);
+        if (filled !== null) value = filled;
+      }
+      values[name] = { value, dirty: false };
     }
     return { mode: "one", values };
   }

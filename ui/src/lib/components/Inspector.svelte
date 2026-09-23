@@ -6,7 +6,9 @@
   import {
     FORM_FIELDS,
     SHARED_FIELDS,
+    fieldLabel,
     mangaChoices,
+    mangaLabel,
     type Candidate,
     type InspectorForm,
     type Volume,
@@ -83,7 +85,9 @@
       {#each fields as name (name)}
         {@const field = form.values[name]}
         <label class="flex flex-col gap-1" for={`field-${name}`}>
-          <span class="text-xs text-zinc-500 dark:text-zinc-400">{name}</span>
+          <span class="text-xs text-zinc-500 dark:text-zinc-400"
+            >{fieldLabel(name)}</span
+          >
           {#if name === "Summary" || name === "Notes"}
             <Textarea
               id={`field-${name}`}
@@ -98,7 +102,7 @@
               disabled={formLocked}
               options={mangaChoices(field.value).map((option) => ({
                 value: option,
-                label: option,
+                label: mangaLabel(option),
               }))}
               onValue={(next) => onEdit(name, next)}
             />

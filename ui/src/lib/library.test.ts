@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   POLL_MS,
+  FORM_FIELDS,
   convertConfirmMessage,
   editField,
   entryErrorLines,
+  fieldLabel,
   filenameStem,
   filterVolumes,
   formFromVolumes,
@@ -12,6 +14,8 @@ import {
   initialPageIndex,
   jobLabel,
   folderDropRequest,
+  mangaChoices,
+  mangaLabel,
   parseRootLines,
   placeAfterLibrary,
   renamePlanLines,
@@ -159,6 +163,50 @@ describe("form", () => {
     expect(savePatch(changed)).toEqual({ Publisher: "" });
     expect(savePatch(changed).Series).toBeUndefined();
     expect(savePatch(changed).Number).toBeUndefined();
+  });
+
+  it("maps ComicInfo keys to readable field captions", () => {
+    expect(fieldLabel("PageCount")).toBe("Page count");
+    expect(fieldLabel("LanguageISO")).toBe("Language");
+    expect(fieldLabel("AgeRating")).toBe("Age rating");
+    expect(fieldLabel("CommunityRating")).toBe("Community rating");
+    expect(fieldLabel("CoverArtist")).toBe("Cover artist");
+    expect(fieldLabel("Title")).toBe("Title");
+    expect(FORM_FIELDS.every((name) => fieldLabel(name).length > 0)).toBe(true);
+  });
+
+  it("maps Manga tokens to readable select captions", () => {
+    expect(mangaLabel("YesAndRightToLeft")).toBe("Yes (right to left)");
+    expect(mangaLabel("YesAndLeftToRight")).toBe("Yes (left to right)");
+    expect(mangaLabel("Yes")).toBe("Yes");
+    expect(mangaLabel("No")).toBe("No");
+    expect(mangaLabel("")).toBe("");
+    expect(mangaLabel("WeirdToken")).toBe("WeirdToken");
+    expect(mangaChoices("WeirdToken")).toEqual([
+      "YesAndRightToLeft",
+      "Yes",
+      "No",
+      "YesAndLeftToRight",
+      "",
+      "WeirdToken",
+    ]);
+  });
+
+  it("fills PageCount from the archive when ComicInfo left it blank", () => {
+    const filled = formFromVolumes([
+      volume("/books/a.cbz", { page_count: "", archive_page_count: 42 }),
+    ])!;
+    expect(filled.values.PageCount).toEqual({ value: "42", dirty: false });
+
+    const kept = formFromVolumes([
+      volume("/books/a.cbz", { page_count: "10", archive_page_count: 42 }),
+    ])!;
+    expect(kept.values.PageCount).toEqual({ value: "10", dirty: false });
+
+    const missing = formFromVolumes([
+      volume("/books/a.cbz", { page_count: "", archive_page_count: null }),
+    ])!;
+    expect(missing.values.PageCount).toEqual({ value: "", dirty: false });
   });
 
   it("uses series for scrape only when it is set and not mixed", () => {
