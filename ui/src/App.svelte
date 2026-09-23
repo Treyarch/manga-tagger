@@ -17,6 +17,7 @@
     X,
   } from "lucide-svelte";
   import { getJson, postJson, putConfig, type Config } from "./lib/api";
+  import BrandMark from "./lib/components/BrandMark.svelte";
   import Button from "./lib/components/Button.svelte";
   import Dialog from "./lib/components/Dialog.svelte";
   import Inspector from "./lib/components/Inspector.svelte";
@@ -461,101 +462,108 @@
   class="flex h-full flex-col gap-2 bg-zinc-100 p-2 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100"
 >
   <header
-    class="flex h-12 shrink-0 items-center gap-1 border border-zinc-200 bg-white px-2 dark:border-zinc-800 dark:bg-zinc-900"
+    class="grid h-12 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-1 border border-zinc-200 bg-white px-2 dark:border-zinc-800 dark:bg-zinc-900"
   >
-    <div class="w-40 shrink-0">
-      <Select
-        label="Provider"
-        value={provider}
-        options={PROVIDERS.map((item) => ({ value: item.id, label: item.label }))}
-        onValue={(next) => (provider = next)}
-      />
+    <div class="justify-self-start">
+      <BrandMark />
     </div>
-    <Button icon label="Scrape" disabled={busy || anchor === null} onclick={scrape}>
-      <ScanSearch size={20} />
-    </Button>
-    <Button
-      icon
-      label="Save"
-      disabled={busy || selection.paths.length === 0}
-      onclick={save}
-    >
-      <Save size={20} />
-    </Button>
-    <Button
-      icon
-      label="Rename file(s)"
-      disabled={busy || selectedPlace === null}
-      onclick={openRename}
-    >
-      <Pencil size={20} />
-    </Button>
-    <Button icon label="Convert CBR" disabled={busy || selectedCbr === 0} onclick={requestConvert}>
-      <FileArchive size={20} />
-    </Button>
-    <Button icon label="Scan library" disabled={busy} onclick={rescan}>
-      <RefreshCw size={20} />
-    </Button>
-    <Button icon label="List view" pressed={view === "list"} onclick={() => (view = "list")}>
-      <List size={20} />
-    </Button>
-    <Button icon label="Grid view" pressed={view === "grid"} onclick={() => (view = "grid")}>
-      <LayoutGrid size={20} />
-    </Button>
-    {#if headerJob}
-      <span class="px-1 text-sm">{jobLabel(headerJob)}</span>
-      <Button icon label="Cancel" onclick={cancelJob}><X size={20} /></Button>
-    {/if}
-    <div class="relative ml-auto">
+    <div class="flex items-center gap-1">
+      <div class="w-40 shrink-0">
+        <Select
+          label="Provider"
+          value={provider}
+          options={PROVIDERS.map((item) => ({ value: item.id, label: item.label }))}
+          onValue={(next) => (provider = next)}
+        />
+      </div>
+      <Button icon label="Scrape" disabled={busy || anchor === null} onclick={scrape}>
+        <ScanSearch size={20} />
+      </Button>
       <Button
         icon
-        label="Theme"
-        onclick={(event) => {
-          event.stopPropagation();
-          themeOpen = !themeOpen;
-        }}
+        label="Save"
+        disabled={busy || selection.paths.length === 0}
+        onclick={save}
       >
-        {#if config.theme === "light"}
-          <Sun size={20} />
-        {:else if config.theme === "dark"}
-          <Moon size={20} />
-        {:else}
-          <Monitor size={20} />
-        {/if}
+        <Save size={20} />
       </Button>
-      {#if themeOpen}
-        <Menu
-          items={[
-            { id: "system", label: "System", checked: config.theme !== "light" && config.theme !== "dark" },
-            { id: "light", label: "Light", checked: config.theme === "light" },
-            { id: "dark", label: "Dark", checked: config.theme === "dark" },
-          ]}
-          onSelect={chooseTheme}
-        >
-          {#snippet icon(id)}
-            {#if id === "light"}
-              <Sun size={16} />
-            {:else if id === "dark"}
-              <Moon size={16} />
-            {:else}
-              <Monitor size={16} />
-            {/if}
-          {/snippet}
-        </Menu>
+      <Button
+        icon
+        label="Rename file(s)"
+        disabled={busy || selectedPlace === null}
+        onclick={openRename}
+      >
+        <Pencil size={20} />
+      </Button>
+      <Button icon label="Convert CBR" disabled={busy || selectedCbr === 0} onclick={requestConvert}>
+        <FileArchive size={20} />
+      </Button>
+      <Button icon label="Scan library" disabled={busy} onclick={rescan}>
+        <RefreshCw size={20} />
+      </Button>
+      <Button icon label="List view" pressed={view === "list"} onclick={() => (view = "list")}>
+        <List size={20} />
+      </Button>
+      <Button icon label="Grid view" pressed={view === "grid"} onclick={() => (view = "grid")}>
+        <LayoutGrid size={20} />
+      </Button>
+      {#if headerJob}
+        <span class="px-1 text-sm">{jobLabel(headerJob)}</span>
+        <Button icon label="Cancel" onclick={cancelJob}><X size={20} /></Button>
       {/if}
     </div>
-    <Button icon label="Settings" onclick={() => (settingsOpen = true)}>
-      <Settings size={20} />
-    </Button>
-    <Button
-      icon
-      label="Close"
-      onclick={() => {
-        void postJson("/api/window/close").catch(() => undefined);
-      }}
-    >
-      <X size={20} />
-    </Button>
+    <div class="flex items-center justify-self-end gap-1">
+      <div class="relative">
+        <Button
+          icon
+          label="Theme"
+          onclick={(event) => {
+            event.stopPropagation();
+            themeOpen = !themeOpen;
+          }}
+        >
+          {#if config.theme === "light"}
+            <Sun size={20} />
+          {:else if config.theme === "dark"}
+            <Moon size={20} />
+          {:else}
+            <Monitor size={20} />
+          {/if}
+        </Button>
+        {#if themeOpen}
+          <Menu
+            items={[
+              { id: "system", label: "System", checked: config.theme !== "light" && config.theme !== "dark" },
+              { id: "light", label: "Light", checked: config.theme === "light" },
+              { id: "dark", label: "Dark", checked: config.theme === "dark" },
+            ]}
+            onSelect={chooseTheme}
+          >
+            {#snippet icon(id)}
+              {#if id === "light"}
+                <Sun size={16} />
+              {:else if id === "dark"}
+                <Moon size={16} />
+              {:else}
+                <Monitor size={16} />
+              {/if}
+            {/snippet}
+          </Menu>
+        {/if}
+      </div>
+      <Button icon label="Settings" onclick={() => (settingsOpen = true)}>
+        <Settings size={20} />
+      </Button>
+      <Button
+        icon
+        label="Close"
+        onclick={() => {
+          void postJson("/api/window/close").catch(() => undefined);
+        }}
+      >
+        <X size={20} />
+      </Button>
+    </div>
   </header>
   <div
     class="flex min-h-0 flex-1 overflow-hidden border border-zinc-200 dark:border-zinc-800"

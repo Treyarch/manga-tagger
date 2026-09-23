@@ -1,5 +1,5 @@
 ---
-description: Nautilus-like light and dark window, with a header bar, places sidebar, volume list or cover grid, inspector, Lucide icons, and a small set of local Tailwind components.
+description: Nautilus-like light and dark window, with a three-zone header bar (brand, centered actions, trailing utilities), places sidebar, volume list or cover grid, inspector, Lucide icons, and a small set of local Tailwind components.
 status: active
 ---
 
@@ -32,7 +32,7 @@ The window fills the webview. It does not sit in a centered page column. The chr
 +------------------------------------------------------------------+
 | (window background, 8px inset)                                   |
 |  +--------------------------------------------------------------+ |
-|  | Header bar                                                   | |
+|  | Brand |          action cluster          | Theme Settings X  | |
 |  +------------------+---------------------------+---------------+ |
 |  | My library      | Volume list or cover grid | Inspector     | |
 |  |                  |                           | cover         | |
@@ -41,10 +41,14 @@ The window fills the webview. It does not sit in a centered page column. The chr
 +------------------------------------------------------------------+
 ```
 
+The header bar is three zones in one 48px row: a leading product brand, a centered action cluster, and trailing theme/settings/close. It is a CSS grid `grid-cols-[1fr_auto_1fr]`. The brand sits `justify-self-start` in the first column. The action cluster (provider select, scrape and write actions, view switch, and the job label with Cancel when a job is busy) sits in the middle column. Theme, Settings, and Close sit `justify-self-end` in the third column. Equal `1fr` side columns keep the action cluster optically centered on wide windows. The bar does not wrap to a second row.
+
+The product brand is a mini SVG logo (closed tankōbon with a tag notch, about 20px, `currentColor` with the accent on the spine) beside the wordmark `Manga Tagger`. It is not a button.
+
 | Region | Size | Surface |
 | --- | --- | --- |
 | Window inset | 8px (`p-2`) around the chrome, 8px (`gap-2`) under the header | Window background |
-| Header bar | 48px tall (`h-12`) | Same fill as the main pane, hairline around the header |
+| Header bar | 48px tall (`h-12`), three zones as above | Same fill as the main pane, hairline around the header |
 | My library sidebar | 240px (`w-60`) | Window background |
 | Main pane | Remaining width | View background |
 | Inspector | 384px (`w-96`) | View background, hairline along its left edge |
@@ -83,16 +87,19 @@ Text on a filled accent or danger button is `white` in both themes. A selected r
 
 ## Type
 
-Use Tailwind's default `font-sans` stack. On Linux that resolves to the desktop UI font. Do not bundle a webfont.
+Use Tailwind's default `font-sans` stack for chrome, rows, and fields. On Linux that resolves to the desktop UI font. Do not bundle a webfont for those uses.
+
+The product wordmark is the one exception: it uses a self-hosted **Dela Gothic One** face (OFL), filed under `ui/src/assets/fonts/`, declared with `@font-face` in `app.css`, and applied only through a `.font-brand` class on the brand title. Chrome and form text stay on `font-sans`.
 
 | Use | Classes |
 | --- | --- |
-| Labels, rows, header, fields | `text-sm` |
+| Labels, rows, header controls, fields | `text-sm` |
+| Product wordmark | `text-sm font-brand` (Dela Gothic One) |
 | Field captions, grid captions, muted secondary text | `text-xs` plus the muted color |
 
 ## Theme
 
-`ui/src/app.css` contains:
+`ui/src/app.css` contains the Tailwind import, the `dark` custom variant, the Dela Gothic One `@font-face` and `.font-brand` class, and:
 
 ```css
 @import "tailwindcss";
@@ -214,6 +221,8 @@ Cover at least:
 - `jobToastMessage` returns null for `cancelled`, the scrape/load/save/rename/convert/scan sentences from the shell toast table for `succeeded` and `failed`, and uses entry counts without `error_message` for save, rename, and convert.
 - `pushToast` adds an item that `dismissToast` removes, and a timer removes it after 5 seconds.
 
+The product brand (SVG logo and wordmark) is presentational chrome. It is covered by the acceptance criteria below, not by a separate unit test.
+
 ## Acceptance criteria
 
 - The window is a header bar, a 240px My library sidebar, a flexible main pane, and a 384px inspector, separated by hairlines. An 8px window-background inset surrounds that chrome, with 8px between the header and the pane strip. A hairline outlines the header and the pane strip. The three panes stay flush with each other. The header does not scroll away.
@@ -226,5 +235,6 @@ Cover at least:
 - Icons are Lucide, `currentColor`, 16px in rows and menu items and 20px in the header. The view switch is `List` / `List view` and `LayoutGrid` / `Grid view`. The theme menu is `Monitor`, `Sun`, and `Moon`. Add folder is `FolderPlus`. Close is `X` at the trailing edge of the header. Icon buttons expose their accessible name as a native `title` so a short hover shows that label.
 - Buttons, text inputs, textareas, checkboxes, selects, menus, dialogs, and toasts are the local components in this document, styled with Tailwind utilities. The UI package does not depend on a third-party component kit.
 - Action toasts appear in a top-right stack, fade in downward with a short overshoot, and disappear after 5 seconds or on click. In dark mode they use a raised `zinc-800` surface and a stronger shadow so they stand apart from the panes. They summarize scrape, load, save, rename, convert, and scan outcomes. Scrape match count, no matches, and provider errors are toast-only. Detailed per-file save/rename/convert errors and scan-root lines stay in the inspector.
-- Type is the default sans stack at `text-sm` for controls and rows, and `text-xs` for captions.
+- Type is the default sans stack at `text-sm` for controls and rows, and `text-xs` for captions. The product wordmark alone uses the bundled Dela Gothic One face via `.font-brand`.
+- The header is three zones: leading brand (mini SVG + `Manga Tagger`), centered action cluster, trailing Theme / Settings / Close. The brand is readable in light and dark.
 - A keyboard focus ring is visible on the shared controls.
