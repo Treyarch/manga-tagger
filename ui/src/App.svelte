@@ -657,36 +657,49 @@
           {/each}
         </ul>
       {:else}
-        <ul class="grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-3 p-3">
-          {#each visible as row (row.path)}
-            <li>
-              <button
-                type="button"
-                class="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:focus-visible:ring-blue-500"
-                onclick={(event) => onVolume(row.path, event)}
-              >
-                <span
-                  class="block aspect-[2/3] overflow-hidden bg-zinc-100 dark:bg-zinc-950 {selected(
-                    row.path,
-                  )
-                    ? 'ring-2 ring-blue-600 dark:ring-blue-500'
-                    : ''}"
+        <div class="flex flex-col gap-4 p-3">
+          {#each groups as group (group.series)}
+            <section class="flex flex-col gap-2">
+              {#if group.series !== ""}
+                <h3
+                  class="truncate text-xs text-zinc-500 dark:text-zinc-400"
                 >
-                  {#if row.status !== "failed"}
-                    <Thumb path={row.path} failed={false} />
-                  {/if}
-                </span>
-                <span
-                  class="mt-1 block truncate text-xs {selected(row.path)
-                    ? 'bg-blue-600/10 dark:bg-blue-500/15'
-                    : ''}"
-                >
-                  {row.name}
-                </span>
-              </button>
-            </li>
+                  {group.series}
+                </h3>
+              {/if}
+              <ul class="grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-3">
+                {#each group.volumes as row (row.path)}
+                  <li>
+                    <button
+                      type="button"
+                      class="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:focus-visible:ring-blue-500"
+                      onclick={(event) => onVolume(row.path, event)}
+                    >
+                      <span
+                        class="block aspect-[2/3] overflow-hidden bg-zinc-100 dark:bg-zinc-950 {selected(
+                          row.path,
+                        )
+                          ? 'ring-2 ring-blue-600 dark:ring-blue-500'
+                          : ''}"
+                      >
+                        {#if row.status !== "failed"}
+                          <Thumb path={row.path} failed={false} />
+                        {/if}
+                      </span>
+                      <span
+                        class="mt-1 block truncate text-xs {selected(row.path)
+                          ? 'bg-blue-600/10 dark:bg-blue-500/15'
+                          : ''}"
+                      >
+                        {row.name}
+                      </span>
+                    </button>
+                  </li>
+                {/each}
+              </ul>
+            </section>
           {/each}
-        </ul>
+        </div>
       {/if}
     </main>
     <aside
