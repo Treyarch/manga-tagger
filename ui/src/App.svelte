@@ -21,6 +21,7 @@
   import Button from "./lib/components/Button.svelte";
   import Dialog from "./lib/components/Dialog.svelte";
   import Inspector from "./lib/components/Inspector.svelte";
+  import MatchesDialog from "./lib/components/MatchesDialog.svelte";
   import Menu from "./lib/components/Menu.svelte";
   import RenameDialog from "./lib/components/RenameDialog.svelte";
   import Select from "./lib/components/Select.svelte";
@@ -215,6 +216,7 @@
       if (selectionKey(selection) !== loadSelectionKey) return;
       const next = formOf(job.result);
       if (next) form = next;
+      candidates = [];
       toastFrom(job);
       return;
     }
@@ -717,16 +719,21 @@
         {anchor}
         {form}
         {formLocked}
-        {busy}
         lines={inspectorLines}
-        {candidates}
         {onEdit}
-        onCandidate={chooseCandidate}
       />
     </aside>
   </div>
 </div>
 
+{#if candidates.length > 0}
+  <MatchesDialog
+    {candidates}
+    {busy}
+    onDismiss={() => (candidates = [])}
+    onCandidate={chooseCandidate}
+  />
+{/if}
 {#if settingsOpen}
   <SettingsDialog
     {config}

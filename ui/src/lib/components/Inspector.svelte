@@ -9,7 +9,6 @@
     fieldLabel,
     mangaChoices,
     mangaLabel,
-    type Candidate,
     type InspectorForm,
     type Volume,
   } from "../library";
@@ -18,20 +17,14 @@
     anchor,
     form,
     formLocked,
-    busy,
     lines,
-    candidates,
     onEdit,
-    onCandidate,
   }: {
     anchor: Volume | null;
     form: InspectorForm | null;
     formLocked: boolean;
-    busy: boolean;
     lines: string[];
-    candidates: Candidate[];
     onEdit: (key: string, value: string) => void;
-    onCandidate: (id: string) => void;
   } = $props();
 
   const fields = $derived(
@@ -44,29 +37,6 @@
     <ul class="flex flex-col gap-1 text-sm text-zinc-900 dark:text-zinc-100">
       {#each lines as line}
         <li>{line}</li>
-      {/each}
-    </ul>
-  {/if}
-  {#if candidates.length > 0}
-    <ul class="flex flex-col">
-      {#each candidates as candidate (candidate.id)}
-        <li>
-          <button
-            type="button"
-            class="w-full rounded-md px-2 py-1 text-left hover:bg-blue-600/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-40 dark:hover:bg-blue-500/15 dark:focus-visible:ring-blue-500"
-            disabled={busy}
-            onclick={() => onCandidate(candidate.id)}
-          >
-            <span class="block text-sm text-zinc-900 dark:text-zinc-100"
-              >{candidate.title}</span
-            >
-            {#if candidate.detail.trim() !== ""}
-              <span class="block text-xs text-zinc-500 dark:text-zinc-400"
-                >{candidate.detail}</span
-              >
-            {/if}
-          </button>
-        </li>
       {/each}
     </ul>
   {/if}

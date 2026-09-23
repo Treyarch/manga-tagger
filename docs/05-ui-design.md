@@ -181,7 +181,13 @@ When a button has an accessible name and no visible text (icon buttons), that na
 
 ### Dialog
 
-`Dialog.svelte`. A `zinc-900/40` backdrop. The panel is `max-w-md`, `rounded-lg`, the view background, a hairline, and `p-4`. The title is `text-sm font-medium`. Actions sit at the trailing edge: a `quiet` dismiss button, then either `primary` or `danger` for the confirm button.
+`Dialog.svelte`. A centered modal over the window with a `zinc-900/40` backdrop at `z-30` (below toasts). The panel is `max-w-md`, `rounded-lg`, and `p-4`. The title is `text-sm font-medium`.
+
+Light mode uses a white fill, a `zinc-200` hairline, and `shadow-md` so the panel lifts off the panes the same way a toast does. Dark mode does not reuse the pane fill: it uses a `zinc-800` fill, a `zinc-600` border, and `shadow-lg` with a dark black wash so the dialog reads clearly against `zinc-900` panes and `zinc-950` chrome.
+
+Enter: fade in and fly upward about 20px over ~400ms with a slight overshoot (`backOut`). Exit: fade out and drift downward over ~220ms. Backdrop click does not dismiss.
+
+Actions sit at the trailing edge: a `quiet` dismiss button labeled `Cancel`. When the dialog has a confirm action, a `primary` or `danger` confirm button follows. Picker dialogs (scrape Matches) omit the confirm button; only Cancel remains. `MatchesDialog.svelte` uses this dismiss-only footer and lists scrape candidate rows (`title`, optional muted `detail`) in the body. Match rows are not shown in the inspector.
 
 ### Toast
 
@@ -234,6 +240,7 @@ The product brand (SVG logo and wordmark) is presentational chrome. It is covere
 - The resolved theme is applied before the first paint.
 - Icons are Lucide, `currentColor`, 16px in rows and menu items and 20px in the header. The view switch is `List` / `List view` and `LayoutGrid` / `Grid view`. The theme menu is `Monitor`, `Sun`, and `Moon`. Add folder is `FolderPlus`. Close is `X` at the trailing edge of the header. Icon buttons expose their accessible name as a native `title` so a short hover shows that label.
 - Buttons, text inputs, textareas, checkboxes, selects, menus, dialogs, and toasts are the local components in this document, styled with Tailwind utilities. The UI package does not depend on a third-party component kit.
+- Dialogs are centered over the window with a dimmed backdrop. Their panels use the same raised surface as toasts (white / `zinc-800` in dark, hairline, shadow) and fade in with a short upward overshoot. Settings, Rename, Convert, and Matches share that chrome. Matches is dismiss-only; the other three keep Cancel plus a confirm action.
 - Action toasts appear in a top-right stack, fade in downward with a short overshoot, and disappear after 5 seconds or on click. In dark mode they use a raised `zinc-800` surface and a stronger shadow so they stand apart from the panes. They summarize scrape, load, save, rename, convert, and scan outcomes. Scrape match count, no matches, and provider errors are toast-only. Detailed per-file save/rename/convert errors and scan-root lines stay in the inspector.
 - Type is the default sans stack at `text-sm` for controls and rows, and `text-xs` for captions. The product wordmark alone uses the bundled Dela Gothic One face via `.font-brand`.
 - The header is three zones: leading brand (mini SVG + `Manga Tagger`), centered action cluster, trailing Theme / Settings / Close. The brand is readable in light and dark.
