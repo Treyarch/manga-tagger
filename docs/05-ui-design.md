@@ -58,7 +58,7 @@ List view groups volumes by ComicInfo `Series`. A non-blank series is a group he
 
 A grid cell is a cover at a 2:3 aspect ratio with the filename as one truncated label under it. Selection is a 2px accent ring around the cover and the selection wash behind the label. A wash behind the cover image would be hidden by the image, so the ring is the selection on the cover itself.
 
-The inspector stacks, from the top: the cover, `object-contain`, on the view background; then the metadata fields. Each field is a label above its control. Labels use the muted text color. Fields stack with `gap-3`. The pane has no shadow and no inner card.
+The inspector stacks, from the top: the cover, then the metadata fields. The cover sits in a fixed 320px-tall (`h-80`) frame the full inspector width; the image is centered with `object-contain` and does not change that frame's height when the page changes. Each field is a label above its control. Labels use the muted text color. Fields stack with `gap-3`. The pane has no shadow and no inner card.
 
 An empty library, or an empty place, shows one sentence in the main pane, centered, in the muted color: `No volumes yet.` There is no illustration.
 

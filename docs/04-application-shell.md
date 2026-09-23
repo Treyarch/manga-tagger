@@ -118,7 +118,7 @@ The form is rebuilt from the index rows when the selection changes and when a sa
 
 ## Preview
 
-The inspector image is one page of the anchor. The client starts at `cover_index`, or at `0` when `cover_index` is null or outside the page list. Previous and next stay inside `0 .. archive_page_count - 1`. They are quiet icon buttons, Lucide `ChevronLeft` and `ChevronRight`, with accessible names `Previous page` and `Next page`. At the ends, the matching button is disabled. Changing the anchor resets the index to the new cover.
+The inspector image is one page of the anchor. The client starts at `cover_index`, or at `0` when `cover_index` is null or outside the page list. Previous and next stay inside `0 .. archive_page_count - 1`. They are quiet icon buttons, Lucide `ChevronLeft` and `ChevronRight`, with accessible names `Previous page` and `Next page`. At the ends, the matching button is disabled. Changing the anchor resets the index to the new cover. Page index lives in the preview control alone: paging does not rebuild the metadata form, and the previous image stays until the next page bytes arrive. The preview frame is a fixed 320px height so paging does not shift the fields below; the image is centered inside that frame.
 
 `GET /api/page` lists page names from the central directory, then reads that one index. The list reads no member bodies. The response body is that member's uncompressed bytes. `Content-Type` is `image/jpeg` for `jpg` and `jpeg`, `image/png` for `png`, `image/webp` for `webp`, and `image/gif` for `gif`, compared case-insensitively, otherwise `application/octet-stream`. A `failed` anchor, or a null or zero `archive_page_count`, shows `error_message` when the row has one, and requests no page.
 

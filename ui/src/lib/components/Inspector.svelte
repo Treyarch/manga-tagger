@@ -1,14 +1,12 @@
 <script lang="ts">
-  import { ChevronLeft, ChevronRight } from "lucide-svelte";
-  import Button from "./Button.svelte";
   import Select from "./Select.svelte";
   import Textarea from "./Textarea.svelte";
   import TextInput from "./TextInput.svelte";
+  import PagePreview from "./PagePreview.svelte";
   import {
     FORM_FIELDS,
     SHARED_FIELDS,
     mangaChoices,
-    requestsPage,
     type Candidate,
     type InspectorForm,
     type Volume,
@@ -16,64 +14,29 @@
 
   let {
     anchor,
-    pageIndex,
     form,
     formLocked,
     busy,
     lines,
     noMatches,
     candidates,
-    onPage,
     onEdit,
     onCandidate,
   }: {
     anchor: Volume | null;
-    pageIndex: number | null;
     form: InspectorForm | null;
     formLocked: boolean;
     busy: boolean;
     lines: string[];
     noMatches: boolean;
     candidates: Candidate[];
-    onPage: (index: number) => void;
     onEdit: (key: string, value: string) => void;
     onCandidate: (id: string) => void;
   } = $props();
 
-  let pageUrl = $state<string | null>(null);
-  const showPage = $derived(
-    anchor !== null && pageIndex !== null && requestsPage(anchor),
-  );
-  const pageCount = $derived(anchor?.archive_page_count ?? 0);
   const fields = $derived(
     form === null ? [] : form.mode === "one" ? FORM_FIELDS : SHARED_FIELDS,
   );
-
-  $effect(() => {
-    const volume = anchor;
-    const index = pageIndex;
-    if (volume === null || index === null || !requestsPage(volume)) {
-      pageUrl = null;
-      return;
-    }
-    const path = volume.path;
-    let cancelled = false;
-    let objectUrl: string | null = null;
-    pageUrl = null;
-    void fetch(
-      `/api/page?path=${encodeURIComponent(path)}&index=${index}`,
-    ).then(async (response) => {
-      if (!response.ok || cancelled) return;
-      const blob = await response.blob();
-      if (cancelled) return;
-      objectUrl = URL.createObjectURL(blob);
-      pageUrl = objectUrl;
-    });
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  });
 </script>
 
 <div class="flex flex-col gap-3 p-4">
@@ -110,32 +73,10 @@
       {/each}
     </ul>
   {/if}
-  {#if anchor && showPage}
-    <div class="flex flex-col gap-2">
-      {#if pageUrl}
-        <img src={pageUrl} alt="" class="max-h-80 w-full object-contain" />
-      {/if}
-      <div class="flex justify-between">
-        <Button
-          icon
-          label="Previous page"
-          disabled={pageIndex === null || pageIndex <= 0}
-          onclick={() => pageIndex !== null && onPage(pageIndex - 1)}
-        >
-          <ChevronLeft size={20} />
-        </Button>
-        <Button
-          icon
-          label="Next page"
-          disabled={pageIndex === null || pageIndex >= pageCount - 1}
-          onclick={() => pageIndex !== null && onPage(pageIndex + 1)}
-        >
-          <ChevronRight size={20} />
-        </Button>
-      </div>
-    </div>
-  {:else if anchor && anchor.error_message}
-    <p class="text-sm text-zinc-900 dark:text-zinc-100">{anchor.error_message}</p>
+  {#if anchor}
+    {#key anchor.path}
+      <PagePreview {anchor} />
+    {/key}
   {/if}
   {#if form}
     <div class="flex flex-col gap-3">

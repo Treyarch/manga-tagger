@@ -44,7 +44,6 @@
     formFromVolumes,
     formIsDirty,
     formOf,
-    initialPageIndex,
     isBusy,
     jobLabel,
     placeAfterLibrary,
@@ -84,8 +83,6 @@
   let inspectorLines = $state<string[]>([]);
   let folderError = $state("");
   let dragDepth = $state(0);
-  let pageIndex = $state<number | null>(null);
-  let pageAnchor = $state("");
   let themeOpen = $state(false);
   let settingsOpen = $state(false);
   let renameOpen = $state(false);
@@ -134,14 +131,6 @@
     form = formFromVolumes(rowsFor(selection.paths));
   }
 
-  function syncPage() {
-    const path = selection.anchor ?? "";
-    if (path === pageAnchor) return;
-    pageAnchor = path;
-    const row = volumes.find((item) => item.path === path) ?? null;
-    pageIndex = row ? initialPageIndex(row.cover_index, row.archive_page_count) : null;
-  }
-
   function terminal(state: string): boolean {
     return state === "succeeded" || state === "failed" || state === "cancelled";
   }
@@ -155,7 +144,6 @@
     selectedPlace = placeAfterLibrary(selectedPlace, places);
     selection = selectionAfterFilter(visiblePathsAfter(), selection);
     rebuildForm();
-    syncPage();
   }
 
   function visiblePathsAfter(): string[] {
@@ -186,7 +174,6 @@
       selection = selectionAfterFilter(visiblePathsAfter(), selection);
     }
     if (!(job.name === "Scan" && formIsDirty(form))) rebuildForm();
-    syncPage();
     if (job.name === "Scan") {
       const result = (job.result ?? {}) as {
         skipped?: string[];
@@ -269,7 +256,6 @@
     query = value;
     selection = selectionAfterFilter(visiblePathsAfter(), selection);
     rebuildForm();
-    syncPage();
   }
 
   function onPlace(path: string) {
@@ -280,7 +266,6 @@
     candidates = [];
     noMatches = false;
     rebuildForm();
-    syncPage();
   }
 
   function onVolume(path: string, event: MouseEvent) {
@@ -294,18 +279,11 @@
       noMatches = false;
     }
     rebuildForm();
-    syncPage();
   }
 
   function onEdit(key: string, value: string) {
     if (form === null) return;
     form = editField(form, key, value);
-  }
-
-  function setPage(index: number) {
-    const count = anchor?.archive_page_count ?? 0;
-    if (index < 0 || index >= count) return;
-    pageIndex = index;
   }
 
   async function scrape() {
@@ -737,14 +715,12 @@
     >
       <Inspector
         {anchor}
-        {pageIndex}
         {form}
         {formLocked}
         {busy}
         lines={inspectorLines}
         {noMatches}
         {candidates}
-        onPage={setPage}
         {onEdit}
         onCandidate={chooseCandidate}
       />
