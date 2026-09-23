@@ -383,7 +383,12 @@ def test_save_many_writes_shared_fields_only(tmp_path: Path) -> None:
     _simple_cbz(second, Title="Two", Series="Old", Number="2", Volume="4", Writer="B")
     results = save_many(
         [first, second],
-        {"Series": "Claymore", "Writer": "Norihiro Yagi", "Manga": "YesAndRightToLeft"},
+        {
+            "Series": "Claymore",
+            "Writer": "Norihiro Yagi",
+            "Manga": "YesAndRightToLeft",
+            "AgeRating": "M",
+        },
         keep_cbr_original=False,
     )
     assert [item.ok for item in results] == [True, True]
@@ -394,6 +399,7 @@ def test_save_many_writes_shared_fields_only(tmp_path: Path) -> None:
         assert _field(path, "Series") == "Claymore"
         assert _field(path, "Writer") == "Norihiro Yagi"
         assert _field(path, "Manga") == "YesAndRightToLeft"
+        assert _field(path, "AgeRating") == "M"
         assert _field(path, "Number") == number
         assert _field(path, "Volume") == volume
         assert _field(path, "Title") == title

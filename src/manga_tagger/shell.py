@@ -17,6 +17,7 @@ SHARED_FIELDS: tuple[str, ...] = (
     "Series",
     "Publisher",
     "LanguageISO",
+    "AgeRating",
     "Genre",
     "Manga",
     "Writer",
@@ -192,6 +193,15 @@ def volumes_in_place(rows: Sequence[object], place_path: str) -> list[object]:
     place = _directory_key(place_path)
     matched = [row for row in rows if _parent_path(str(row.path)) == place]
     return sorted(matched, key=lambda row: str(row.name))
+
+
+def volumes_for_shelf(
+    rows: Sequence[object], place_path: str | None
+) -> list[object]:
+    """Return the shelf for ``place_path``, or every row by ``name`` when None."""
+    if place_path is None:
+        return sorted(rows, key=lambda row: str(row.name))
+    return volumes_in_place(rows, place_path)
 
 
 def filter_volumes(rows: Sequence[object], query: str) -> list[object]:

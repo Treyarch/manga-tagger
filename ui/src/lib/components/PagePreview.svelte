@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
+  import { onDestroy, untrack } from "svelte";
   import { ChevronLeft, ChevronRight } from "lucide-svelte";
   import Button from "./Button.svelte";
   import {
@@ -10,8 +10,11 @@
 
   let { anchor }: { anchor: Volume } = $props();
 
+  // Mount-time seed only; Inspector remounts this via {#key anchor.path}.
   let pageIndex = $state(
-    initialPageIndex(anchor.cover_index, anchor.archive_page_count),
+    untrack(() =>
+      initialPageIndex(anchor.cover_index, anchor.archive_page_count),
+    ),
   );
   let pageUrl = $state<string | null>(null);
 

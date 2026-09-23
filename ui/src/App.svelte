@@ -56,7 +56,7 @@
     selectionKey,
     seriesForSearch,
     shouldRefetchLibrary,
-    volumesInPlace,
+    volumesForShelf,
     type Candidate,
     type InspectorForm,
     type Job,
@@ -97,10 +97,8 @@
   let planToken = 0;
   const settled = new Set<string>();
 
-  const inPlace = $derived(
-    selectedPlace === null ? [] : volumesInPlace(volumes, selectedPlace),
-  );
-  const groups = $derived(groupVolumesBySeries(filterVolumes(inPlace, query)));
+  const shelf = $derived(volumesForShelf(volumes, selectedPlace));
+  const groups = $derived(groupVolumesBySeries(filterVolumes(shelf, query)));
   const visible = $derived(groups.flatMap((group) => group.volumes));
   const visiblePaths = $derived(visible.map((row) => row.path));
   const selectedRows = $derived(
@@ -147,9 +145,8 @@
   }
 
   function visiblePathsAfter(): string[] {
-    if (selectedPlace === null) return [];
     return groupVolumesBySeries(
-      filterVolumes(volumesInPlace(volumes, selectedPlace), query),
+      filterVolumes(volumesForShelf(volumes, selectedPlace), query),
     ).flatMap((group) => group.volumes.map((row) => row.path));
   }
 
@@ -259,9 +256,7 @@
   }
 
   function onPlace(path: string) {
-    if (path === selectedPlace) return;
-    selectedPlace = path;
-    query = query;
+    selectedPlace = path === selectedPlace ? null : path;
     selection = { paths: [], anchor: null };
     candidates = [];
     noMatches = false;
@@ -603,7 +598,7 @@
     >
       <div class="flex h-9 items-center gap-1 px-2">
         <span class="min-w-0 flex-1 truncate text-xs text-zinc-500 dark:text-zinc-400"
-          >Places</span
+          >My library</span
         >
         <Button icon label="Add folder" onclick={() => void addFolder()}>
           <FolderPlus size={16} />

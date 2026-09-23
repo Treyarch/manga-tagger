@@ -33,6 +33,7 @@ from manga_tagger.shell import (
     select_toggle,
     selection_after_filter,
     volumes_for_roots,
+    volumes_for_shelf,
     volumes_in_place,
 )
 
@@ -86,6 +87,9 @@ def test_places_filter_and_selection() -> None:
         "/books/Claymore/a.cbz",
         "/books/Claymore/b.cbz",
     ]
+    all_shelf = volumes_for_shelf(rows, None)
+    assert [row.name for row in all_shelf] == sorted(row.name for row in rows)
+    assert volumes_for_shelf(rows, "/books/Claymore") == in_claymore
     extra_only = [nested]
     assert places_from_volumes(extra_only)[0].path == "/books/Claymore/extra"
     assert volumes_in_place(extra_only, "/books/Claymore") == []

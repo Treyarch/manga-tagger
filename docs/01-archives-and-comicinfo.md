@@ -134,6 +134,7 @@ A batch save exists to stamp the same series-level ComicInfo onto every selected
 - `Series`
 - `Publisher`
 - `LanguageISO`
+- `AgeRating`
 - `Genre`
 - `Writer`
 - `Penciller`
@@ -141,7 +142,7 @@ A batch save exists to stamp the same series-level ComicInfo onto every selected
 - `CoverArtist`
 - `Manga`
 
-`Title`, `Number`, `Volume`, `Summary`, `PageCount`, `Pages`, dates, `Web`, `Notes`, `AgeRating`, and `CommunityRating` are not batch fields. `Number` is written per file by the shell, from that file's filename, through `save_comic_info` with `write_number` true. It is not a `save_many` key. If `patch` contains any other key, `save_many` raises `BatchFieldError` before it writes any file.
+`Title`, `Number`, `Volume`, `Summary`, `PageCount`, `Pages`, dates, `Web`, `Notes`, and `CommunityRating` are not batch fields. `Number` is written per file by the shell, from that file's filename, through `save_comic_info` with `write_number` true. It is not a `save_many` key. If `patch` contains any other key, `save_many` raises `BatchFieldError` before it writes any file.
 
 Each path is saved with `write_number` false and with that patch. The call runs sequentially. One path that raises leaves that file unchanged, records the failure, and continues with the remaining paths. Files already written stay written. There is no rollback.
 
@@ -209,7 +210,7 @@ Cover at least:
 - `write_number` false leaves `Number` unchanged even when the patch contains `Number`. `write_number` true writes `Number`.
 - A missing `ComicInfo.xml` reads as an empty model. The first save creates the member with only the patched elements.
 - Replacing the original happens by rename of a temporary file in the same directory. Forcing the write to fail before the rename leaves the original bytes intact and removes the temporary file.
-- `save_many` with `Series`, `Writer`, and `Manga` updates those elements on each selected file and leaves `Title`, `Number`, and `Volume` as they were. A patch that also contains `Title` or `Number` raises `BatchFieldError` and writes neither file.
+- `save_many` with `Series`, `Writer`, `Manga`, and `AgeRating` updates those elements on each selected file and leaves `Title`, `Number`, and `Volume` as they were. A patch that also contains `Title` or `Number` raises `BatchFieldError` and writes neither file.
 - `save_many` on two CBZs, with the second path unreadable, writes the first file and leaves the second path absent or unchanged. The first file’s new ComicInfo is still readable.
 - `rename_in_directory` with `{Series} v{Number:02}` renames `old.cbz` to `Claymore v01.cbz` when `Series` is `Claymore` and `Number` is `1`, and the zip bytes are unchanged. `Number` `1.5` produces `Claymore v1.5.cbz`. An existing `old-poster.jpg` becomes `Claymore v01-poster.jpg`. A sibling with a blank `Number` stays at its old name. An archive in a subdirectory is not renamed. Two files that render to the same name both stay put. Two files whose posters would land on the same path both stay put. A template of `{Series} v{Number:02}.cbz` or `{NotAField}` raises `RenameTemplateError` and renames nothing.
 - `plan_rename` with the same template returns the new path and does not rename the file or move the poster.
@@ -226,7 +227,7 @@ Cover at least:
 - A metadata save replaces `ComicInfo.xml` and copies every other member unchanged, including compression method, page bytes, and central-directory order. Member names are marked UTF-8. `Pages` is not rebuilt. Unknown XML is still there after the save.
 - The new CBZ is written to a temporary file in the same directory and renamed into place only after `ComicInfo.xml` reads back. A failed save does not truncate the previous file.
 - `Number` is written only when `write_number` is true on a single-file save. `Volume` is written only when the patch includes it. A save never copies `Number` into `Volume` and never rewrites a stored `Manga` token on its own.
-- `save_many` writes only `Series`, `Publisher`, `LanguageISO`, `Genre`, `Writer`, `Penciller`, `Inker`, `CoverArtist`, and `Manga`. Any other patch key, including `Number`, writes nothing. A failed file does not roll back files already written. The shell does not call `save_many`.
+- `save_many` writes only `Series`, `Publisher`, `LanguageISO`, `AgeRating`, `Genre`, `Writer`, `Penciller`, `Inker`, `CoverArtist`, and `Manga`. Any other patch key, including `Number`, writes nothing. A failed file does not roll back files already written. The shell does not call `save_many`.
 - Rename uses each file’s own ComicInfo, keeps the file in the same directory, keeps its extension, and does not change archive bytes. The offered template `{Series} v{Number:02}` produces `Claymore v01.cbz` from `Number` `1`, and `Claymore v1.5.cbz` from `Number` `1.5`. A blank tag or a name collision skips that file. Poster targets are part of the same plan. An invalid template renames nothing. An existing sibling poster moves with the archive. `plan_rename` writes nothing.
 - `write_poster` writes `{stem}-poster.jpg` from the cover only, 600 pixels wide, on white when the cover has an alpha channel, without modifying the archive.
 - Saving a `.cbr`, or converting one, produces a sibling `.cbz` and removes the `.cbr` only after that `.cbz` is complete and its `ComicInfo.xml` reads back. An existing sibling `.cbz` fails the convert and leaves the `.cbr` untouched. `keep_cbr_original` true keeps the `.cbr`.

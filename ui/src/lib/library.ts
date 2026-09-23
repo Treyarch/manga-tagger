@@ -32,6 +32,7 @@ export const SHARED_FIELDS = [
   "Series",
   "Publisher",
   "LanguageISO",
+  "AgeRating",
   "Genre",
   "Manga",
   "Writer",
@@ -227,6 +228,20 @@ export function volumesInPlace(rows: Volume[], placePath: string): Volume[] {
     );
 }
 
+export function volumesForShelf(
+  rows: Volume[],
+  placePath: string | null,
+): Volume[] {
+  if (placePath === null) {
+    return rows
+      .slice()
+      .sort((left, right) =>
+        left.name < right.name ? -1 : left.name > right.name ? 1 : 0,
+      );
+  }
+  return volumesInPlace(rows, placePath);
+}
+
 export function filterVolumes(rows: Volume[], query: string): Volume[] {
   const needle = casefold(query.trim());
   if (needle === "") return rows.slice();
@@ -418,11 +433,10 @@ export function placeAfterLibrary(
   current: string | null,
   places: Place[],
 ): string | null {
-  if (places.length === 0) return null;
   if (current !== null && places.some((place) => place.path === current)) {
     return current;
   }
-  return places[0].path;
+  return null;
 }
 
 export function initialPageIndex(

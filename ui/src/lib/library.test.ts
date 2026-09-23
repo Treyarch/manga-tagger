@@ -29,6 +29,7 @@ import {
   selectionAfterFilter,
   selectionFromClick,
   seriesForSearch,
+  volumesForShelf,
   volumesInPlace,
   type Volume,
 } from "./library";
@@ -78,6 +79,14 @@ describe("shelf and selection", () => {
       volume("/books/Other/b.cbz", { series: "Other" }),
     ];
     expect(volumesInPlace(rows, "/books/Claymore").map((row) => row.name)).toEqual([
+      "a.cbz",
+    ]);
+    expect(volumesForShelf(rows, null).map((row) => row.name)).toEqual([
+      "a.cbz",
+      "b.cbz",
+      "v01.cbz",
+    ]);
+    expect(volumesForShelf(rows, "/books/Claymore").map((row) => row.name)).toEqual([
       "a.cbz",
     ]);
     expect(filterVolumes(rows, "clay").map((row) => row.series)).toEqual([
@@ -150,6 +159,7 @@ describe("form", () => {
       volume("/books/b.cbz", { series: "Monster", publisher: "Shueisha", manga: "No" }),
     ]);
     expect(Object.keys(many?.values ?? [])).toContain("Manga");
+    expect(Object.keys(many?.values ?? [])).toContain("AgeRating");
     expect(many?.values.Series).toEqual({ value: "", mixed: true, dirty: false });
     expect(many?.values.Publisher).toEqual({
       value: "Shueisha",
@@ -277,10 +287,13 @@ describe("jobs and dialogs", () => {
     expect(initialPageIndex(0, 0)).toBeNull();
     expect(requestsPage(volume("/books/a.cbz", { status: "failed" }))).toBe(false);
     expect(placeAfterLibrary(null, [{ path: "/books", label: "books" }])).toBe(
-      "/books",
+      null,
     );
     expect(placeAfterLibrary("/gone", [{ path: "/books", label: "books" }])).toBe(
-      "/books",
+      null,
     );
+    expect(
+      placeAfterLibrary("/books", [{ path: "/books", label: "books" }]),
+    ).toBe("/books");
   });
 });

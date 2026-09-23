@@ -34,7 +34,7 @@ The window fills the webview. It does not sit in a centered page column. The chr
 |  +--------------------------------------------------------------+ |
 |  | Header bar                                                   | |
 |  +------------------+---------------------------+---------------+ |
-|  | Places sidebar   | Volume list or cover grid | Inspector     | |
+|  | My library      | Volume list or cover grid | Inspector     | |
 |  |                  |                           | cover         | |
 |  |                  |                           | form          | |
 |  +------------------+---------------------------+---------------+ |
@@ -45,12 +45,12 @@ The window fills the webview. It does not sit in a centered page column. The chr
 | --- | --- | --- |
 | Window inset | 8px (`p-2`) around the chrome, 8px (`gap-2`) under the header | Window background |
 | Header bar | 48px tall (`h-12`) | Same fill as the main pane, hairline around the header |
-| Places sidebar | 240px (`w-60`) | Window background |
+| My library sidebar | 240px (`w-60`) | Window background |
 | Main pane | Remaining width | View background |
 | Inspector | 384px (`w-96`) | View background, hairline along its left edge |
 | Pane strip | Sidebar, main, and inspector as one row | Hairline around the strip |
 
-The sidebar lists library places. The first row is 36px: muted caption text `Places` on the leading edge, and a quiet icon button at the trailing edge, Lucide `FolderPlus`, accessible name `Add folder`. A place row is an icon and a label, 36px tall. The selected place uses the selection wash. Dragging a folder over the sidebar uses that same wash on the sidebar. When there are no places, one muted line under the button reads `Drop a folder here.` A failed add shows one line under the button. The main pane still says `No volumes yet.`
+The sidebar lists library places. The first row is 36px: muted caption text `My library` on the leading edge, and a quiet icon button at the trailing edge, Lucide `FolderPlus`, accessible name `Add folder`. A place row is an icon and a label, 36px tall. The selected place uses the selection wash. When no place is selected, no place row is washed and the main pane shows the whole library. Dragging a folder over the sidebar uses that same wash on the sidebar. When there are no places, one muted line under the button reads `Drop a folder here.` A failed add shows one line under the button. The main pane still says `No volumes yet.`
 
 The main pane lists volumes. List is the default. Grid shows covers only. The switch is session state. It is not a configuration key. Switching back to list restores the list, and switching to grid restores the grid, for as long as the window is open.
 
@@ -200,10 +200,10 @@ Cover at least:
 
 ## Acceptance criteria
 
-- The window is a header bar, a 240px places sidebar, a flexible main pane, and a 384px inspector, separated by hairlines. An 8px window-background inset surrounds that chrome, with 8px between the header and the pane strip. A hairline outlines the header and the pane strip. The three panes stay flush with each other. The header does not scroll away.
+- The window is a header bar, a 240px My library sidebar, a flexible main pane, and a 384px inspector, separated by hairlines. An 8px window-background inset surrounds that chrome, with 8px between the header and the pane strip. A hairline outlines the header and the pane strip. The three panes stay flush with each other. The header does not scroll away.
 - List is the view when the window opens. Rows are 36px. List view groups by series: a muted series header above the volumes that share it, filename-only rows under the header with a muted tree marker (tee or L) tying each row to that header, blank-series volumes first with no header and no marker, then named series in case-folded alphabetical order. Grid cells show a 2:3 cover, the filename as a truncated label, and a 2px accent ring when selected. List selection is the accent wash on the row.
 - An empty main pane shows the sentence `No volumes yet.` and no illustration. An empty sidebar shows `Drop a folder here.` under the Add folder button.
-- The first sidebar row is the muted caption `Places`, then Add folder, Lucide `FolderPlus`, 16px, trailing in a 36px row. A drag over the sidebar uses the selection wash.
+- The first sidebar row is the muted caption `My library`, then Add folder, Lucide `FolderPlus`, 16px, trailing in a 36px row. A drag over the sidebar uses the selection wash.
 - Light and dark use the color table in this document. Dark mode is the `dark` class. The layout does not change between themes. With `dark`, native selects use a dark popup through `color-scheme: dark`.
 - `theme` defaults to `system`. `light` and `dark` force that theme. Any other value follows the system. The header menu can set each of the three values, and the class updates immediately. `system` keeps following `prefers-color-scheme`.
 - The resolved theme is applied before the first paint.

@@ -35,6 +35,7 @@ BATCH_FIELDS: frozenset[str] = frozenset(
         "Series",
         "Publisher",
         "LanguageISO",
+        "AgeRating",
         "Genre",
         "Writer",
         "Penciller",
