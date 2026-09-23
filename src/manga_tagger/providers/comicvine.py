@@ -11,6 +11,7 @@ from manga_tagger.providers.service_types import Candidate
 from manga_tagger.providers.text import (
     catalog_id,
     detail_text,
+    first_url,
     join_names,
     nonblank,
     plain_summary,
@@ -47,7 +48,7 @@ def search(
             ("resources", "volume"),
             ("query", query),
             ("limit", str(RESULT_LIMIT)),
-            ("field_list", "id,name,start_year,publisher"),
+            ("field_list", "id,name,start_year,publisher,image"),
         ],
         cancel=cancel,
     )
@@ -147,10 +148,15 @@ def _candidate(item: object) -> Candidate | None:
         return None
     publisher = item.get("publisher")
     credit = publisher.get("name") if isinstance(publisher, dict) else None
+    image = item.get("image")
+    cover = ""
+    if isinstance(image, dict):
+        cover = first_url(image.get("thumb_url"), image.get("small_url"))
     return Candidate(
         id=identity,
         title=title,
         detail=detail_text(item.get("start_year"), credit),
+        cover=cover,
     )
 
 

@@ -60,6 +60,15 @@ def nonblank(value: object) -> str | None:
     return None
 
 
+def first_url(*values: object) -> str:
+    """Return the first non-blank string among ``values``, or ``""``."""
+    for value in values:
+        found = nonblank(value)
+        if found is not None:
+            return found
+    return ""
+
+
 def integer_text(value: object) -> str | None:
     """Return a decimal string for an integer, without zero padding."""
     if isinstance(value, bool) or not isinstance(value, int):

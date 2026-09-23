@@ -79,7 +79,7 @@ search(provider, query, *, title_languages, api_key="", client, cancel=None) -> 
 load(provider, match_id, *, filename_stem, title_languages, api_key="", client, cancel=None) -> dict[str, str]
 ```
 
-A `Candidate` has `id`, `title`, and `detail`, all strings. `id` is the catalog id in decimal digits for AniList, Jikan, and Comic Vine, and the MangaDex UUID for MangaDex. `title` is the preferred series title. `detail` joins, with `, `, the year and the first credit the search payload actually has. The credit is the first author for MangaDex and Jikan, the first staff name for AniList, and the publisher name for Comic Vine. A missing part is left out. When both are missing, `detail` is `""`.
+A `Candidate` has `id`, `title`, `detail`, and `cover`, all strings. `id` is the catalog id in decimal digits for AniList, Jikan, and Comic Vine, and the MangaDex UUID for MangaDex. `title` is the preferred series title. `detail` joins, with `, `, the year and the first credit the search payload actually has. The credit is the first author for MangaDex and Jikan, the first staff name for AniList, and the publisher name for Comic Vine. A missing part is left out. When both are missing, `detail` is `""`. `cover` is an absolute HTTPS image URL from the search payload, or `""` when that URL is missing, blank, or not a string. A missing cover does not drop the candidate.
 
 At most 10 hits are requested. That limit is a constant. A hit with no usable title is dropped. The module then keeps at most the first 10 remaining hits, in API order. An empty list is not an error.
 
@@ -138,7 +138,7 @@ Search query parameters:
 - `limit` is `10`
 - `order[relevance]` is `desc`
 - `contentRating[]` is `safe`, `suggestive`, `erotica`, and `pornographic`, repeated
-- `includes[]` is `author`
+- `includes[]` is `author` and `cover_art`, repeated
 
 Load repeats `includes[]` as `author` and `artist`.
 
@@ -156,7 +156,7 @@ The search body is `data` as a list. The load body is one manga object in `data`
 | `Web` | `https://mangadex.org/title/{id}` |
 | `Manga` | `YesAndRightToLeft` |
 
-`Publisher` is omitted. A relationship with no `attributes` is skipped. The candidate detail uses `attributes.year` and the first author name.
+`Publisher` is omitted. A relationship with no `attributes` is skipped. The candidate detail uses `attributes.year` and the first author name. The candidate cover is `https://uploads.mangadex.org/covers/{mangaId}/{fileName}.256.jpg` from a `cover_art` relationship whose `attributes.fileName` is a non-blank string. When several cover arts are included, a cover whose `volume` is null or blank is preferred; otherwise the first usable cover art in response order is used.
 
 ## AniList
 
@@ -170,6 +170,7 @@ query ($search: String) {
     media(search: $search, type: MANGA, sort: SEARCH_MATCH) {
       id
       title { romaji english native }
+      coverImage { medium }
       startDate { year }
       staff(perPage: 1, sort: RELEVANCE) {
         edges { node { name { full } } }
@@ -212,11 +213,11 @@ HTTP 200 with a non-empty `errors` array raises `ProviderResponseError`. Search 
 | `Web` | `siteUrl` |
 | `Manga` | `YesAndRightToLeft` |
 
-`Publisher` is omitted. One role can fill both credit groups. `Story & Art` is `Writer`, `Penciller`, and `CoverArtist`. The candidate detail uses `startDate.year` and the first staff name.
+`Publisher` is omitted. One role can fill both credit groups. `Story & Art` is `Writer`, `Penciller`, and `CoverArtist`. The candidate detail uses `startDate.year` and the first staff name. The candidate cover is `coverImage.medium` when that string is non-blank.
 
 ## Jikan
 
-Search is `GET https://api.jikan.moe/v4/manga` with `q`, `limit` `10`, and `sfw` `false`. Load is `GET https://api.jikan.moe/v4/manga/{id}/full`.
+Search is `GET https://api.tenrai.org/v1/manga` with `q`, `limit` `10`, and `sfw` `false`. Load is `GET https://api.tenrai.org/v1/manga/{id}/full`. That host is a Jikan v4-compatible public API. The historical `api.jikan.moe` base is not used.
 
 Search reads `data` as a list. Load reads `data` as one object. A missing load `data`, or load `data` that is not an object, raises `ProviderResponseError`. Search `data` of `[]` returns no candidates.
 
@@ -233,11 +234,11 @@ Search reads `data` as a list. Load reads `data` as one object. A missing load `
 | `Web` | `url` |
 | `Manga` | `YesAndRightToLeft` |
 
-`Story & Art` fills `Writer`, `Penciller`, and `CoverArtist`. The candidate detail uses `published.prop.from.year` and `authors[0].name`.
+`Story & Art` fills `Writer`, `Penciller`, and `CoverArtist`. The candidate detail uses `published.prop.from.year` and `authors[0].name`. The candidate cover is `images.jpg.image_url`, or `images.jpg.small_image_url` when the full URL is missing or blank.
 
 ## Comic Vine
 
-Search is `GET https://comicvine.gamespot.com/api/search/` with `api_key`, `format` `json`, `resources` `volume`, `query`, `limit` `10`, and `field_list` `id,name,start_year,publisher`.
+Search is `GET https://comicvine.gamespot.com/api/search/` with `api_key`, `format` `json`, `resources` `volume`, `query`, `limit` `10`, and `field_list` `id,name,start_year,publisher,image`.
 
 Load is `GET https://comicvine.gamespot.com/api/volume/4050-{id}/` with `api_key`, `format` `json`, and `field_list` `name,start_year,publisher,description,deck,site_detail_url,person_credits`.
 
@@ -258,7 +259,7 @@ HTTP 200 is still an error when `error` is not `OK` or `status_code` is not `1`.
 | `CoverArtist` | Role piece `cover` or `cover artist` |
 | `Manga` | `No` |
 
-`LanguageISO` is omitted. A role is split on commas. Each piece is trimmed and compared case-insensitively, as a whole piece. `writer, artist` fills `Writer` and `Penciller`. It does not fill `CoverArtist`. `artist` is not copied into `CoverArtist`. The candidate detail uses `start_year` and `publisher.name`.
+`LanguageISO` is omitted. A role is split on commas. Each piece is trimmed and compared case-insensitively, as a whole piece. `writer, artist` fills `Writer` and `Penciller`. It does not fill `CoverArtist`. `artist` is not copied into `CoverArtist`. The candidate detail uses `start_year` and `publisher.name`. The candidate cover is `image.thumb_url`, or `image.small_url` when the thumb URL is missing or blank.
 
 ## HTTP
 
@@ -306,10 +307,12 @@ Cover at least:
 - `load` whose `cancel` returns true raises `ProviderCancelledError` and the transport sees no request.
 - Provider name `other` raises `ProviderResponseError` and the transport sees no request.
 - `search` and `load` have no archive path argument. A test that calls them writes nothing in a temporary directory.
+- Search candidates include `cover` when the fixture has a usable image URL (MangaDex cover art file name, AniList `coverImage.medium`, Jikan `images.jpg`, Comic Vine `image`), and `cover` is `""` when that URL is absent. MangaDex search requests `includes[]=cover_art`. AniList search requests `coverImage { medium }`. Comic Vine search `field_list` includes `image`.
 
 ## Acceptance criteria
 
 - The caller selects one of MangaDex, AniList, Jikan, or Comic Vine. Search returns at most 10 candidates. An empty query returns no candidates and sends no request.
+- Each candidate has `cover` as an absolute HTTPS URL or `""`. A missing cover does not drop the hit.
 - The query is the trimmed `Series` when that value is non-blank, without removing numbers from it. Otherwise it is the filename stem after release tags and one volume suffix. The locked stem table produces those queries and numbers.
 - `load` returns a form patch and does not write an archive. `Title` and `Series` are the same preferred series title. `Number` is present only when the filename stem has a volume marker. `Volume` is never present.
 - French, then English, then the original title, following `title_languages`. AniList has no French title slot, so `fr` is skipped there. Comic Vine uses its single name and omits `LanguageISO`.

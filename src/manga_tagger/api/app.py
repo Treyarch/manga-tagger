@@ -50,6 +50,7 @@ from manga_tagger.jobs import (
     JobRunner,
 )
 from manga_tagger.providers import build_query, load, parse_number, search
+from manga_tagger.providers.remote_cover import RemoteCoverError, remote_cover_bytes
 from manga_tagger.shell import (
     NoThumbnailError,
     ShellError,
@@ -258,6 +259,7 @@ def _register_errors(app: FastAPI) -> None:
         (ConfigError, 400),
         (ShellError, 400),
         (ArchiveError, 400),
+        (RemoteCoverError, 400),
         (NoThumbnailError, 404),
         (JobNotFoundError, 404),
         (JobBusyError, 409),
@@ -308,6 +310,11 @@ def _register_routes(app: FastAPI) -> None:
             cache_dir=str(state.thumbnail_dir),
         )
         return Response(content=payload, media_type="image/jpeg")
+
+    @app.get("/api/cover")
+    def cover(url: str) -> Response:
+        payload, media = remote_cover_bytes(url)
+        return Response(content=payload, media_type=media)
 
     @app.get("/api/config", response_model=ConfigModel)
     def get_config() -> ConfigModel:

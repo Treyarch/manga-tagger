@@ -122,6 +122,10 @@ def test_mangadex_search_request_and_detail() -> None:
                 "relationships": [
                     {"type": "author"},
                     {"type": "author", "attributes": {"name": "Norihiro Yagi"}},
+                    {
+                        "type": "cover_art",
+                        "attributes": {"fileName": "cover-file.jpg"},
+                    },
                 ],
             },
             {
@@ -141,11 +145,19 @@ def test_mangadex_search_request_and_detail() -> None:
             client=client,
         )
     assert found == [
-        Candidate(id=MD_ID, title="Titre", detail="2001, Norihiro Yagi"),
+        Candidate(
+            id=MD_ID,
+            title="Titre",
+            detail="2001, Norihiro Yagi",
+            cover=(
+                f"https://uploads.mangadex.org/covers/{MD_ID}/cover-file.jpg.256.jpg"
+            ),
+        ),
         Candidate(
             id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
             title="Bare",
             detail="",
+            cover="",
         ),
     ]
     assert len(seen) == 1
@@ -162,7 +174,7 @@ def test_mangadex_search_request_and_detail() -> None:
         "erotica",
         "pornographic",
     ]
-    assert request.url.params.get_list("includes[]") == ["author"]
+    assert request.url.params.get_list("includes[]") == ["author", "cover_art"]
 
 
 def test_search_keeps_ten_titled_hits() -> None:
@@ -481,6 +493,9 @@ def test_anilist_native_romaji_and_search() -> None:
                             "english": "Claymore EN",
                             "native": "ネイティブ",
                         },
+                        "coverImage": {
+                            "medium": "https://example.com/anilist-cover.jpg"
+                        },
                         "startDate": {"year": 2004},
                         "staff": {"edges": [{"node": {"name": {"full": "Staff One"}}}]},
                     }
@@ -496,10 +511,18 @@ def test_anilist_native_romaji_and_search() -> None:
             title_languages=["fr", "en"],
             client=client,
         )
-    assert found == [Candidate(id="42", title="Claymore EN", detail="2004, Staff One")]
+    assert found == [
+        Candidate(
+            id="42",
+            title="Claymore EN",
+            detail="2004, Staff One",
+            cover="https://example.com/anilist-cover.jpg",
+        )
+    ]
     payload = json.loads(seen[0].content)
     assert "perPage: 10" in payload["query"]
     assert "SEARCH_MATCH" in payload["query"]
+    assert "coverImage { medium }" in payload["query"]
     assert payload["variables"] == {"search": "Claymore"}
     assert seen[0].headers["user-agent"] == "manga-tagger"
 
@@ -588,7 +611,7 @@ def test_jikan_french_title_dates_and_credits() -> None:
     assert "Volume" not in patch
     request = seen[0]
     assert request.method == "GET"
-    assert _bare(request) == "https://api.jikan.moe/v4/manga/26/full"
+    assert _bare(request) == "https://api.tenrai.org/v1/manga/26/full"
     assert request.headers["user-agent"] == "manga-tagger"
 
 
@@ -605,6 +628,12 @@ def test_jikan_search_original_title_and_unique_names() -> None:
                     "prop": {"from": {"year": 2001, "month": 6, "day": None}}
                 },
                 "authors": [{"name": "Tsugumi Ohba", "type": "Story"}],
+                "images": {
+                    "jpg": {
+                        "image_url": "https://example.com/large.jpg",
+                        "small_image_url": "https://example.com/small.jpg",
+                    }
+                },
             }
         ]
     }
@@ -613,11 +642,18 @@ def test_jikan_search_original_title_and_unique_names() -> None:
         found = search(
             "jikan", "Death Note", title_languages=["fr", "en"], client=client
         )
-    assert found == [Candidate(id="26", title="Titre FR", detail="2001, Tsugumi Ohba")]
+    assert found == [
+        Candidate(
+            id="26",
+            title="Titre FR",
+            detail="2001, Tsugumi Ohba",
+            cover="https://example.com/large.jpg",
+        )
+    ]
     assert seen[0].url.params.get("q") == "Death Note"
     assert seen[0].url.params.get("limit") == "10"
     assert seen[0].url.params.get("sfw") == "false"
-    assert _bare(seen[0]) == "https://api.jikan.moe/v4/manga"
+    assert _bare(seen[0]) == "https://api.tenrai.org/v1/manga"
 
     japanese = {
         "data": {
@@ -746,6 +782,10 @@ def test_comicvine_search_deck_and_year_string() -> None:
                 "name": "Sandman",
                 "start_year": "1989",
                 "publisher": {"name": "DC Comics"},
+                "image": {
+                    "thumb_url": "https://example.com/thumb.jpg",
+                    "small_url": "https://example.com/small.jpg",
+                },
             },
             {"id": 8, "name": "  "},
         ],
@@ -759,13 +799,22 @@ def test_comicvine_search_deck_and_year_string() -> None:
             client=client,
             api_key="secret",
         )
-    assert found == [Candidate(id="12345", title="Sandman", detail="1989, DC Comics")]
+    assert found == [
+        Candidate(
+            id="12345",
+            title="Sandman",
+            detail="1989, DC Comics",
+            cover="https://example.com/thumb.jpg",
+        )
+    ]
     request = seen[0]
     assert _bare(request) == "https://comicvine.gamespot.com/api/search/"
     assert request.url.params.get("resources") == "volume"
     assert request.url.params.get("query") == "Sandman"
     assert request.url.params.get("limit") == "10"
-    assert request.url.params.get("field_list") == "id,name,start_year,publisher"
+    assert request.url.params.get("field_list") == (
+        "id,name,start_year,publisher,image"
+    )
     assert "4050-" not in found[0].id
 
     deck = {

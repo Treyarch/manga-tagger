@@ -37,6 +37,7 @@ def search(
     ]
     params.extend(("contentRating[]", rating) for rating in _CONTENT_RATINGS)
     params.append(("includes[]", "author"))
+    params.append(("includes[]", "cover_art"))
     body = send(
         client,
         "mangadex",
@@ -139,7 +140,28 @@ def _candidate(item: object, languages: Sequence[str]) -> Candidate | None:
         id=identity,
         title=title,
         detail=detail_text(integer_text(attributes.get("year")), credit),
+        cover=_cover_url(identity, relationships),
     )
+
+
+def _cover_url(manga_id: str, relationships: list[object]) -> str:
+    chosen: str | None = None
+    for item in relationships:
+        if not isinstance(item, dict) or item.get("type") != "cover_art":
+            continue
+        attributes = item.get("attributes")
+        if not isinstance(attributes, dict):
+            continue
+        filename = nonblank(attributes.get("fileName"))
+        if filename is None:
+            continue
+        url = f"https://uploads.mangadex.org/covers/{manga_id}/{filename}.256.jpg"
+        volume = attributes.get("volume")
+        if volume is None or nonblank(volume) is None:
+            return url
+        if chosen is None:
+            chosen = url
+    return chosen or ""
 
 
 def _choose_title(

@@ -11,6 +11,7 @@ from manga_tagger.providers.service_types import Candidate
 from manga_tagger.providers.text import (
     catalog_id,
     detail_text,
+    first_url,
     has_word,
     jikan_title,
     join_names,
@@ -19,7 +20,7 @@ from manga_tagger.providers.text import (
     put,
 )
 
-_SEARCH_URL = "https://api.jikan.moe/v4/manga"
+_SEARCH_URL = "https://api.tenrai.org/v1/manga"
 _WRITER = frozenset({"story"})
 _ART = frozenset({"art", "artist"})
 
@@ -128,7 +129,22 @@ def _candidate(item: object, languages: Sequence[str]) -> Candidate | None:
     credit = None
     if isinstance(authors, list) and authors and isinstance(authors[0], dict):
         credit = authors[0].get("name")
-    return Candidate(id=identity, title=title, detail=detail_text(year, credit))
+    return Candidate(
+        id=identity,
+        title=title,
+        detail=detail_text(year, credit),
+        cover=_cover_url(item),
+    )
+
+
+def _cover_url(item: dict[str, object]) -> str:
+    images = item.get("images")
+    if not isinstance(images, dict):
+        return ""
+    jpg = images.get("jpg")
+    if not isinstance(jpg, dict):
+        return ""
+    return first_url(jpg.get("image_url"), jpg.get("small_image_url"))
 
 
 def _publisher(serializations: object) -> str | None:

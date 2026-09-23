@@ -12,8 +12,10 @@ class Candidate:
             A MangaDex UUID for MangaDex.
         title: Preferred series title.
         detail: Year and first credit joined with ``", "``, or ``""``.
+        cover: Absolute HTTPS cover URL, or ``""`` when missing.
     """
 
     id: str
     title: str
     detail: str
+    cover: str

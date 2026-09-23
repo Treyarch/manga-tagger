@@ -399,6 +399,7 @@ def test_search_and_load_do_not_write() -> None:
             id = "1"
             title = "Claymore"
             detail = "2001, Yagi"
+            cover = "https://example.com/cover.jpg"
 
         return [Hit()]
 
@@ -415,7 +416,12 @@ def test_search_and_load_do_not_write() -> None:
         progress=lambda _completed, _total: writes.append("progress"),
     )
     assert result["candidates"] == [
-        {"id": "1", "title": "Claymore", "detail": "2001, Yagi"}
+        {
+            "id": "1",
+            "title": "Claymore",
+            "detail": "2001, Yagi",
+            "cover": "https://example.com/cover.jpg",
+        }
     ]
     client = default_client()
     assert client.timeout == httpx.Timeout(15.0)

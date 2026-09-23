@@ -15,6 +15,7 @@ import {
   folderDropRequest,
   mangaChoices,
   mangaLabel,
+  matchCoverSrc,
   parseRootLines,
   placeAfterLibrary,
   renamePlanLines,
@@ -108,6 +109,19 @@ describe("shelf and selection", () => {
       "a2.cbz",
       "a1.cbz",
     ]);
+  });
+
+  it("proxies MangaDex covers through /api/cover", () => {
+    expect(
+      matchCoverSrc("https://uploads.mangadex.org/covers/a/b.jpg.256.jpg"),
+    ).toBe(
+      "/api/cover?url=" +
+        encodeURIComponent("https://uploads.mangadex.org/covers/a/b.jpg.256.jpg"),
+    );
+    expect(matchCoverSrc("https://s4.anilist.co/file/x.jpg")).toBe(
+      "https://s4.anilist.co/file/x.jpg",
+    );
+    expect(matchCoverSrc("  ")).toBe("");
   });
 
   it("follows plain, range, and toggle clicks", () => {

@@ -186,7 +186,22 @@ export type WorkEntry = {
   skipped?: boolean;
 };
 
-export type Candidate = { id: string; title: string; detail: string };
+export type Candidate = { id: string; title: string; detail: string; cover: string };
+
+/** Same-origin img src for a candidate cover. MangaDex CDN is proxied. */
+export function matchCoverSrc(cover: string): string {
+  const trimmed = cover.trim();
+  if (trimmed === "") return "";
+  try {
+    const host = new URL(trimmed).hostname;
+    if (host === "uploads.mangadex.org") {
+      return `/api/cover?url=${encodeURIComponent(trimmed)}`;
+    }
+  } catch {
+    return trimmed;
+  }
+  return trimmed;
+}
 
 export function casefold(value: string): string {
   return value.normalize("NFKC").toLowerCase().replaceAll("ß", "ss");
@@ -564,12 +579,18 @@ export function candidatesOf(result: unknown): Candidate[] {
   if (!Array.isArray(raw)) return [];
   return raw.flatMap((item) => {
     if (item === null || typeof item !== "object") return [];
-    const row = item as { id?: unknown; title?: unknown; detail?: unknown };
+    const row = item as {
+      id?: unknown;
+      title?: unknown;
+      detail?: unknown;
+      cover?: unknown;
+    };
     return [
       {
         id: String(row.id ?? ""),
         title: String(row.title ?? ""),
         detail: String(row.detail ?? ""),
+        cover: String(row.cover ?? ""),
       },
     ];
   });

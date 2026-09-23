@@ -11,6 +11,7 @@ from manga_tagger.providers.text import (
     anilist_title,
     catalog_id,
     detail_text,
+    first_url,
     has_word,
     integer_text,
     join_names,
@@ -30,6 +31,7 @@ query ($search: String) {
     media(search: $search, type: MANGA, sort: SEARCH_MATCH) {
       id
       title { romaji english native }
+      coverImage { medium }
       startDate { year }
       staff(perPage: 1, sort: RELEVANCE) {
         edges { node { name { full } } }
@@ -179,10 +181,15 @@ def _candidate(item: object, languages: Sequence[str]) -> Candidate | None:
     title, _language = chosen
     start = item.get("startDate")
     year = start.get("year") if isinstance(start, dict) else None
+    cover_image = item.get("coverImage")
+    cover = ""
+    if isinstance(cover_image, dict):
+        cover = first_url(cover_image.get("medium"))
     return Candidate(
         id=identity,
         title=title,
         detail=detail_text(year, _first_staff_name(item)),
+        cover=cover,
     )
 
 

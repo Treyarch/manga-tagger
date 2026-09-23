@@ -491,7 +491,12 @@ def run_search(
     progress(1, 1)
     return {
         "candidates": [
-            {"id": item.id, "title": item.title, "detail": item.detail}
+            {
+                "id": item.id,
+                "title": item.title,
+                "detail": item.detail,
+                "cover": item.cover,
+            }
             for item in found
         ]
     }

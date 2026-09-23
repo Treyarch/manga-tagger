@@ -104,6 +104,17 @@ def test_thumbnail_miss_is_404(tmp_path: Path) -> None:
     assert response.json()["error_type"] == "NoThumbnailError"
 
 
+def test_cover_rejects_hosts_outside_the_allow_list(tmp_path: Path) -> None:
+    app = _app(tmp_path, roots=["/books"])
+    with TestClient(app) as client:
+        response = client.get(
+            "/api/cover",
+            params={"url": "https://example.com/cover.jpg"},
+        )
+    assert response.status_code == 400
+    assert response.json()["error_type"] == "RemoteCoverError"
+
+
 def test_config_put_keeps_unknown_keys_and_rejects_a_busy_rescan(
     tmp_path: Path,
 ) -> None:
@@ -285,6 +296,7 @@ def test_search_and_load_jobs(tmp_path: Path) -> None:
             id = "9"
             title = "Claymore"
             detail = ""
+            cover = ""
 
         return [Hit()]
 
