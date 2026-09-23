@@ -20,7 +20,6 @@
     formLocked,
     busy,
     lines,
-    noMatches,
     candidates,
     onEdit,
     onCandidate,
@@ -30,7 +29,6 @@
     formLocked: boolean;
     busy: boolean;
     lines: string[];
-    noMatches: boolean;
     candidates: Candidate[];
     onEdit: (key: string, value: string) => void;
     onCandidate: (id: string) => void;
@@ -48,9 +46,6 @@
         <li>{line}</li>
       {/each}
     </ul>
-  {/if}
-  {#if noMatches}
-    <p class="text-sm text-zinc-500 dark:text-zinc-400">No matches.</p>
   {/if}
   {#if candidates.length > 0}
     <ul class="flex flex-col">

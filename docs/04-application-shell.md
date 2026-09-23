@@ -181,17 +181,30 @@ Job JSON is `{ "id", "name", "state", "error_type", "error_message", "result", "
 
 The client polls `GET /api/jobs/current` from startup, and polls `GET /api/jobs/{id}` for a job it started, while the state is `queued` or `running`. The poll interval is 500 milliseconds. It is not a TOML key. Tests do not wait on it. When `scan`, `save`, `rename`, or `convert` reaches `succeeded`, `failed`, or `cancelled`, the client fetches the library once for that job id. `search` and `load` do not refetch the library. A search or load result is applied only when its id is the newest search or load the client started. While that load is `queued` or `running`, the form controls are disabled. While that save is `queued` or `running`, the form controls are disabled.
 
+When a watched job reaches `succeeded` or `failed`, the client also shows one toast summary from [05-ui-design.md](05-ui-design.md). A `cancelled` job does not toast. Stale search or load ids (not the newest the client started) do not toast. Rename preview errors and folder-drop validation stay in their dialogs and sidebar lines; they are not toasts. Search and load outcomes (match count, no matches, and provider errors) are toast-only; the inspector does not repeat them. Inspector lines for per-file save/rename/convert errors and scan-root detail stay as they are.
+
+| Job | Success toast | Failure toast |
+| --- | --- | --- |
+| Search (Scrape) | `Found N matches.` or `No matches.` | `error_message`, or `Scrape failed.` when that string is blank |
+| Load | `Metadata loaded.` | `error_message`, or `Load failed.` when that string is blank |
+| Save | `Saved N volumes.` when every entry has no `error_message`; `Saved N of M.` when some do | `error_message`, or `Save failed.` when that string is blank |
+| Rename | `Renamed N files.` or `Renamed N of M.` with the same entry rule | `error_message`, or `Rename failed.` when that string is blank |
+| Convert | `Converted N files.` or `Converted N of M.`, counting only entries that are not `skipped` | `error_message`, or `Convert failed.` when that string is blank |
+| Scan | `Library updated.` | `error_message`, or `Scan failed.` when that string is blank |
+
+For save, rename, and convert, `N` is the number of counted entries with a blank or missing `error_message`, and `M` is the counted entry total. An empty entry list on success is `Saved 0 volumes.`, `Renamed 0 files.`, or `Converted 0 files.`
+
 ## Scrape
 
 The provider select lists MangaDex (`mangadex`), AniList (`anilist`), MyAnimeList (`jikan`), and Comic Vine (`comicvine`). The choice is session state and defaults to `mangadex`. It is not a config key.
 
 Scrape uses the anchor. It does nothing when there is no anchor. The request `series` is the form's `Series` when that control is non-blank and not mixed. Otherwise `series` is `""`. `filename_stem` is the anchor `name` with its extension removed. The job calls `build_query(series, filename_stem)` and then `search`. It passes `title_languages` and `comicvine_api_key` from config at the start of the job, the cancel callable, and an `httpx.Client` with a 15 second timeout. The client is closed when the job ends. The shell does not set `User-Agent` and does not retry.
 
-The result is `{ "candidates": [{ "id", "title", "detail" }] }`. The inspector shows those rows above the form. A row shows `title`, and `detail` on a second muted line when `detail` is non-blank. Choosing a row starts `load` for that id. An empty list is success, not an error. The inspector shows `No matches.` and the form is unchanged.
+The result is `{ "candidates": [{ "id", "title", "detail" }] }`. The inspector shows those rows above the form. A row shows `title`, and `detail` on a second muted line when `detail` is non-blank. Choosing a row starts `load` for that id. An empty list is success, not an error. The toast shows `No matches.` and the form is unchanged. The inspector does not show a no-matches line.
 
 `load` calls the provider `load` with the anchor `filename_stem` and the same config and client rules. The job then runs `merge_load_patch(form, patch, mode)`. For `one`, each patch key that is in `FORM_FIELDS` replaces that form value and sets `dirty` to true. Keys the patch omits stay, and their `dirty` flag stays as it was. For `many`, each patch key that is in `SHARED_FIELDS` sets that field's `value`, sets `mixed` to false, and sets `dirty` to true. `Manga` is one of those keys. Every other patch key is ignored, including `Title`, `Number`, `Summary`, `Web`, and dates. The result is `{ "form": { "mode", "values" } }`. The client replaces its form with that object when the selection is still the one it sent. No archive is written.
 
-`ProviderUnavailableError`, `ProviderTimeoutError`, `ProviderRateLimitError`, and `ProviderResponseError` fail the job. `ProviderCancelledError` cancels it. The form is unchanged and the archive is unchanged. A new search clears the candidate list when it starts. A failed search clears candidates and shows `error_message` in the inspector. A failed load leaves the candidate list so another row can be chosen.
+`ProviderUnavailableError`, `ProviderTimeoutError`, `ProviderRateLimitError`, and `ProviderResponseError` fail the job. `ProviderCancelledError` cancels it. The form is unchanged and the archive is unchanged. A new search clears the candidate list when it starts. A failed search clears candidates and the toast shows `error_message` (or `Scrape failed.`). A failed load leaves the candidate list so another row can be chosen; its toast shows `error_message` (or `Load failed.`). Search and load do not write those messages into the inspector.
 
 A blank Comic Vine key fails inside `search` or `load` with `ProviderUnavailableError` before a request. The shell does not replace that error.
 
@@ -254,7 +267,7 @@ Dropping a folder on the sidebar does not call into Python from the client. `win
 
 Settings is a dialog. It edits library roots, one absolute path per line, the Comic Vine key, `keep_cbr_original` as a checkbox labeled `Keep the original CBR`, and `title_languages` as comma-separated codes in order. It does not edit `theme`. Dismiss writes nothing. Save drops blank root lines. If a non-blank root line is not absolute, the dialog does not send the request and shows `Paths must be absolute.` A successful save calls `PUT /api/config`.
 
-Per-file errors and provider errors are listed at the top of the inspector, above candidates, above the form.
+Per-file save, rename, and convert errors, and scan-root lines, are listed at the top of the inspector, above candidates, above the form. Search and load status (match count, no matches, provider errors) is toast-only and is not repeated in the inspector. The toast for every finished job is the short summary in the jobs client section.
 
 ## Errors
 
@@ -314,7 +327,7 @@ Cover at least:
 - Search and load fill the form and do not write an archive. A load marks the fields it sets dirty, including `Manga` on a shared form. A blank Comic Vine key fails before a request.
 - Save writes through `save_comic_info` and does not call `save_many`. One volume writes dirty fields, `Number` from the filename when that field was not edited and the stored value differs, and `PageCount` from `archive_page_count` when that field was not in the patch and ComicInfo left it blank. Several volumes write the dirty shared fields, including `Manga`, each file's `Number` from its filename, and each file's blank `PageCount` from its archive count. `Volume` is not written. Cancel stops before the next file. A failed file does not stop the rest, and files already written stay written. A successful save writes the sibling poster.
 - Rename shows the planned names, then runs on the selected place with the offered template `{Series} v{Number:02}`, then `write_poster` on each success. Convert asks before deleting `.cbr` files, turns selected `.cbr` files into `.cbz`, and skips `.cbz`. A path outside the library is rejected before any read or write.
-- Scrapes, saves, converts, and rescans are jobs on one worker. A new job is refused while one is queued or running. The header shows `completed/total`. The user can cancel that job. A finished scan names a skipped or incomplete root in the inspector. Closing the window asks the worker to stop and does not leave a truncated archive from this process killing a write.
+- Scrapes, saves, converts, and rescans are jobs on one worker. A new job is refused while one is queued or running. The header shows `completed/total`. The user can cancel that job. A finished scrape, load, save, rename, convert, or scan that succeeded or failed shows one toast summary; cancelled jobs do not. A finished scan names a skipped or incomplete root in the inspector. Closing the window asks the worker to stop and does not leave a truncated archive from this process killing a write.
 - The startup scan is enqueued only after the server is bound, and only when `library_roots` is non-empty. The first library response does not wait for it.
 - Add folder asks for one directory and appends it to `library_roots`, then scans. A drop on the sidebar does the same. Existing roots stay. Settings can still replace the list.
 

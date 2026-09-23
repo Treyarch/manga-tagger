@@ -174,6 +174,16 @@ When a button has an accessible name and no visible text (icon buttons), that na
 
 `Dialog.svelte`. A `zinc-900/40` backdrop. The panel is `max-w-md`, `rounded-lg`, the view background, a hairline, and `p-4`. The title is `text-sm font-medium`. Actions sit at the trailing edge: a `quiet` dismiss button, then either `primary` or `danger` for the confirm button.
 
+### Toast
+
+`ToastHost.svelte` plus `ui/src/lib/toast.ts`. The host is a fixed stack at the top-right of the window (`top-4 right-4`), `z-40` so it sits above dialogs. Each toast is one short sentence, `rounded-lg`, `text-sm`, `max-w-sm`, and `px-4 py-3`. Success uses primary text. Failure uses `text-red-600` in light and `text-red-400` in dark. No badges, icons, or progress bars.
+
+Light mode uses a white fill, a `zinc-200` hairline, and `shadow-md` so the toast lifts off the pane. Dark mode does not reuse the pane fill: it uses a `zinc-800` fill, a `zinc-600` border, and `shadow-lg` with a dark black wash so the toast reads clearly against `zinc-900` panes and `zinc-950` chrome.
+
+Enter: fade in and fly downward about 24px over ~400ms with a slight overshoot (`backOut`). Exit: fade out and drift upward over ~220ms. Each toast removes itself after 5 seconds. A click dismisses it early. Several toasts stack downward with a small gap. The live region uses `role="status"` and `aria-live="polite"`. Toasts are not keyboard-focusable chrome and do not take a focus ring.
+
+`toast.ts` owns the queue (`pushToast`, `dismissToast`) and the pure `jobToastMessage` helper that turns a finished job into that sentence. [04-application-shell.md](04-application-shell.md) decides when the client pushes a toast.
+
 ## Configuration
 
 This specification adds one key to the TOML file described in [00-project-overview.md](00-project-overview.md).
@@ -199,6 +209,8 @@ Cover at least:
 - With a resolved dark theme, the shell root that sets the document class carries `dark`. With a resolved light theme, that element does not carry `dark`.
 - Grouping by series puts blank-series volumes first with an empty `series` key, then named series in case-folded alphabetical order, preserving name order within each group.
 - Inspector field captions use the readable names from the shell form section, not camel-cased ComicInfo keys.
+- `jobToastMessage` returns null for `cancelled`, the scrape/load/save/rename/convert/scan sentences from the shell toast table for `succeeded` and `failed`, and uses entry counts without `error_message` for save, rename, and convert.
+- `pushToast` adds an item that `dismissToast` removes, and a timer removes it after 5 seconds.
 
 ## Acceptance criteria
 
@@ -210,6 +222,7 @@ Cover at least:
 - `theme` defaults to `system`. `light` and `dark` force that theme. Any other value follows the system. The header menu can set each of the three values, and the class updates immediately. `system` keeps following `prefers-color-scheme`.
 - The resolved theme is applied before the first paint.
 - Icons are Lucide, `currentColor`, 16px in rows and menu items and 20px in the header. The view switch is `List` / `List view` and `LayoutGrid` / `Grid view`. The theme menu is `Monitor`, `Sun`, and `Moon`. Add folder is `FolderPlus`. Close is `X` at the trailing edge of the header. Icon buttons expose their accessible name as a native `title` so a short hover shows that label.
-- Buttons, text inputs, textareas, checkboxes, selects, menus, and dialogs are the local components in this document, styled with Tailwind utilities. The UI package does not depend on a third-party component kit.
+- Buttons, text inputs, textareas, checkboxes, selects, menus, dialogs, and toasts are the local components in this document, styled with Tailwind utilities. The UI package does not depend on a third-party component kit.
+- Action toasts appear in a top-right stack, fade in downward with a short overshoot, and disappear after 5 seconds or on click. In dark mode they use a raised `zinc-800` surface and a stronger shadow so they stand apart from the panes. They summarize scrape, load, save, rename, convert, and scan outcomes. Scrape match count, no matches, and provider errors are toast-only. Detailed per-file save/rename/convert errors and scan-root lines stay in the inspector.
 - Type is the default sans stack at `text-sm` for controls and rows, and `text-xs` for captions.
 - A keyboard focus ring is visible on the shared controls.

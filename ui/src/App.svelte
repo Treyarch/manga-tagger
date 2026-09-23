@@ -27,6 +27,8 @@
   import SettingsDialog from "./lib/components/SettingsDialog.svelte";
   import TextInput from "./lib/components/TextInput.svelte";
   import Thumb from "./lib/components/Thumb.svelte";
+  import ToastHost from "./lib/components/ToastHost.svelte";
+  import { jobToastMessage, pushToast } from "./lib/toast";
   import {
     OFFERED_RENAME_TEMPLATE,
     POLL_MS,
@@ -79,7 +81,6 @@
   let provider = $state("mangadex");
   let headerJob = $state<Job | null>(null);
   let candidates = $state<Candidate[]>([]);
-  let noMatches = $state(false);
   let inspectorLines = $state<string[]>([]);
   let folderError = $state("");
   let dragDepth = $state(0);
@@ -188,6 +189,11 @@
     }
   }
 
+  function toastFrom(job: Job) {
+    const toast = jobToastMessage(job);
+    if (toast) pushToast(toast.message, toast.tone);
+  }
+
   async function settle(job: Job) {
     if (settled.has(job.id) || !terminal(job.state)) return;
     settled.add(job.id);
@@ -195,29 +201,28 @@
       if (job.id !== newestSearchId) return;
       if (job.state === "failed") {
         candidates = [];
-        noMatches = false;
-        inspectorLines = job.error_message ? [job.error_message] : [];
+        toastFrom(job);
         return;
       }
       if (job.state !== "succeeded") return;
-      const found = candidatesOf(job.result);
-      candidates = found;
-      noMatches = found.length === 0;
-      inspectorLines = [];
+      candidates = candidatesOf(job.result);
+      toastFrom(job);
       return;
     }
     if (job.name === "Load") {
       if (job.id !== newestLoadId || job.state === "cancelled") return;
       if (job.state === "failed") {
-        inspectorLines = job.error_message ? [job.error_message] : [];
+        toastFrom(job);
         return;
       }
       if (selectionKey(selection) !== loadSelectionKey) return;
       const next = formOf(job.result);
       if (next) form = next;
+      toastFrom(job);
       return;
     }
     if (shouldRefetchLibrary(job)) await refreshLibrary(job);
+    toastFrom(job);
   }
 
   function watch(job: Job) {
@@ -259,7 +264,6 @@
     selectedPlace = path === selectedPlace ? null : path;
     selection = { paths: [], anchor: null };
     candidates = [];
-    noMatches = false;
     rebuildForm();
   }
 
@@ -271,7 +275,6 @@
     });
     if (selection.anchor !== previous) {
       candidates = [];
-      noMatches = false;
     }
     rebuildForm();
   }
@@ -284,8 +287,6 @@
   async function scrape() {
     if (anchor === null || busy) return;
     candidates = [];
-    noMatches = false;
-    inspectorLines = [];
     const job = await postJson<Job>("/api/jobs/search", {
       provider,
       series: seriesForSearch(form),
@@ -719,7 +720,6 @@
         {formLocked}
         {busy}
         lines={inspectorLines}
-        {noMatches}
         {candidates}
         {onEdit}
         onCandidate={chooseCandidate}
@@ -770,3 +770,4 @@
     <p class="text-sm">{convertConfirmMessage(selectedCbr)}</p>
   </Dialog>
 {/if}
+<ToastHost />
