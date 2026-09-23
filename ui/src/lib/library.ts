@@ -196,6 +196,33 @@ export function filterVolumes(rows: Volume[], query: string): Volume[] {
   );
 }
 
+export type SeriesGroup = { series: string; volumes: Volume[] };
+
+/** Groups by trimmed series: blank first, then case-folded series name. */
+export function groupVolumesBySeries(rows: Volume[]): SeriesGroup[] {
+  const buckets = new Map<string, Volume[]>();
+  for (const row of rows) {
+    const series = row.series.trim();
+    const bucket = buckets.get(series);
+    if (bucket) bucket.push(row);
+    else buckets.set(series, [row]);
+  }
+  const named = [...buckets.keys()]
+    .filter((series) => series !== "")
+    .sort((left, right) => {
+      const a = casefold(left);
+      const b = casefold(right);
+      return a < b ? -1 : a > b ? 1 : left < right ? -1 : left > right ? 1 : 0;
+    });
+  const groups: SeriesGroup[] = [];
+  const blank = buckets.get("");
+  if (blank) groups.push({ series: "", volumes: blank });
+  for (const series of named) {
+    groups.push({ series, volumes: buckets.get(series)! });
+  }
+  return groups;
+}
+
 export function selectPlain(visible: string[], path: string): Selection {
   return { paths: [path], anchor: path };
 }

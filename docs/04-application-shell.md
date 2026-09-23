@@ -74,7 +74,7 @@ The selected place is session state. It is not a config key. When the library re
 
 The main pane lists `volumes_in_place` for the selected place. An empty library, a selected place with no rows, or a filter with no hits shows the sentence `No volumes yet.`
 
-A list row's primary label is `name`. Its secondary text is `series` when that value is non-blank after trim, and is omitted otherwise. A grid cell's label is `name`.
+List view groups those rows by `series` after trim. Blank-series volumes come first with no header. Named series follow in case-folded alphabetical order, each with a muted series header above its volumes. A volume under a named series shows a tree marker before the thumbnail. A volume row's only text label is `name`. A grid cell's label is `name`. Grid view does not show series headers. Visible list order for selection is that grouped order, flattened.
 
 `GET /api/library` calls `list_volumes`, then `volumes_for_roots` and `places_from_volumes`. The response `volumes` are every row kept for the current roots, not only the selected place. The client applies `volumes_in_place` locally. The request does not call `scan`, does not open an archive, and does not build a thumbnail.
 
@@ -305,7 +305,7 @@ Cover at least:
 
 - One process loads config, binds `127.0.0.1` on an ephemeral port, and opens the pywebview window on that origin. The port is not config. Tests do not open the window.
 - The shelf is `GET /api/library`. That response does not scan, open an archive, or build a thumbnail. A missing config file is the defaults, is not created, and paints no volumes.
-- A place is a directory that directly contains indexed volumes. The main pane lists those volumes only. A list row shows the filename, and the series underneath when it is set. A grid cell shows the filename. Nested volumes are a different place. The header field filters `series`, `title`, and filename, and does not scrape.
+- A place is a directory that directly contains indexed volumes. The main pane lists those volumes only. List view groups by series with a muted header above shared volumes; a volume row shows the filename only. A grid cell shows the filename. Nested volumes are a different place. The header field filters `series`, `title`, and filename, and does not scrape.
 - One selected volume shows that volume's form and one preview page. Several selected volumes show one shared form for `Series`, `Publisher`, `LanguageISO`, `Genre`, `Manga`, `Writer`, `Penciller`, `Inker`, and `CoverArtist`. A field is written only after the user edits it or a load sets it, except each file's `Number`, which a save takes from that file's filename when the stored number differs. An unchanged save does not rewrite the archive. The preview follows the anchor.
 - Search and load fill the form and do not write an archive. A load marks the fields it sets dirty, including `Manga` on a shared form. A blank Comic Vine key fails before a request.
 - Save writes through `save_comic_info` and does not call `save_many`. One volume writes dirty fields, and `Number` from the filename when that field was not edited and the stored value differs. Several volumes write the dirty shared fields, including `Manga`, and each file's `Number` from its filename. `Volume` is not written. Cancel stops before the next file. A failed file does not stop the rest, and files already written stay written. A successful save writes the sibling poster.

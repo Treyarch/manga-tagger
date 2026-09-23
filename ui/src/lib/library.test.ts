@@ -8,6 +8,7 @@ import {
   filenameStem,
   filterVolumes,
   formFromVolumes,
+  groupVolumesBySeries,
   initialPageIndex,
   jobLabel,
   folderDropRequest,
@@ -80,6 +81,26 @@ describe("shelf and selection", () => {
       "Claymore",
     ]);
     expect(filterVolumes(rows, "   ")).toHaveLength(3);
+  });
+
+  it("groups blank series first, then named series alphabetically", () => {
+    const rows = [
+      volume("/books/z.cbz", { series: "Zebra" }),
+      volume("/books/a2.cbz", { series: "Aposimz" }),
+      volume("/books/plain.cbz", { series: "" }),
+      volume("/books/a1.cbz", { series: "Aposimz" }),
+      volume("/books/spaced.cbz", { series: "  " }),
+    ];
+    const groups = groupVolumesBySeries(rows);
+    expect(groups.map((group) => group.series)).toEqual(["", "Aposimz", "Zebra"]);
+    expect(groups[0].volumes.map((row) => row.name)).toEqual([
+      "plain.cbz",
+      "spaced.cbz",
+    ]);
+    expect(groups[1].volumes.map((row) => row.name)).toEqual([
+      "a2.cbz",
+      "a1.cbz",
+    ]);
   });
 
   it("follows plain, range, and toggle clicks", () => {

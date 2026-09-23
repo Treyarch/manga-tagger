@@ -40,6 +40,7 @@
     filenameStem,
     folderDropRequest,
     filterVolumes,
+    groupVolumesBySeries,
     formFromVolumes,
     formIsDirty,
     formOf,
@@ -102,7 +103,8 @@
   const inPlace = $derived(
     selectedPlace === null ? [] : volumesInPlace(volumes, selectedPlace),
   );
-  const visible = $derived(filterVolumes(inPlace, query));
+  const groups = $derived(groupVolumesBySeries(filterVolumes(inPlace, query)));
+  const visible = $derived(groups.flatMap((group) => group.volumes));
   const visiblePaths = $derived(visible.map((row) => row.path));
   const selectedRows = $derived(
     selection.paths.flatMap((path) => {
@@ -158,9 +160,9 @@
 
   function visiblePathsAfter(): string[] {
     if (selectedPlace === null) return [];
-    return filterVolumes(volumesInPlace(volumes, selectedPlace), query).map(
-      (row) => row.path,
-    );
+    return groupVolumesBySeries(
+      filterVolumes(volumesInPlace(volumes, selectedPlace), query),
+    ).flatMap((group) => group.volumes.map((row) => row.path));
   }
 
   async function refreshLibrary(job: Job) {
@@ -652,28 +654,45 @@
         </div>
       {:else if view === "list"}
         <ul>
-          {#each visible as row (row.path)}
-            <li>
-              <button
-                type="button"
-                class="flex h-9 w-full items-center gap-2 px-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:focus-visible:ring-blue-500 {selected(
-                  row.path,
-                )
-                  ? 'bg-blue-600/10 dark:bg-blue-500/15'
-                  : ''}"
-                onclick={(event) => onVolume(row.path, event)}
+          {#each groups as group (group.series)}
+            {#if group.series !== ""}
+              <li
+                class="truncate px-2 pt-3 pb-1 text-xs text-zinc-500 dark:text-zinc-400"
               >
-                <span class="flex size-4 shrink-0 items-center justify-center overflow-hidden">
-                  <Thumb path={row.path} failed={row.status === "failed"} fallback />
-                </span>
-                <span class="truncate text-sm">{row.name}</span>
-                {#if row.series.trim() !== ""}
-                  <span class="truncate text-xs text-zinc-500 dark:text-zinc-400"
-                    >{row.series}</span
-                  >
-                {/if}
-              </button>
-            </li>
+                {group.series}
+              </li>
+            {/if}
+            {#each group.volumes as row, index (row.path)}
+              <li>
+                <button
+                  type="button"
+                  class="flex h-9 w-full items-center gap-2 px-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:focus-visible:ring-blue-500 {selected(
+                    row.path,
+                  )
+                    ? 'bg-blue-600/10 dark:bg-blue-500/15'
+                    : ''}"
+                  onclick={(event) => onVolume(row.path, event)}
+                >
+                  {#if group.series !== ""}
+                    <span class="relative h-9 w-3 shrink-0" aria-hidden="true">
+                      <span
+                        class="absolute top-0 left-1 w-px bg-zinc-300 dark:bg-zinc-600 {index ===
+                        group.volumes.length - 1
+                          ? 'h-1/2'
+                          : 'bottom-0'}"
+                      ></span>
+                      <span
+                        class="absolute top-1/2 left-1 h-px w-2 bg-zinc-300 dark:bg-zinc-600"
+                      ></span>
+                    </span>
+                  {/if}
+                  <span class="flex size-4 shrink-0 items-center justify-center overflow-hidden">
+                    <Thumb path={row.path} failed={row.status === "failed"} fallback />
+                  </span>
+                  <span class="min-w-0 flex-1 truncate text-sm">{row.name}</span>
+                </button>
+              </li>
+            {/each}
           {/each}
         </ul>
       {:else}

@@ -49,7 +49,7 @@ The sidebar lists library places. The first row is 36px: muted caption text `Pla
 
 The main pane lists volumes. List is the default. Grid shows covers only. The switch is session state. It is not a configuration key. Switching back to list restores the list, and switching to grid restores the grid, for as long as the window is open.
 
-A list row is 36px tall (`h-9`): a 16px icon or thumbnail, the filename as the primary label, and the series as muted secondary text on the same line when that series is non-blank. The whole row takes the selection wash.
+List view groups volumes by ComicInfo `Series`. A non-blank series is a group header above its volumes: muted caption text (`text-xs`), not selectable, truncated on one line. Volumes that share that series sit directly under it. A volume row is 36px tall (`h-9`): a small tree marker, a 16px icon or thumbnail, and the filename as the only label. The tree marker is a muted hairline L (└) for the last volume in the group and a muted hairline tee (├) for every earlier volume, drawn with the hairline colors, so the row reads as a child of the series header. The series is not repeated on the row. The whole row takes the selection wash. Volumes with a blank series have no group header and no tree marker; they keep their place among the groups: blank-series volumes come first, then named series in case-folded alphabetical order. Within a group, volume order is the same name sort the shelf already uses. Grid view stays a flat cover grid with no series headers.
 
 A grid cell is a cover at a 2:3 aspect ratio with the filename as one truncated label under it. Selection is a 2px accent ring around the cover and the selection wash behind the label. A wash behind the cover image would be hidden by the image, so the ring is the selection on the cover itself.
 
@@ -190,11 +190,12 @@ Cover at least:
 - `resolveDark("system", true)` is true, and `resolveDark("system", false)` is false.
 - `resolveDark("nope", true)` is true, and `resolveDark("nope", false)` is false.
 - With a resolved dark theme, the shell root that sets the document class carries `dark`. With a resolved light theme, that element does not carry `dark`.
+- Grouping by series puts blank-series volumes first with an empty `series` key, then named series in case-folded alphabetical order, preserving name order within each group.
 
 ## Acceptance criteria
 
 - The window is a header bar, a 240px places sidebar, a flexible main pane, and a 384px inspector, separated by hairlines. The header does not scroll away.
-- List is the view when the window opens. Rows are 36px. A list row shows the filename, and the series in muted text when it is set. Grid cells show a 2:3 cover, the filename as a truncated label, and a 2px accent ring when selected. List selection is the accent wash on the row.
+- List is the view when the window opens. Rows are 36px. List view groups by series: a muted series header above the volumes that share it, filename-only rows under the header with a muted tree marker (tee or L) tying each row to that header, blank-series volumes first with no header and no marker, then named series in case-folded alphabetical order. Grid cells show a 2:3 cover, the filename as a truncated label, and a 2px accent ring when selected. List selection is the accent wash on the row.
 - An empty main pane shows the sentence `No volumes yet.` and no illustration. An empty sidebar shows `Drop a folder here.` under the Add folder button.
 - The first sidebar row is the muted caption `Places`, then Add folder, Lucide `FolderPlus`, 16px, trailing in a 36px row. A drag over the sidebar uses the selection wash.
 - Light and dark use the color table in this document. Dark mode is the `dark` class. The layout does not change between themes. With `dark`, native selects use a dark popup through `color-scheme: dark`.
