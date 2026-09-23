@@ -124,7 +124,7 @@ Icons are [Lucide](https://lucide.dev), package `lucide-svelte`. They are outlin
 | Rows and menu items | 16px |
 | Header bar | 20px |
 
-The view switch uses `List` and `LayoutGrid`. The active view uses the selection wash on its button. Search uses `Search` as the leading icon inside the header field.
+The view switch uses Lucide `List` and `LayoutGrid`, with accessible names `List view` and `Grid view`. The active view uses the selection wash on its button. Search uses `Search` as the leading icon inside the header field.
 
 Do not add a second icon set. Do not use filled or multicolor icons in the chrome.
 
@@ -147,6 +147,8 @@ Every control shows a 2px accent focus ring on `:focus-visible` (`blue-600` in l
 | `danger` | `red-600` fill, white text. Hover is `red-700` in both themes |
 
 The header icon button is `quiet`, 32px square (`size-8`), with a 20px icon. The default button height is 36px (`h-9`) and `text-sm`.
+
+When a button has an accessible name and no visible text (icon buttons), that name is also the native `title` attribute. Hovering shows the browser tooltip after the platform delay so the user can learn what Scrape, Save, Rename file(s), Convert CBR, Scan library, List view, Grid view, and the other chrome icons do. Do not add a custom tooltip component.
 
 ### Text input
 
@@ -207,7 +209,7 @@ Cover at least:
 - Light and dark use the color table in this document. Dark mode is the `dark` class. The layout does not change between themes. With `dark`, native selects use a dark popup through `color-scheme: dark`.
 - `theme` defaults to `system`. `light` and `dark` force that theme. Any other value follows the system. The header menu can set each of the three values, and the class updates immediately. `system` keeps following `prefers-color-scheme`.
 - The resolved theme is applied before the first paint.
-- Icons are Lucide, `currentColor`, 16px in rows and menu items and 20px in the header. The view switch is `List` and `LayoutGrid`. The theme menu is `Monitor`, `Sun`, and `Moon`. Add folder is `FolderPlus`. Close is `X` at the trailing edge of the header.
+- Icons are Lucide, `currentColor`, 16px in rows and menu items and 20px in the header. The view switch is `List` / `List view` and `LayoutGrid` / `Grid view`. The theme menu is `Monitor`, `Sun`, and `Moon`. Add folder is `FolderPlus`. Close is `X` at the trailing edge of the header. Icon buttons expose their accessible name as a native `title` so a short hover shows that label.
 - Buttons, text inputs, textareas, checkboxes, selects, menus, and dialogs are the local components in this document, styled with Tailwind utilities. The UI package does not depend on a third-party component kit.
 - Type is the default sans stack at `text-sm` for controls and rows, and `text-xs` for captions.
 - A keyboard focus ring is visible on the shared controls.

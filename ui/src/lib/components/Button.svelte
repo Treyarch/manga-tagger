@@ -38,6 +38,7 @@
   {type}
   {disabled}
   aria-label={label}
+  title={label}
   aria-pressed={pressed ? true : undefined}
   class="inline-flex items-center justify-center rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-40 dark:focus-visible:ring-blue-500 {icon
     ? 'size-8'

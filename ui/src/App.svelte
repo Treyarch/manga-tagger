@@ -503,19 +503,24 @@
     >
       <Save size={20} />
     </Button>
-    <Button icon label="Rename" disabled={busy || selectedPlace === null} onclick={openRename}>
+    <Button
+      icon
+      label="Rename file(s)"
+      disabled={busy || selectedPlace === null}
+      onclick={openRename}
+    >
       <Pencil size={20} />
     </Button>
-    <Button icon label="Convert" disabled={busy || selectedCbr === 0} onclick={requestConvert}>
+    <Button icon label="Convert CBR" disabled={busy || selectedCbr === 0} onclick={requestConvert}>
       <FileArchive size={20} />
     </Button>
-    <Button icon label="Rescan" disabled={busy} onclick={rescan}>
+    <Button icon label="Scan library" disabled={busy} onclick={rescan}>
       <RefreshCw size={20} />
     </Button>
-    <Button icon label="List" pressed={view === "list"} onclick={() => (view = "list")}>
+    <Button icon label="List view" pressed={view === "list"} onclick={() => (view = "list")}>
       <List size={20} />
     </Button>
-    <Button icon label="Grid" pressed={view === "grid"} onclick={() => (view = "grid")}>
+    <Button icon label="Grid view" pressed={view === "grid"} onclick={() => (view = "grid")}>
       <LayoutGrid size={20} />
     </Button>
     {#if headerJob}

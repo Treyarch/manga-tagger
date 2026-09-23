@@ -140,7 +140,7 @@ Search and load set `total` to 1 and `completed` to 0 until the request finishes
 
 `shutdown` cancels every queued job without running it, sets the cancel flag on the running job, and joins the worker. It does not kill the thread. Closing the window calls `shutdown`, then stops the server. The process exits 0.
 
-Header text for a `queued` or `running` job is `Scan`, `Search`, `Load`, `Save`, `Rename`, or `Convert`. When `total` is greater than 0 the text is that name, a space, then `{completed}/{total}`, such as `Save 3/40`. The Cancel control is shown only then. Its accessible name is `Cancel`. Scrape, Save, Rename, Convert, and Rescan are disabled while `current` is `queued` or `running`.
+Header text for a `queued` or `running` job is `Scan`, `Search`, `Load`, `Save`, `Rename`, or `Convert`. When `total` is greater than 0 the text is that name, a space, then `{completed}/{total}`, such as `Save 3/40`. The Cancel control is shown only then. Its accessible name is `Cancel`. Scrape, Save, Rename file(s), Convert CBR, and Scan library are disabled while `current` is `queued` or `running`.
 
 ## HTTP API
 
@@ -242,7 +242,7 @@ When the result names a skipped root, the inspector shows `{path} was skipped.` 
 
 ## Header and settings
 
-Leading to trailing, the header contains: the filter field, the provider select, Scrape (`ScanSearch`), Save (`Save`), Rename (`Pencil`), Convert (`FileArchive`), Rescan (`RefreshCw`), the list and grid switch, the job name and Cancel (`X`) while a job is queued or running, the theme menu, Settings (`Settings`), and Close (`X`). The filter field, view switch, and theme menu are the controls in the UI specification. The controls this specification adds are quiet header icon buttons with those accessible names, except the provider select, which is the select component. Close sits at the trailing edge. It calls `POST /api/window/close`, which destroys the pywebview window. That ends the process the same way the window chrome close does. No closer returns 503.
+Leading to trailing, the header contains: the filter field, the provider select, Scrape (`ScanSearch`), Save (`Save`), Rename file(s) (`Pencil`), Convert CBR (`FileArchive`), Scan library (`RefreshCw`), the list and grid switch, the job name and Cancel (`X`) while a job is queued or running, the theme menu, Settings (`Settings`), and Close (`X`). The filter field, view switch, and theme menu are the controls in the UI specification. The controls this specification adds are quiet header icon buttons with those accessible names, except the provider select, which is the select component. Close sits at the trailing edge. It calls `POST /api/window/close`, which destroys the pywebview window. That ends the process the same way the window chrome close does. No closer returns 503.
 
 Choosing a theme calls `PUT /api/config` with that `theme` value. On success the class updates from the UI specification's `resolveDark`. That change does not rescan. A failed write leaves the previous theme in memory and does not change the class.
 
