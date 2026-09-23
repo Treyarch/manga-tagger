@@ -493,9 +493,11 @@
   });
 </script>
 
-<div class="flex h-full flex-col bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100">
+<div
+  class="flex h-full flex-col gap-2 bg-zinc-100 p-2 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100"
+>
   <header
-    class="flex h-12 shrink-0 items-center gap-1 border-b border-zinc-200 px-2 dark:border-zinc-800"
+    class="flex h-12 shrink-0 items-center gap-1 border border-zinc-200 bg-white px-2 dark:border-zinc-800 dark:bg-zinc-900"
   >
     <div class="relative w-52 shrink-0">
       <Search
@@ -598,7 +600,9 @@
       <X size={20} />
     </Button>
   </header>
-  <div class="flex min-h-0 flex-1">
+  <div
+    class="flex min-h-0 flex-1 overflow-hidden border border-zinc-200 dark:border-zinc-800"
+  >
     <nav
       id="places"
       class="w-60 shrink-0 overflow-y-auto {dragDepth > 0
@@ -647,7 +651,7 @@
         </button>
       {/each}
     </nav>
-    <main class="min-w-0 flex-1 overflow-y-auto">
+    <main class="min-w-0 flex-1 overflow-y-auto bg-white dark:bg-zinc-900">
       {#if visible.length === 0}
         <div class="flex h-full items-center justify-center">
           <p class="text-sm text-zinc-500 dark:text-zinc-400">No volumes yet.</p>
@@ -729,7 +733,7 @@
       {/if}
     </main>
     <aside
-      class="w-96 shrink-0 overflow-y-auto border-l border-zinc-200 dark:border-zinc-800"
+      class="w-96 shrink-0 overflow-y-auto border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
     >
       <Inspector
         {anchor}
