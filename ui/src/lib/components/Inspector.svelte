@@ -59,12 +59,14 @@
               value={field.value}
               placeholder={field.mixed ? "Mixed" : ""}
               disabled={formLocked}
+              dirty={field.dirty}
               onValue={(next) => onEdit(name, next)}
             />
           {:else if name === "Manga"}
             <Select
               value={field.value}
               disabled={formLocked}
+              dirty={field.dirty}
               options={mangaChoices(field.value).map((option) => ({
                 value: option,
                 label: mangaLabel(option),
@@ -77,6 +79,7 @@
               value={field.value}
               placeholder={field.mixed ? "Mixed" : ""}
               disabled={formLocked}
+              dirty={field.dirty}
               onValue={(next) => onEdit(name, next)}
             />
           {/if}

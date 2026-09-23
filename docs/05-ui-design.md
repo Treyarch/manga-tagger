@@ -64,13 +64,13 @@ Grid view uses the same series groups and the same muted series headers. Covers 
 
 A grid cell is a cover at a 2:3 aspect ratio with the filename as one truncated label under it. Selection is a 2px accent ring around the cover and the selection wash behind the label. A wash behind the cover image would be hidden by the image, so the ring is the selection on the cover itself.
 
-The inspector stacks, from the top: the cover, then the metadata fields. The cover sits in a fixed 320px-tall (`h-80`) frame the full inspector width; the image is centered with `object-contain` and does not change that frame's height when the page changes. Each field is a label above its control. Labels use the muted text color and the readable captions from [04-application-shell.md](04-application-shell.md) (`Page count`, `Language`, `Cover artist`, and the rest), not the raw ComicInfo element names. Fields stack with `gap-3`. The pane has no shadow and no inner card.
+The inspector stacks, from the top: the cover, then the metadata fields. The cover sits in a fixed 320px-tall (`h-80`) frame the full inspector width; the image is centered with `object-contain` and does not change that frame's height when the page changes. Each field is a label above its control. Labels use the muted text color and the readable captions from [04-application-shell.md](04-application-shell.md) (`Page count`, `Language`, `Cover artist`, and the rest), not the raw ComicInfo element names. When a field's form `dirty` flag is true (the user edited it or a load overwrote it), the control's value text and border use the dirty field colors from the color table; the caption stays muted. After a successful Save rebuilds the form from the index, those controls return to primary text and the hairline border. Fields stack with `gap-3`. The pane has no shadow and no inner card.
 
 An empty library, or an empty place, shows one sentence in the main pane, centered, in the muted color: `No volumes yet.` There is no illustration.
 
 ## Color
 
-Use Tailwind's built-in `zinc` and `blue` scales so a control can keep the classes from the official Tailwind CSS examples. Do not add a custom palette, and do not add an accent picker.
+Use Tailwind's built-in `zinc` and `blue` scales for chrome so a control can keep the classes from the official Tailwind CSS examples. Dirty inspector fields use `amber` the same way danger buttons use `red`. Do not add a custom palette, and do not add an accent picker.
 
 | Role | Light | Dark |
 | --- | --- | --- |
@@ -82,6 +82,8 @@ Use Tailwind's built-in `zinc` and `blue` scales so a control can keep the class
 | Accent | `blue-600` | `blue-500` |
 | Selection wash | `blue-600/10` | `blue-500/15` |
 | Cover ring when selected | `blue-600` | `blue-500` |
+| Dirty field text | `amber-700` | `amber-400` |
+| Dirty field border | `amber-600` | `amber-500` |
 
 Text on a filled accent or danger button is `white` in both themes. A selected row keeps the primary text color. The wash shows the selection.
 
@@ -161,11 +163,11 @@ When a button has an accessible name and no visible text (icon buttons), that na
 
 ### Text input
 
-`TextInput.svelte`. Height 36px, `text-sm`, `rounded-md`, hairline border, view background, muted placeholder. Settings, rename, and inspector fields use it.
+`TextInput.svelte`. Height 36px, `text-sm`, `rounded-md`, hairline border, view background, muted placeholder. Settings, rename, and inspector fields use it. An optional `extra` class string is appended for callers that need it. When `dirty` is true, value text and border use the dirty amber colors instead of primary text and the hairline border (not both; amber must replace zinc so it wins).
 
 ### Textarea
 
-`Textarea.svelte`. Same border, radius, background, and `text-sm` as the text input. At least four rows. `Summary` and `Notes` use it.
+`Textarea.svelte`. Same border, radius, background, and `text-sm` as the text input. At least four rows. `Summary` and `Notes` use it. It accepts the same optional `extra` and `dirty` props as the text input.
 
 ### Checkbox
 
@@ -173,7 +175,7 @@ When a button has an accessible name and no visible text (icon buttons), that na
 
 ### Select
 
-`Select.svelte`. Same height, radius, border, and background as the text input. It is a native `<select>`. Its open list follows the document `color-scheme`, so it is dark when the window is dark.
+`Select.svelte`. Same height, radius, border, and background as the text input. It is a native `<select>`. Its open list follows the document `color-scheme`, so it is dark when the window is dark. It accepts the same optional `extra` and `dirty` props as the text input.
 
 ### Menu
 
@@ -224,6 +226,7 @@ Cover at least:
 - With a resolved dark theme, the shell root that sets the document class carries `dark`. With a resolved light theme, that element does not carry `dark`.
 - Grouping by series puts blank-series volumes first with an empty `series` key, then named series in case-folded alphabetical order, preserving name order within each group.
 - Inspector field captions use the readable names from the shell form section, not camel-cased ComicInfo keys.
+- `dirtyFieldClass(true)` returns the amber dirty text and border utilities; `dirtyFieldClass(false)` returns `""`.
 - `jobToastMessage` returns null for `cancelled`, the scrape/load/save/rename/convert/scan sentences from the shell toast table for `succeeded` and `failed`, and uses entry counts without `error_message` for save, rename, and convert.
 - `pushToast` adds an item that `dismissToast` removes, and a timer removes it after 5 seconds.
 
@@ -236,6 +239,7 @@ The product brand (SVG logo and wordmark) is presentational chrome. It is covere
 - An empty main pane shows the sentence `No volumes yet.` and no illustration. An empty sidebar shows `Drop a folder here.` under the Add folder button.
 - The first sidebar row is the muted caption `My library`, then Add folder, Lucide `FolderPlus`, 16px, trailing in a 36px row. A drag over the sidebar uses the selection wash.
 - Light and dark use the color table in this document. Dark mode is the `dark` class. The layout does not change between themes. With `dark`, native selects use a dark popup through `color-scheme: dark`.
+- A dirty inspector field (edited or loaded, `dirty` true) shows amber value text and border on its text input, textarea, or select. A clean field keeps primary text and the hairline border. After Save rebuilds the form, dirty styling is gone.
 - `theme` defaults to `system`. `light` and `dark` force that theme. Any other value follows the system. The header menu can set each of the three values, and the class updates immediately. `system` keeps following `prefers-color-scheme`.
 - The resolved theme is applied before the first paint.
 - Icons are Lucide, `currentColor`, 16px in rows and menu items and 20px in the header. The view switch is `List` / `List view` and `LayoutGrid` / `Grid view`. The theme menu is `Monitor`, `Sun`, and `Moon`. Add folder is `FolderPlus`. Close is `X` at the trailing edge of the header. Icon buttons expose their accessible name as a native `title` so a short hover shows that label.

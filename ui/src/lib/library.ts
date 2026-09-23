@@ -70,6 +70,13 @@ export function fieldLabel(name: string): string {
   return FIELD_LABELS[name as (typeof FORM_FIELDS)[number]] ?? name;
 }
 
+/** Amber text and border for unsaved inspector fields until Save rebuilds the form. */
+export function dirtyFieldClass(dirty: boolean): string {
+  return dirty
+    ? "border-amber-600 text-amber-700 dark:border-amber-500 dark:text-amber-400"
+    : "";
+}
+
 export const MANGA_OPTIONS = [
   "YesAndRightToLeft",
   "Yes",

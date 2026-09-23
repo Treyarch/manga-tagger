@@ -6,6 +6,7 @@ import {
   convertConfirmMessage,
   editField,
   entryErrorLines,
+  dirtyFieldClass,
   fieldLabel,
   filenameStem,
   formFromVolumes,
@@ -191,6 +192,13 @@ describe("form", () => {
     expect(fieldLabel("CoverArtist")).toBe("Cover artist");
     expect(fieldLabel("Title")).toBe("Title");
     expect(FORM_FIELDS.every((name) => fieldLabel(name).length > 0)).toBe(true);
+  });
+
+  it("returns amber dirty classes only when the field is dirty", () => {
+    expect(dirtyFieldClass(false)).toBe("");
+    expect(dirtyFieldClass(true)).toBe(
+      "border-amber-600 text-amber-700 dark:border-amber-500 dark:text-amber-400",
+    );
   });
 
   it("maps Manga tokens to readable select captions", () => {
