@@ -23,6 +23,13 @@ def test_missing_config_returns_defaults(tmp_path: Path) -> None:
     assert config.nautiljon_base_url == ""
     assert config.nautiljon_api_key == ""
     assert config.title_languages == ["fr", "en"]
+    assert config.enabled_providers == [
+        "mangadex",
+        "anilist",
+        "jikan",
+        "comicvine",
+        "nautiljon",
+    ]
     assert config.theme == "system"
     assert config.extra == {}
     assert not path.exists()
@@ -35,6 +42,7 @@ def test_missing_config_returns_defaults(tmp_path: Path) -> None:
         "nautiljon_base_url",
         "nautiljon_api_key",
         "title_languages",
+        "enabled_providers",
         "theme",
     }
 
@@ -70,6 +78,13 @@ def test_unknown_key_survives_a_theme_change(tmp_path: Path) -> None:
     assert languages.title_languages == ["fr", "ja"]
     empty = apply_put(config, {"title_languages": []})
     assert empty.title_languages == []
+    providers = apply_put(
+        config,
+        {"enabled_providers": ["nautiljon", "nope", "nautiljon", 1, "mangadex"]},
+    )
+    assert providers.enabled_providers == ["nautiljon", "mangadex"]
+    none = apply_put(config, {"enabled_providers": []})
+    assert none.enabled_providers == []
 
 
 def test_invalid_toml_names_the_path(tmp_path: Path) -> None:
@@ -94,6 +109,24 @@ def test_put_rejects_wrong_json_types(tmp_path: Path) -> None:
         apply_put(config, {"nautiljon_api_key": 5})
     with pytest.raises(ConfigError):
         apply_put(config, {"title_languages": "fr"})
+    with pytest.raises(ConfigError):
+        apply_put(config, {"enabled_providers": "mangadex"})
+
+
+def test_enabled_providers_load_fallbacks(tmp_path: Path) -> None:
+    path = tmp_path / "config.toml"
+    path.write_text('enabled_providers = "mangadex"\n', encoding="utf-8")
+    config = load_config(path)
+    assert config.enabled_providers == [
+        "mangadex",
+        "anilist",
+        "jikan",
+        "comicvine",
+        "nautiljon",
+    ]
+    path.write_text("enabled_providers = []\n", encoding="utf-8")
+    empty = load_config(path)
+    assert empty.enabled_providers == []
 
 
 def test_app_paths(tmp_path: Path) -> None:

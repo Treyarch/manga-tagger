@@ -76,7 +76,7 @@ class LibraryResponse(BaseModel):
 
 
 class ConfigModel(BaseModel):
-    """The seven known config keys."""
+    """The eight known config keys."""
 
     library_roots: list[str]
     keep_cbr_original: bool
@@ -84,6 +84,7 @@ class ConfigModel(BaseModel):
     nautiljon_base_url: str
     nautiljon_api_key: str
     title_languages: list[str]
+    enabled_providers: list[str]
     theme: str
 
 
@@ -98,6 +99,7 @@ class ConfigPut(BaseModel):
     nautiljon_base_url: Any = None
     nautiljon_api_key: Any = None
     title_languages: Any = None
+    enabled_providers: Any = None
     theme: Any = None
 
 

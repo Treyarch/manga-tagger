@@ -40,7 +40,7 @@ A hit with a blank `id` or blank `number` is dropped. Order is API order for Com
 list_issues(provider, series_id, *, title_languages, api_key="", nautiljon_base_url="", nautiljon_api_key="", client, cancel=None) -> list[IssueCandidate]
 ```
 
-Call order matches `load` for provider name, blank/illegal `series_id`, Comic Vine key, Nautiljon settings, and `cancel`. MangaDex, AniList, and Jikan return `[]` after those checks and before any HTTP.
+Call order matches `load` for provider name, enabled_providers, blank/illegal `series_id`, Comic Vine key, Nautiljon settings, and `cancel`. MangaDex, AniList, and Jikan return `[]` after those checks and before any HTTP.
 
 ### Comic Vine
 

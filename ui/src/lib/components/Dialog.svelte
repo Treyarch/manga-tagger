@@ -21,7 +21,7 @@
   }: {
     title: string;
     icon?: Snippet;
-    size?: "md" | "xl";
+    size?: "md" | "lg" | "xl";
     confirmLabel?: string;
     confirmVariant?: "primary" | "danger";
     confirmDisabled?: boolean;
@@ -33,7 +33,9 @@
     children?: Snippet;
   } = $props();
 
-  const width = $derived(size === "xl" ? "max-w-4xl" : "max-w-md");
+  const width = $derived(
+    size === "xl" ? "max-w-4xl" : size === "lg" ? "max-w-2xl" : "max-w-md",
+  );
 </script>
 
 <div

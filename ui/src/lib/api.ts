@@ -17,6 +17,7 @@ export type Config = {
   nautiljon_base_url: string;
   nautiljon_api_key: string;
   title_languages: string[];
+  enabled_providers: string[];
   theme: string;
 };
 

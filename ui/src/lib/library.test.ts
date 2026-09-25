@@ -4,8 +4,10 @@ import {
   POLL_MS,
   FORM_FIELDS,
   candidatesOf,
+  clampProvider,
   convertConfirmMessage,
   editField,
+  enabledProviderOptions,
   entryErrorLines,
   dirtyFieldClass,
   fieldLabel,
@@ -301,6 +303,17 @@ describe("jobs and dialogs", () => {
   it("rejects a relative settings root and keeps absolute ones", () => {
     expect(parseRootLines("\n/books\n\n").roots).toEqual(["/books"]);
     expect(parseRootLines("/books\nrelative").error).toBe("Paths must be absolute.");
+  });
+
+  it("filters and clamps enabled providers", () => {
+    expect(enabledProviderOptions(["mangadex", "nope", "nautiljon"])).toEqual([
+      { value: "mangadex", label: "MangaDex" },
+      { value: "nautiljon", label: "Nautiljon" },
+    ]);
+    expect(enabledProviderOptions([])).toEqual([]);
+    expect(clampProvider("anilist", ["mangadex", "anilist"])).toBe("anilist");
+    expect(clampProvider("jikan", ["mangadex", "anilist"])).toBe("mangadex");
+    expect(clampProvider("jikan", [])).toBe("");
   });
 
   it("starts the preview at the cover and skips a failed archive", () => {

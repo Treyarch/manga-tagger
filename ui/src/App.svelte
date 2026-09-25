@@ -6,24 +6,20 @@
     FolderPlus,
     LayoutGrid,
     List,
-    Monitor,
-    Moon,
     Pencil,
     RefreshCw,
     Save,
     ScanSearch,
     Settings,
-    Sun,
     X,
   } from "lucide-svelte";
-  import { getJson, postJson, putConfig, type Config } from "./lib/api";
+  import { getJson, postJson, type Config } from "./lib/api";
   import BrandMark from "./lib/components/BrandMark.svelte";
   import Button from "./lib/components/Button.svelte";
   import Dialog from "./lib/components/Dialog.svelte";
   import Inspector from "./lib/components/Inspector.svelte";
   import MatchesDialog from "./lib/components/MatchesDialog.svelte";
   import IssuesDialog from "./lib/components/IssuesDialog.svelte";
-  import Menu from "./lib/components/Menu.svelte";
   import RenameDialog from "./lib/components/RenameDialog.svelte";
   import Select from "./lib/components/Select.svelte";
   import SettingsDialog from "./lib/components/SettingsDialog.svelte";
@@ -33,11 +29,12 @@
   import {
     OFFERED_RENAME_TEMPLATE,
     POLL_MS,
-    PROVIDERS,
     cbrCount,
     candidatesOf,
+    clampProvider,
     convertConfirmMessage,
     editField,
+    enabledProviderOptions,
     entriesOf,
     entryErrorLines,
     filenameStem,
@@ -88,7 +85,6 @@
   let inspectorLines = $state<string[]>([]);
   let folderError = $state("");
   let dragDepth = $state(0);
-  let themeOpen = $state(false);
   let settingsOpen = $state(false);
   let renameOpen = $state(false);
   let convertOpen = $state(false);
@@ -140,6 +136,15 @@
       (headerJob.name === "Load" || headerJob.name === "Save"),
   );
   const selectedCbr = $derived(cbrCount(selectedRows));
+  const providerOptions = $derived(
+    enabledProviderOptions(config.enabled_providers),
+  );
+
+  $effect(() => {
+    const enabled = config.enabled_providers;
+    const next = clampProvider(untrack(() => provider), enabled);
+    if (next !== untrack(() => provider)) provider = next;
+  });
 
   function rowsFor(paths: string[]): Volume[] {
     return paths.flatMap((path) => {
@@ -449,20 +454,6 @@
     else convertOpen = true;
   }
 
-  async function chooseTheme(theme: string) {
-    themeOpen = false;
-    const previous = config;
-    try {
-      config = await putConfig({ theme });
-      applyDocumentClass(
-        document.documentElement,
-        resolveDark(config.theme, window.matchMedia("(prefers-color-scheme: dark)").matches),
-      );
-    } catch {
-      config = previous;
-    }
-  }
-
   async function dismissMatches() {
     if (searching || listingIssues) await cancelJob();
     candidates = [];
@@ -528,14 +519,9 @@
     const timer = setInterval(() => {
       void poll().catch(() => undefined);
     }, POLL_MS);
-    const closeTheme = () => {
-      themeOpen = false;
-    };
-    window.addEventListener("click", closeTheme);
     window.addEventListener("folders-dropped", onFoldersDropped);
     return () => {
       clearInterval(timer);
-      window.removeEventListener("click", closeTheme);
       window.removeEventListener("folders-dropped", onFoldersDropped);
     };
   });
@@ -569,11 +555,17 @@
         <Select
           label="Provider"
           value={provider}
-          options={PROVIDERS.map((item) => ({ value: item.id, label: item.label }))}
+          options={providerOptions}
+          disabled={providerOptions.length === 0}
           onValue={(next) => (provider = next)}
         />
       </div>
-      <Button icon label="Scrape" disabled={busy || anchor === null} onclick={scrape}>
+      <Button
+        icon
+        label="Scrape"
+        disabled={busy || anchor === null || provider === ""}
+        onclick={scrape}
+      >
         <ScanSearch size={20} />
       </Button>
       <Button
@@ -610,44 +602,6 @@
       {/if}
     </div>
     <div class="flex items-center justify-self-end gap-1">
-      <div class="relative">
-        <Button
-          icon
-          label="Theme"
-          onclick={(event) => {
-            event.stopPropagation();
-            themeOpen = !themeOpen;
-          }}
-        >
-          {#if config.theme === "light"}
-            <Sun size={20} />
-          {:else if config.theme === "dark"}
-            <Moon size={20} />
-          {:else}
-            <Monitor size={20} />
-          {/if}
-        </Button>
-        {#if themeOpen}
-          <Menu
-            items={[
-              { id: "system", label: "System", checked: config.theme !== "light" && config.theme !== "dark" },
-              { id: "light", label: "Light", checked: config.theme === "light" },
-              { id: "dark", label: "Dark", checked: config.theme === "dark" },
-            ]}
-            onSelect={chooseTheme}
-          >
-            {#snippet icon(id)}
-              {#if id === "light"}
-                <Sun size={16} />
-              {:else if id === "dark"}
-                <Moon size={16} />
-              {:else}
-                <Monitor size={16} />
-              {/if}
-            {/snippet}
-          </Menu>
-        {/if}
-      </div>
       <Button icon label="Settings" onclick={() => (settingsOpen = true)}>
         <Settings size={20} />
       </Button>
@@ -852,6 +806,14 @@
         next.library_roots.length !== config.library_roots.length ||
         next.library_roots.some((root, index) => root !== config.library_roots[index]);
       config = next;
+      provider = clampProvider(provider, next.enabled_providers);
+      applyDocumentClass(
+        document.documentElement,
+        resolveDark(
+          next.theme,
+          window.matchMedia("(prefers-color-scheme: dark)").matches,
+        ),
+      );
       settingsOpen = false;
       if (rootsChanged) {
         void getJson<Job | null>("/api/jobs/current").then((current) => {

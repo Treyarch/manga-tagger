@@ -32,6 +32,7 @@ _NUMERIC_ID = re.compile(r"[1-9]\d*")
 _COMICVINE_KEY = "The Comic Vine API key is not set"
 _NAUTILJON_BASE = "The Nautiljon base URL is not set"
 _NAUTILJON_KEY = "The Nautiljon API key is not set"
+_PROVIDER_DISABLED = "{provider}: provider is disabled"
 _SLUG_PROVIDERS = frozenset({"mangadex", "nautiljon"})
 _CV_NOT_FOUND = "comicvine: could not find an issue"
 _NJ_NOT_FOUND = "nautiljon: could not find an issue"
@@ -46,6 +47,7 @@ def search(
     api_key: str = "",
     nautiljon_base_url: str = "",
     nautiljon_api_key: str = "",
+    enabled_providers: Sequence[str] | None = None,
     cancel: Callable[[], bool] | None = None,
 ) -> list[Candidate]:
     """Return at most 10 candidates from one catalog.
@@ -61,12 +63,15 @@ def search(
         api_key: Comic Vine key. Blank disables that catalog.
         nautiljon_base_url: Nautiljon wrapper origin. Blank disables that catalog.
         nautiljon_api_key: Nautiljon wrapper key. Blank disables that catalog.
+        enabled_providers: When set, providers outside this list are unavailable.
+            ``None`` treats every known provider as enabled.
         cancel: Checked once, immediately before each request.
 
     Returns:
         Candidates in API order. An empty list is not an error.
     """
     _require_provider(provider)
+    _require_enabled(provider, enabled_providers)
     if query.strip() == "":
         return []
     _require_comicvine_key(provider, api_key)
@@ -112,6 +117,7 @@ def list_issues(
     api_key: str = "",
     nautiljon_base_url: str = "",
     nautiljon_api_key: str = "",
+    enabled_providers: Sequence[str] | None = None,
     cancel: Callable[[], bool] | None = None,
 ) -> list[IssueCandidate]:
     """Return issues or volumes for one series id.
@@ -120,6 +126,7 @@ def list_issues(
     """
     del title_languages
     _require_provider(provider)
+    _require_enabled(provider, enabled_providers)
     _require_match_id(provider, series_id)
     _require_comicvine_key(provider, api_key)
     _require_nautiljon(provider, nautiljon_base_url, nautiljon_api_key)
@@ -148,6 +155,7 @@ def load(
     api_key: str = "",
     nautiljon_base_url: str = "",
     nautiljon_api_key: str = "",
+    enabled_providers: Sequence[str] | None = None,
     cancel: Callable[[], bool] | None = None,
     issue_id: str = "",
     number: str | None = None,
@@ -163,6 +171,8 @@ def load(
         api_key: Comic Vine key. Blank disables that catalog.
         nautiljon_base_url: Nautiljon wrapper origin. Blank disables that catalog.
         nautiljon_api_key: Nautiljon wrapper key. Blank disables that catalog.
+        enabled_providers: When set, providers outside this list are unavailable.
+            ``None`` treats every known provider as enabled.
         cancel: Checked once, immediately before each request.
         issue_id: Comic Vine issue id or Nautiljon volume number when set.
         number: Preferred issue/volume number from the form when non-blank.
@@ -171,6 +181,7 @@ def load(
         ComicInfo element names mapped to strings. ``Volume`` is never included.
     """
     _require_provider(provider)
+    _require_enabled(provider, enabled_providers)
     _require_match_id(provider, match_id)
     _require_comicvine_key(provider, api_key)
     _require_nautiljon(provider, nautiljon_base_url, nautiljon_api_key)
@@ -284,6 +295,17 @@ def _preferred_number(number: str | None, filename_stem: str) -> str | None:
 def _require_provider(provider: str) -> None:
     if provider not in _PROVIDERS:
         raise ProviderResponseError(f"{provider}: unknown provider")
+
+
+def _require_enabled(
+    provider: str, enabled_providers: Sequence[str] | None
+) -> None:
+    if enabled_providers is None:
+        return
+    if provider not in enabled_providers:
+        raise ProviderUnavailableError(
+            _PROVIDER_DISABLED.format(provider=provider)
+        )
 
 
 def _require_comicvine_key(provider: str, api_key: str) -> None:

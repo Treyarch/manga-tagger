@@ -930,6 +930,63 @@ def test_comicvine_blank_key_and_api_error() -> None:
                     api_key=api_key,
                     issue_id="99",
                 )
+
+
+def test_disabled_provider_raises_without_http() -> None:
+    with _forbid_client() as client:
+        with pytest.raises(ProviderUnavailableError, match="provider is disabled"):
+            search(
+                "mangadex",
+                "Claymore",
+                title_languages=["en"],
+                client=client,
+                enabled_providers=["anilist"],
+            )
+        with pytest.raises(ProviderUnavailableError, match="provider is disabled"):
+            load(
+                "mangadex",
+                "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+                filename_stem="Claymore",
+                title_languages=["en"],
+                client=client,
+                enabled_providers=[],
+            )
+        with pytest.raises(ProviderUnavailableError, match="provider is disabled"):
+            list_issues(
+                "comicvine",
+                "12345",
+                title_languages=["en"],
+                client=client,
+                api_key="secret",
+                enabled_providers=["mangadex"],
+            )
+
+
+def test_disabled_provider_before_blank_query() -> None:
+    with _forbid_client() as client:
+        with pytest.raises(ProviderUnavailableError, match="provider is disabled"):
+            search(
+                "mangadex",
+                "",
+                title_languages=["en"],
+                client=client,
+                enabled_providers=["anilist"],
+            )
+    client, _seen = _client({"data": []})
+    assert (
+        search(
+            "mangadex",
+            "",
+            title_languages=["en"],
+            client=client,
+            enabled_providers=["mangadex"],
+        )
+        == []
+    )
+    client.close()
+
+
+def test_comicvine_api_error_status() -> None:
     client, seen = _client(
         {
             "error": "OK",

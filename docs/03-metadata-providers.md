@@ -75,9 +75,9 @@ The query remainder is the tag-stripped stem without that matched suffix, includ
 The caller chooses one provider: `mangadex`, `anilist`, `jikan`, `comicvine`, or `nautiljon`. Any other name raises `ProviderResponseError` and sends no request.
 
 ```text
-search(provider, query, *, title_languages, api_key="", nautiljon_base_url="", nautiljon_api_key="", client, cancel=None) -> list[Candidate]
-list_issues(provider, series_id, *, title_languages, api_key="", nautiljon_base_url="", nautiljon_api_key="", client, cancel=None) -> list[IssueCandidate]
-load(provider, match_id, *, filename_stem, title_languages, api_key="", nautiljon_base_url="", nautiljon_api_key="", client, cancel=None, issue_id="", number=None) -> dict[str, str]
+search(provider, query, *, title_languages, api_key="", nautiljon_base_url="", nautiljon_api_key="", enabled_providers=None, client, cancel=None) -> list[Candidate]
+list_issues(provider, series_id, *, title_languages, api_key="", nautiljon_base_url="", nautiljon_api_key="", enabled_providers=None, client, cancel=None) -> list[IssueCandidate]
+load(provider, match_id, *, filename_stem, title_languages, api_key="", nautiljon_base_url="", nautiljon_api_key="", enabled_providers=None, client, cancel=None, issue_id="", number=None) -> dict[str, str]
 ```
 
 A `Candidate` has `id`, `title`, `year`, `credit`, `count`, `summary`, and `cover`, all strings. `id` is the catalog id in decimal digits for AniList, Jikan, and Comic Vine, the MangaDex UUID for MangaDex, and the Nautiljon series slug for Nautiljon. `title` is the preferred series title. `year` is the start or publish year from the search payload when present, otherwise `""`. `credit` is the first author for MangaDex and Jikan, the first staff name for AniList, the publisher name for Comic Vine, and `""` for Nautiljon search hits, otherwise `""`. `count` is an issue or volume count from the search payload when present, otherwise `""`. `summary` is a plain-text synopsis or deck from the search payload when present (HTML-stripped), otherwise `""`. `cover` is an absolute HTTPS image URL from the search payload, or `""` when that URL is missing, blank, or not a string. A missing cover does not drop the candidate.
@@ -99,13 +99,16 @@ The patch is what one accepted match loads into the form. It may include `Title`
 `search` does this, and stops at the first step that applies:
 
 1. Unknown provider: `ProviderResponseError`.
-2. `query` blank after trim: return `[]`.
-3. Comic Vine with `api_key` blank after trim: `ProviderUnavailableError`.
-4. Nautiljon with `nautiljon_base_url` or `nautiljon_api_key` blank after trim: `ProviderUnavailableError`.
-5. `cancel` is not `None` and returns true: `ProviderCancelledError`.
-6. Send the request(s).
+2. Provider not in `enabled_providers` (when that list is passed): `ProviderUnavailableError`. The message says the provider is disabled.
+3. `query` blank after trim: return `[]`.
+4. Comic Vine with `api_key` blank after trim: `ProviderUnavailableError`.
+5. Nautiljon with `nautiljon_base_url` or `nautiljon_api_key` blank after trim: `ProviderUnavailableError`.
+6. `cancel` is not `None` and returns true: `ProviderCancelledError`.
+7. Send the request(s).
 
-`load` and `list_issues` use the same order, except step 2 is a blank or illegal `match_id` / `series_id`, which raises `ProviderResponseError`. An empty search query does not check keys and does not call `cancel`. MangaDex, AniList, and Jikan `list_issues` return `[]` after those checks and send no request.
+`load` and `list_issues` use the same order, except step 3 is a blank or illegal `match_id` / `series_id`, which raises `ProviderResponseError`. An empty search query does not check keys and does not call `cancel`. MangaDex, AniList, and Jikan `list_issues` return `[]` after those checks and send no request.
+
+Callers pass `enabled_providers` from the loaded config. When the argument is omitted, every known provider is treated as enabled (tests and direct calls). An empty list disables every provider.
 
 `cancel` is checked once, immediately before each request. A request already started is not aborted. Comic Vine `list_issues` and issue `load` may send more than one request; Nautiljon `load` may send a series request and a volume request; `cancel` is checked again before each.
 

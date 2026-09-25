@@ -14,10 +14,13 @@ _KNOWN_KEYS = (
     "nautiljon_base_url",
     "nautiljon_api_key",
     "title_languages",
+    "enabled_providers",
     "theme",
 )
 _THEMES = frozenset({"system", "light", "dark"})
 _DEFAULT_LANGUAGES = ["fr", "en"]
+_DEFAULT_PROVIDERS = ["mangadex", "anilist", "jikan", "comicvine", "nautiljon"]
+_KNOWN_PROVIDERS = frozenset(_DEFAULT_PROVIDERS)
 
 
 class ConfigError(Exception):
@@ -35,7 +38,7 @@ class AppPaths:
 
 @dataclass
 class AppConfig:
-    """The seven known keys plus unknown keys from the last successful load."""
+    """The eight known keys plus unknown keys from the last successful load."""
 
     path: Path
     library_roots: list[str] = field(default_factory=list)
@@ -44,11 +47,14 @@ class AppConfig:
     nautiljon_base_url: str = ""
     nautiljon_api_key: str = ""
     title_languages: list[str] = field(default_factory=lambda: list(_DEFAULT_LANGUAGES))
+    enabled_providers: list[str] = field(
+        default_factory=lambda: list(_DEFAULT_PROVIDERS)
+    )
     theme: str = "system"
     extra: dict[str, object] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, object]:
-        """Return the seven known keys."""
+        """Return the eight known keys."""
         return {
             "library_roots": list(self.library_roots),
             "keep_cbr_original": self.keep_cbr_original,
@@ -56,6 +62,7 @@ class AppConfig:
             "nautiljon_base_url": self.nautiljon_base_url,
             "nautiljon_api_key": self.nautiljon_api_key,
             "title_languages": list(self.title_languages),
+            "enabled_providers": list(self.enabled_providers),
             "theme": self.theme,
         }
 
@@ -121,6 +128,7 @@ def load_config(path: Path) -> AppConfig:
     extra = {key: value for key, value in data.items() if key not in _KNOWN_KEYS}
     roots = data.get("library_roots", [])
     languages = data.get("title_languages", list(_DEFAULT_LANGUAGES))
+    providers = data.get("enabled_providers", list(_DEFAULT_PROVIDERS))
     return AppConfig(
         path=path,
         library_roots=_clean_roots(roots) if isinstance(roots, list) else [],
@@ -145,6 +153,7 @@ def load_config(path: Path) -> AppConfig:
             else ""
         ),
         title_languages=_clean_languages(languages, fallback=True),
+        enabled_providers=_clean_providers(providers, fallback=True),
         theme=_load_theme(data.get("theme", "system")),
         extra=extra,
     )
@@ -176,7 +185,8 @@ def apply_put(config: AppConfig, updates: Mapping[str, object]) -> AppConfig:
         updates: Keys the client sent.
 
     Returns:
-        A new config. ``library_roots`` replaces that list wholesale.
+        A new config. ``library_roots`` and ``enabled_providers`` replace those
+        lists wholesale.
 
     Raises:
         ConfigError: A provided value has the wrong JSON type.
@@ -194,6 +204,7 @@ def apply_put(config: AppConfig, updates: Mapping[str, object]) -> AppConfig:
         nautiljon_base_url=str(current["nautiljon_base_url"]),
         nautiljon_api_key=str(current["nautiljon_api_key"]),
         title_languages=list(current["title_languages"]),  # type: ignore[arg-type]
+        enabled_providers=list(current["enabled_providers"]),  # type: ignore[arg-type]
         theme=str(current["theme"]),
         extra=dict(config.extra),
     )
@@ -224,6 +235,10 @@ def _put_value(key: str, value: object) -> object:
         if not isinstance(value, list):
             raise ConfigError("title_languages must be a list")
         return _clean_languages(value, fallback=False)
+    if key == "enabled_providers":
+        if not isinstance(value, list):
+            raise ConfigError("enabled_providers must be a list")
+        return _clean_providers(value, fallback=False)
     if isinstance(value, str) and value in _THEMES:
         return value
     return "system"
@@ -250,6 +265,21 @@ def _clean_languages(values: object, *, fallback: bool) -> list[str]:
     if not isinstance(values, list):
         return list(_DEFAULT_LANGUAGES) if fallback else []
     return [item for item in values if isinstance(item, str)]
+
+
+def _clean_providers(values: object, *, fallback: bool) -> list[str]:
+    if not isinstance(values, list):
+        return list(_DEFAULT_PROVIDERS) if fallback else []
+    kept: list[str] = []
+    seen: set[str] = set()
+    for item in values:
+        if not isinstance(item, str) or item not in _KNOWN_PROVIDERS:
+            continue
+        if item in seen:
+            continue
+        seen.add(item)
+        kept.append(item)
+    return kept
 
 
 def _load_theme(value: object) -> str:

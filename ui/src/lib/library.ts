@@ -105,6 +105,24 @@ export const PROVIDERS = [
   { id: "nautiljon", label: "Nautiljon" },
 ] as const;
 
+export function enabledProviderOptions(
+  enabled: readonly string[],
+): { value: string; label: string }[] {
+  const allowed = new Set(enabled);
+  return PROVIDERS.filter((item) => allowed.has(item.id)).map((item) => ({
+    value: item.id,
+    label: item.label,
+  }));
+}
+
+export function clampProvider(
+  current: string,
+  enabled: readonly string[],
+): string {
+  if (enabled.includes(current)) return current;
+  return enabled[0] ?? "";
+}
+
 const FIELD_COLUMNS: Record<string, string> = {
   Title: "title",
   Series: "series",

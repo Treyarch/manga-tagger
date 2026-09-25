@@ -39,7 +39,7 @@ When this specification is implemented, `pyproject.toml` gains `fastapi`, `uvico
 
 `load_config(path)` reads UTF-8 TOML with the standard-library `tomllib`. A missing file returns the defaults below and does not create the file. Invalid TOML raises `ConfigError`. The message includes the path and says the TOML could not be parsed. Startup then exits with status 1 and does not open the window.
 
-`save_config(path, config)` creates the parent directory and writes UTF-8 TOML with `tomli-w`. Unknown keys from the last successful load are written back. Comments are not preserved. A missing file's first save writes the seven known keys.
+`save_config(path, config)` creates the parent directory and writes UTF-8 TOML with `tomli-w`. Unknown keys from the last successful load are written back. Comments are not preserved. A missing file's first save writes the eight known keys.
 
 The process keeps the loaded config in memory. `GET /api/config` returns that memory. `PUT /api/config` writes the file and, only after the write succeeds, replaces memory. A failed write leaves memory and the previous file unchanged and does not enqueue a scan.
 
@@ -53,9 +53,12 @@ A TOML value of the wrong type falls back on load. The file is not rewritten jus
 | `nautiljon_base_url` | Not a string becomes `""` | Not a string is `400` `ConfigError` |
 | `nautiljon_api_key` | Not a string becomes `""` | Not a string is `400` `ConfigError` |
 | `title_languages` | Not a list becomes `["fr", "en"]`. Non-strings are dropped. An empty list stays `[]` | Not a list is `400` `ConfigError`. Non-strings are dropped |
+| `enabled_providers` | Not a list becomes the five known provider ids. Non-strings and unknown ids are dropped. Duplicates keep the first. An empty list stays `[]` | Not a list is `400` `ConfigError`. Same dropping rules as load. An empty list stays `[]` |
 | `theme` | Not a string becomes `system`. Any string is kept, including one the UI treats as `system` | `system`, `light`, or `dark` are stored. Any other value is stored as `system` |
 
-`PUT` replaces `library_roots` wholesale. Omitted keys stay. When the body includes `library_roots`, a scan is enqueued after the successful write, including when the stored list is empty. If a job is already `queued` or `running`, that `PUT` returns 409 `JobBusyError` and does not write. Other keys do not enqueue a scan and are accepted during a job.
+`PUT` replaces `library_roots` and `enabled_providers` wholesale. Omitted keys stay. When the body includes `library_roots`, a scan is enqueued after the successful write, including when the stored list is empty. If a job is already `queued` or `running`, that `PUT` returns 409 `JobBusyError` and does not write. Other keys do not enqueue a scan and are accepted during a job.
+
+A provider id not listed in `enabled_providers` is unavailable for search, load, and list_issues. The provider module raises `ProviderUnavailableError` before HTTP. The header provider select only offers enabled ids.
 
 ## Places
 
@@ -158,7 +161,7 @@ Archive, page, thumbnail, save, rename, and convert paths must be absolute. A re
 | `GET /api/page?path=&index=` | One page. `index` is a non-negative integer. A missing or negative index is `ShellError` |
 | `GET /api/thumbnail?path=` | The cached cover JPEG, building it on demand through `thumbnail_for` |
 | `GET /api/cover?url=` | Bytes of one allow-listed remote catalog cover. Only `https` URLs whose host is `uploads.mangadex.org`, `www.nautiljon.com`, or `nautiljon.com` are accepted. Used by Matches so the WebView loads a same-origin image |
-| `GET /api/config` | The seven known keys |
+| `GET /api/config` | The eight known keys |
 | `PUT /api/config` | A partial object of those keys. Returns the full config. Roots in the body enqueue a scan after a successful write |
 | `POST /api/dialogs/folder` | Calls the injected `pick_folder`. Returns `{ "path" }` or `{ "path": null }` when the dialog is cancelled. No picker is HTTP 503 |
 | `POST /api/window/close` | Calls the injected `destroy_window`. Returns an empty 204. No closer is HTTP 503 |
@@ -270,7 +273,7 @@ The first sidebar row is Add folder. It calls `POST /api/dialogs/folder`. A canc
 
 Dropping a folder on the sidebar does not call into Python from the client. `window.py` reads the native drop on `#places` and dispatches a `folders-dropped` window event whose `detail.paths` are absolute paths. The client posts those paths to `POST /api/library/roots`.
 
-Settings is a dialog. It edits library roots, one absolute path per line, the Comic Vine key, the Nautiljon base URL, the Nautiljon API key, `keep_cbr_original` as a checkbox labeled `Keep the original CBR`, and `title_languages` as comma-separated codes in order. It does not edit `theme`. Dismiss writes nothing. Save drops blank root lines. If a non-blank root line is not absolute, the dialog does not send the request and shows `Paths must be absolute.` A successful save calls `PUT /api/config`.
+Settings is a dialog with General, Archives, and Scrapers tabs. It edits `theme`, library roots (one absolute path per line), `title_languages` as comma-separated codes in order, `keep_cbr_original` as a checkbox labeled `Keep the original CBR` on Archives, the Comic Vine key, the Nautiljon base URL, the Nautiljon API key, and `enabled_providers`. Dismiss writes nothing. Save drops blank root lines. If a non-blank root line is not absolute, the dialog does not send the request and shows `Paths must be absolute.` A successful save calls `PUT /api/config`.
 
 Per-file save, rename, and convert errors, and scan-root lines, are listed at the top of the inspector, above the form. Search and load status (match count, no matches, provider errors) is toast-only and is not repeated in the inspector. Scrape opens the Matches dialog (searching, then rows when any); match rows are not listed in the inspector. The toast for every finished job is the short summary in the jobs client section.
 

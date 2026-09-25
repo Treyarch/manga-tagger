@@ -32,7 +32,7 @@ The window fills the webview. It does not sit in a centered page column. The chr
 +------------------------------------------------------------------+
 | (window background, 8px inset)                                   |
 |  +--------------------------------------------------------------+ |
-|  | Brand |          action cluster          | Theme Settings X  | |
+|  | Brand |          action cluster          | Settings X  | |
 |  +------------------+---------------------------+---------------+ |
 |  | My library      | Volume list or cover grid | Inspector     | |
 |  |                  |                           | cover         | |
@@ -41,7 +41,7 @@ The window fills the webview. It does not sit in a centered page column. The chr
 +------------------------------------------------------------------+
 ```
 
-The header bar is three zones in one 48px row: a leading product brand, a centered action cluster, and trailing theme/settings/close. It is a CSS grid `grid-cols-[1fr_auto_1fr]`. The brand sits `justify-self-start` in the first column. The action cluster (provider select, scrape and write actions, view switch, and—for Save, Rename, Convert, and Scan only—the job label with Cancel when that job is busy) sits in the middle column. Search and Load do not add header job chrome. Theme, Settings, and Close sit `justify-self-end` in the third column. Equal `1fr` side columns keep the action cluster optically centered on wide windows. The bar does not wrap to a second row.
+The header bar is three zones in one 48px row: a leading product brand, a centered action cluster, and trailing settings/close. It is a CSS grid `grid-cols-[1fr_auto_1fr]`. The brand sits `justify-self-start` in the first column. The action cluster (provider select, scrape and write actions, view switch, and—for Save, Rename, Convert, and Scan only—the job label with Cancel when that job is busy) sits in the middle column. Search and Load do not add header job chrome. Settings and Close sit `justify-self-end` in the third column. Equal `1fr` side columns keep the action cluster optically centered on wide windows. The bar does not wrap to a second row. The provider select only lists providers from `enabled_providers` in config.
 
 The product brand is a mini SVG logo (closed tankōbon with a tag notch, about 20px, `currentColor` with the accent on the spine) beside the wordmark `Manga Tagger`. It is not a button.
 
@@ -122,7 +122,7 @@ Dark mode is the `dark` class on an ancestor. Components use `dark:` variants fo
 
 The shell reads `theme` before the first paint and puts `dark` on `document.documentElement` when `resolveDark` is true. It removes that class when `resolveDark` is false. The first frame uses the resolved theme. When `dark` is present, the document sets `color-scheme: dark` so native controls such as the provider `<select>` popup use the dark system palette. Without `dark`, it sets `color-scheme: light`.
 
-The header bar has a quiet icon button that opens the menu with three choices: System, Light, and Dark. The icons are Lucide `Monitor`, `Sun`, and `Moon`. The current choice shows a check. Choosing one updates `theme` and applies the class immediately.
+Theme is chosen in Settings on the General tab (`system`, `light`, or `dark` via `Select`). There is no theme control in the header. Saving Settings writes `theme` and applies the class. Cancel leaves the previous theme.
 
 While `theme` is `system`, the class follows later changes to `prefers-color-scheme` for the life of the window. A forced `light` or `dark` ignores those changes until the user picks System again.
 
@@ -172,7 +172,7 @@ When a button has an accessible name and no visible text (icon buttons), that na
 
 ### Checkbox
 
-`Checkbox.svelte`. A native checkbox with a `text-sm` label beside it. The settings row `Keep the original CBR` uses it.
+`Checkbox.svelte`. A custom-styled checkbox (`appearance-none`) with a `text-sm` label beside it: zinc hairline border, white / `zinc-900` fill, and blue fill with a white check when on. Focus uses the shared accent ring. Optional `hideLabel` keeps the accessible name and hides the visible caption — Settings Scrapers uses that so each row shows only the box. Settings Archives keeps the visible `Keep the original CBR` label.
 
 ### Select
 
@@ -184,7 +184,13 @@ When a button has an accessible name and no visible text (icon buttons), that na
 
 ### Dialog
 
-`Dialog.svelte`. A centered modal over the window with a `zinc-900/40` backdrop at `z-30` (below toasts). The panel is `rounded-lg` and `p-4`. Size is a prop: `md` (default, `max-w-md`) for Settings, Rename, and Convert; `xl` (`max-w-4xl`) for Matches and Issues. The title row is obvious: the Lucide icon of the control that opened the dialog (20px, `currentColor`, decorative) sits before a `text-base font-bold` title. Settings uses `Settings`, Rename uses `Pencil`, Convert uses `FileArchive`, Matches uses `ScanSearch` (the Scrape control), and Issues uses `ListOrdered`. A quiet icon button with Lucide `X` sits at the trailing edge of that row; its accessible name is `Close`, and it dismisses the same way Cancel does.
+`Dialog.svelte`. A centered modal over the window with a `zinc-900/40` backdrop at `z-30` (below toasts). The panel is `rounded-lg` and `p-4`. Size is a prop: `md` (default, `max-w-md`) for Rename and Convert; `lg` (`max-w-2xl`) for Settings; `xl` (`max-w-4xl`) for Matches and Issues. The title row is obvious: the Lucide icon of the control that opened the dialog (20px, `currentColor`, decorative) sits before a `text-base font-bold` title. Settings uses `Settings`, Rename uses `Pencil`, Convert uses `FileArchive`, Matches uses `ScanSearch` (the Scrape control), and Issues uses `ListOrdered`. A quiet icon button with Lucide `X` sits at the trailing edge of that row; its accessible name is `Close`, and it dismisses the same way Cancel does.
+
+`SettingsDialog.svelte` uses the `lg` panel. Under the title it has a left tab rail and a content pane. The tabs are **General** and **Scrapers**. Selecting a tab only changes the visible pane; Save still writes every field from both tabs.
+
+- **General** — theme (`Select` with System / Light / Dark), library roots (textarea), then title languages (text input).
+- **Archives** — `keep_cbr_original` as a checkbox labeled `Keep the original CBR`, with a short muted description under it explaining that convert writes a sibling `.cbz` and, when this is off (the default), deletes the `.cbr` so each book stays one file.
+- **Scrapers** — one block per known provider in a fixed order (MangaDex, AniList, MyAnimeList, Comic Vine, Nautiljon). Each block shows the provider label, a short muted capability line, and a checkbox (no visible caption; accessible name `Enable {label}`) to enable it. Comic Vine adds an API key field. Nautiljon adds base URL and API key fields. Credential fields stay editable when the provider is off so keys can be set before enabling. The header provider select only offers enabled providers after Save.
 
 Light mode uses a white fill, a `zinc-200` hairline, and `shadow-md` so the panel lifts off the panes the same way a toast does. Dark mode does not reuse the pane fill: it uses a `zinc-800` fill, a `zinc-600` border, and `shadow-lg` with a dark black wash so the dialog reads clearly against `zinc-900` panes and `zinc-950` chrome.
 
@@ -246,12 +252,12 @@ The product brand (SVG logo and wordmark) is presentational chrome. It is covere
 - The first sidebar row is the muted caption `My library`, then Add folder, Lucide `FolderPlus`, 16px, trailing in a 36px row. A drag over the sidebar uses the selection wash.
 - Light and dark use the color table in this document. Dark mode is the `dark` class. The layout does not change between themes. With `dark`, native selects use a dark popup through `color-scheme: dark`.
 - A dirty inspector field (edited or loaded, `dirty` true) shows amber value text and border on its text input, textarea, or select. A clean field keeps primary text and the hairline border. After Save rebuilds the form, dirty styling is gone.
-- `theme` defaults to `system`. `light` and `dark` force that theme. Any other value follows the system. The header menu can set each of the three values, and the class updates immediately. `system` keeps following `prefers-color-scheme`.
+- `theme` defaults to `system`. `light` and `dark` force that theme. Any other value follows the system. Settings General can set each of the three values; the class updates when Settings is saved. `system` keeps following `prefers-color-scheme`.
 - The resolved theme is applied before the first paint.
-- Icons are Lucide, `currentColor`, 16px in rows and menu items and 20px in the header. The view switch is `List` / `List view` and `LayoutGrid` / `Grid view`. The theme menu is `Monitor`, `Sun`, and `Moon`. Add folder is `FolderPlus`. Close is `X` at the trailing edge of the header. Icon buttons expose their accessible name as a native `title` so a short hover shows that label.
+- Icons are Lucide, `currentColor`, 16px in rows and menu items and 20px in the header. The view switch is `List` / `List view` and `LayoutGrid` / `Grid view`. Add folder is `FolderPlus`. Close is `X` at the trailing edge of the header. Icon buttons expose their accessible name as a native `title` so a short hover shows that label.
 - Buttons, text inputs, textareas, checkboxes, selects, menus, dialogs, and toasts are the local components in this document, styled with Tailwind utilities. The UI package does not depend on a third-party component kit.
-- Dialogs are centered over the window with a dimmed backdrop. Their panels use the same raised surface as toasts (white / `zinc-800` in dark, hairline, shadow) and fade in with a short upward overshoot. The title is bold with the opening control's Lucide icon ahead of it, and a Close `X` at the trailing edge of the title row. Settings, Rename, Convert, Matches, and Issues share that chrome. Matches and Issues use the `xl` panel width. Matches shows secondary Select Issue and Cancel beside primary OK; while searching it shows `Searching…` with a spinner, then a large cover beside a Series/Year/Issues/(Publisher or Author) table and a summary pane. Issues shows Loading issues… then Issue/Date/Title with the same cover and summary layout. The other three keep `md` width, secondary Cancel, and a confirm action.
+- Dialogs are centered over the window with a dimmed backdrop. Their panels use the same raised surface as toasts (white / `zinc-800` in dark, hairline, shadow) and fade in with a short upward overshoot. The title is bold with the opening control's Lucide icon ahead of it, and a Close `X` at the trailing edge of the title row. Settings, Rename, Convert, Matches, and Issues share that chrome. Settings uses the `lg` panel with a General / Archives / Scrapers tab rail. Matches and Issues use the `xl` panel width. Matches shows secondary Select Issue and Cancel beside primary OK; while searching it shows `Searching…` with a spinner, then a large cover beside a Series/Year/Issues/(Publisher or Author) table and a summary pane. Issues shows Loading issues… then Issue/Date/Title with the same cover and summary layout. Rename and Convert keep `md` width, secondary Cancel, and a confirm action.
 - Action toasts appear in a top-right stack, fade in downward with a short overshoot, and disappear after 5 seconds or on click. In dark mode they use a raised `zinc-800` surface and a stronger shadow so they stand apart from the panes. They summarize scrape, load, save, rename, convert, and scan outcomes only—not in-progress search. Scrape match count, no matches, and provider errors are toast-only. Detailed per-file save/rename/convert errors and scan-root lines stay in the inspector.
 - Type is the default sans stack at `text-sm` for controls and rows, and `text-xs` for captions. The product wordmark alone uses the bundled Dela Gothic One face via `.font-brand`.
-- The header is three zones: leading brand (mini SVG + `Manga Tagger`), centered action cluster, trailing Theme / Settings / Close. The brand is readable in light and dark.
+- The header is three zones: leading brand (mini SVG + `Manga Tagger`), centered action cluster, trailing Settings / Close. The brand is readable in light and dark.
 - A keyboard focus ring is visible on the shared controls.

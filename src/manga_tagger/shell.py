@@ -481,6 +481,7 @@ def run_search(
     api_key: str,
     nautiljon_base_url: str,
     nautiljon_api_key: str,
+    enabled_providers: Sequence[str],
     build_query: Callable[[str, str], str],
     search: Callable[..., list[object]],
     client_factory: Callable[[], httpx.Client],
@@ -500,6 +501,7 @@ def run_search(
             api_key=api_key,
             nautiljon_base_url=nautiljon_base_url,
             nautiljon_api_key=nautiljon_api_key,
+            enabled_providers=list(enabled_providers),
             cancel=cancel,
         )
     finally:
@@ -546,6 +548,7 @@ def run_list_issues(
     api_key: str,
     nautiljon_base_url: str,
     nautiljon_api_key: str,
+    enabled_providers: Sequence[str],
     list_issues: Callable[..., list[object]],
     client_factory: Callable[[], httpx.Client],
     cancel: Cancel,
@@ -563,6 +566,7 @@ def run_list_issues(
             api_key=api_key,
             nautiljon_base_url=nautiljon_base_url,
             nautiljon_api_key=nautiljon_api_key,
+            enabled_providers=list(enabled_providers),
             cancel=cancel,
         )
     finally:
@@ -594,6 +598,7 @@ def run_load(
     api_key: str,
     nautiljon_base_url: str,
     nautiljon_api_key: str,
+    enabled_providers: Sequence[str],
     load: Callable[..., Mapping[str, str]],
     client_factory: Callable[[], httpx.Client],
     cancel: Cancel,
@@ -613,6 +618,7 @@ def run_load(
             api_key=api_key,
             nautiljon_base_url=nautiljon_base_url,
             nautiljon_api_key=nautiljon_api_key,
+            enabled_providers=list(enabled_providers),
             cancel=cancel,
             issue_id=issue_id,
             number=preferred_load_number(form),
