@@ -164,6 +164,10 @@ describe("form", () => {
     expect(one?.values.Pages).toBeUndefined();
     const edited = editField(one!, "Number", "9");
     expect(edited.values.Number).toEqual({ value: "9", dirty: true });
+    expect(editField(one!, "Number", "4").values.Number).toEqual({
+      value: "4",
+      dirty: false,
+    });
     expect(savePatch(edited)).toEqual({ Number: "9" });
 
     const many = formFromVolumes([

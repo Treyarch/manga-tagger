@@ -198,6 +198,15 @@ def test_form_and_merge() -> None:
     assert merged["values"]["Number"] == {"value": "2", "dirty": True}
     assert merged["values"]["Summary"]["dirty"] is True
     assert merged["values"]["Series"] == one["values"]["Series"]
+    same = merge_load_patch(
+        one, {"Number": one["values"]["Number"]["value"], "Series": "Monster"}, "one"
+    )
+    assert same["values"]["Number"] == one["values"]["Number"]
+    assert same["values"]["Number"]["dirty"] is False
+    assert same["values"]["Series"] == {"value": "Monster", "dirty": True}
+    assert edit_field(one, "Number", one["values"]["Number"]["value"])["values"][
+        "Number"
+    ]["dirty"] is False
     many = merge_load_patch(
         shared,
         {
@@ -217,6 +226,9 @@ def test_form_and_merge() -> None:
     }
     assert many["values"]["Manga"]["dirty"] is True
     assert many["values"]["Publisher"]["dirty"] is False
+    same_many = merge_load_patch(shared, {"Publisher": "Shueisha"}, "many")
+    assert same_many["values"]["Publisher"] == shared["values"]["Publisher"]
+    assert same_many["values"]["Publisher"]["dirty"] is False
 
 
 def test_one_save_number_rules(tmp_path: Path) -> None:

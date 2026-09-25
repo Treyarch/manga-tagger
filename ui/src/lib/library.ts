@@ -427,6 +427,10 @@ export function editField(
   key: string,
   value: string,
 ): InspectorForm {
+  const current = form.values[key];
+  if (current.value === value && !current.mixed) {
+    return form;
+  }
   const values: Record<string, Field> = {};
   for (const [name, field] of Object.entries(form.values)) {
     values[name] = { ...field };

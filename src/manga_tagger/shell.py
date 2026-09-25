@@ -290,11 +290,18 @@ def form_from_volumes(rows: Sequence[object]) -> dict[str, object] | None:
 
 
 def edit_field(form: Mapping[str, object], key: str, value: str) -> dict[str, object]:
-    """Set one field to ``value``, mark it dirty, and clear ``mixed``."""
+    """Set one field to ``value``, mark it dirty, and clear ``mixed``.
+
+    When ``value`` equals the current text and the field is not mixed, the form
+    is returned unchanged (values copied, dirty left as it was).
+    """
     values = {
         name: dict(field)  # type: ignore[arg-type]
         for name, field in form["values"].items()  # type: ignore[union-attr]
     }
+    current = values[key]
+    if current.get("value") == value and not current.get("mixed"):
+        return {"mode": form["mode"], "values": values}
     updated: dict[str, object] = {"value": value, "dirty": True}
     if "mixed" in values[key]:
         updated["mixed"] = False
@@ -313,8 +320,10 @@ def merge_load_patch(
         mode: ``one`` or ``many``.
 
     Returns:
-        A new form. Omitted keys keep their value and dirty flag. On ``many``,
-        only shared fields change. ``Number`` and ``Title`` are ignored there.
+        A new form. Omitted keys keep their value and dirty flag. A patch value
+        that equals the current text on a non-mixed field leaves that field
+        unchanged. On ``many``, only shared fields change. ``Number`` and
+        ``Title`` are ignored there.
     """
     values = {
         name: dict(field)  # type: ignore[arg-type]
@@ -323,6 +332,9 @@ def merge_load_patch(
     allowed = FORM_FIELDS if mode == "one" else SHARED_FIELDS
     for key, value in patch.items():
         if key not in allowed or key not in values:
+            continue
+        current = values[key]
+        if current.get("value") == value and not current.get("mixed"):
             continue
         updated: dict[str, object] = {"value": value, "dirty": True}
         if mode == "many":
