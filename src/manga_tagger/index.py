@@ -27,6 +27,7 @@ _TEXT_COLUMNS: tuple[tuple[str, str], ...] = (
     ("Series", "series"),
     ("Number", "number"),
     ("Volume", "volume"),
+    ("Count", "count"),
     ("Publisher", "publisher"),
     ("PageCount", "page_count"),
     ("LanguageISO", "language_iso"),
@@ -63,6 +64,7 @@ CREATE TABLE volumes (
   series TEXT NOT NULL,
   number TEXT NOT NULL,
   volume TEXT NOT NULL,
+  count TEXT NOT NULL,
   publisher TEXT NOT NULL,
   page_count TEXT NOT NULL,
   language_iso TEXT NOT NULL,
@@ -89,7 +91,7 @@ class LibraryIndexError(Exception):
 
 
 class IndexVersionError(LibraryIndexError):
-    """``user_version`` is neither 0 nor 1. The schema is left unchanged."""
+    """``user_version`` is neither 0, 1, nor 2. The schema is left unchanged."""
 
 
 @dataclass(frozen=True)
@@ -111,6 +113,7 @@ class Volume:
     series: str
     number: str
     volume: str
+    count: str
     publisher: str
     page_count: str
     language_iso: str
@@ -677,7 +680,7 @@ def _connect(db_path: os.PathLike[str] | str) -> sqlite3.Connection:
             version = int(readonly.execute("PRAGMA user_version").fetchone()[0])
         finally:
             readonly.close()
-        if version not in {0, 1}:
+        if version not in {0, 1, 2}:
             raise IndexVersionError(f"{path} has schema version {version}")
     try:
         connection = sqlite3.connect(path)
@@ -688,9 +691,15 @@ def _connect(db_path: os.PathLike[str] | str) -> sqlite3.Connection:
     version = int(connection.execute("PRAGMA user_version").fetchone()[0])
     if version == 0:
         connection.executescript(_SCHEMA)
-        connection.execute("PRAGMA user_version = 1")
+        connection.execute("PRAGMA user_version = 2")
         connection.commit()
-    elif version != 1:
+    elif version == 1:
+        connection.execute(
+            "ALTER TABLE volumes ADD COLUMN count TEXT NOT NULL DEFAULT ''"
+        )
+        connection.execute("PRAGMA user_version = 2")
+        connection.commit()
+    elif version != 2:
         connection.close()
         raise IndexVersionError(f"{path} has schema version {version}")
     return connection

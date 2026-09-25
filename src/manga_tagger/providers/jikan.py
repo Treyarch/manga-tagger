@@ -85,6 +85,7 @@ def load(
     put(patch, "Genre", join_names(_genre_names(data.get("genres"))))
     put(patch, "Summary", plain_summary(data.get("synopsis")))
     put(patch, "Web", nonblank(data.get("url")))
+    put(patch, "Count", count_text(data.get("volumes")) or None)
     _dates(patch, data)
     writers, artists = _credits(data.get("authors"))
     put(patch, "Writer", join_names(writers))

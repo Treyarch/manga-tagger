@@ -137,7 +137,7 @@ def load(
                 "field_list",
                 (
                     "name,start_year,publisher,description,deck,"
-                    "site_detail_url,person_credits"
+                    "site_detail_url,person_credits,count_of_issues"
                 ),
             ),
         ],
@@ -229,6 +229,7 @@ def _volume_patch(results: dict[str, object]) -> dict[str, str]:
     if year is not None:
         patch["Year"] = year
     put(patch, "Web", nonblank(results.get("site_detail_url")))
+    put(patch, "Count", count_text(results.get("count_of_issues")) or None)
     writers, pencillers, inkers, covers = _credits(results.get("person_credits"))
     put(patch, "Writer", join_names(writers))
     put(patch, "Penciller", join_names(pencillers))

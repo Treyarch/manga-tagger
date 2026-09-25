@@ -12,7 +12,9 @@ from manga_tagger.archives.errors import BatchFieldError
 from manga_tagger.index import ScanResult
 from manga_tagger.jobs import Cancel, JobCancelled, Progress
 
-FORM_FIELDS: tuple[str, ...] = OWNED_ELEMENTS
+FORM_FIELDS: tuple[str, ...] = tuple(
+    name for name in OWNED_ELEMENTS if name != "Volume"
+)
 SHARED_FIELDS: tuple[str, ...] = (
     "Series",
     "Publisher",
@@ -24,6 +26,7 @@ SHARED_FIELDS: tuple[str, ...] = (
     "Penciller",
     "Inker",
     "CoverArtist",
+    "Count",
 )
 if set(SHARED_FIELDS) != BATCH_FIELDS:
     raise RuntimeError("SHARED_FIELDS does not match the archive batch fields")
@@ -33,6 +36,7 @@ FIELD_COLUMNS: dict[str, str] = {
     "Series": "series",
     "Number": "number",
     "Volume": "volume",
+    "Count": "count",
     "Publisher": "publisher",
     "PageCount": "page_count",
     "LanguageISO": "language_iso",
@@ -604,27 +608,33 @@ def run_load(
     cancel: Cancel,
     progress: Progress,
     issue_id: str = "",
+    count: str = "",
 ) -> dict[str, object]:
     """Load one series or issue and merge the patch into the form. Writes nothing."""
     progress(0, 1)
     client = client_factory()
     try:
-        patch = load(
-            provider,
-            match_id,
-            filename_stem=filename_stem,
-            title_languages=list(title_languages),
-            client=client,
-            api_key=api_key,
-            nautiljon_base_url=nautiljon_base_url,
-            nautiljon_api_key=nautiljon_api_key,
-            enabled_providers=list(enabled_providers),
-            cancel=cancel,
-            issue_id=issue_id,
-            number=preferred_load_number(form),
+        patch = dict(
+            load(
+                provider,
+                match_id,
+                filename_stem=filename_stem,
+                title_languages=list(title_languages),
+                client=client,
+                api_key=api_key,
+                nautiljon_base_url=nautiljon_base_url,
+                nautiljon_api_key=nautiljon_api_key,
+                enabled_providers=list(enabled_providers),
+                cancel=cancel,
+                issue_id=issue_id,
+                number=preferred_load_number(form),
+            )
         )
     finally:
         client.close()
+    series_count = count.strip()
+    if series_count:
+        patch["Count"] = series_count
     merged = merge_load_patch(form, patch, mode)
     progress(1, 1)
     return {"form": merged}

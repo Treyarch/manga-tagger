@@ -476,11 +476,45 @@ def test_search_and_load_do_not_write() -> None:
         client_factory=default_client,
         cancel=lambda: False,
         progress=lambda _completed, _total: None,
+        count="27",
     )
     assert "Number" not in loaded["form"]["values"]
     assert loaded["form"]["values"]["Series"]["value"] == "Claymore"
+    assert loaded["form"]["values"]["Count"] == {
+        "value": "27",
+        "mixed": False,
+        "dirty": True,
+    }
     assert writes == ["progress", "progress"]
 
+
+def test_run_load_applies_search_count_on_one() -> None:
+    form = form_from_volumes([_volume("/books/a.cbz", series="A", number="1")])
+    loaded = run_load(
+        provider="comicvine",
+        match_id="12345",
+        filename_stem="Claymore v01",
+        mode="one",
+        form=form,
+        title_languages=["en"],
+        api_key="secret",
+        nautiljon_base_url="",
+        nautiljon_api_key="",
+        enabled_providers=["comicvine"],
+        load=lambda *_args, **_kwargs: {
+            "Series": "Claymore",
+            "Title": "First",
+            "Number": "1",
+            "Manga": "No",
+        },
+        client_factory=default_client,
+        cancel=lambda: False,
+        progress=lambda _completed, _total: None,
+        issue_id="99",
+        count=" 75 ",
+    )
+    assert loaded["form"]["values"]["Count"] == {"value": "75", "dirty": True}
+    assert loaded["form"]["values"]["Number"] == {"value": "1", "dirty": False}
 
 def test_list_issues_and_preferred_number() -> None:
     form = form_from_volumes([_volume("/books/a.cbz", series="A", number="3")])
@@ -700,6 +734,7 @@ def _volume(path: str, **overrides: object) -> Volume:
         "series": "",
         "number": "",
         "volume": "",
+        "count": "",
         "publisher": "",
         "page_count": "1",
         "language_iso": "",

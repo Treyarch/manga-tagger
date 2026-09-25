@@ -449,6 +449,7 @@ def _register_routes(app: FastAPI) -> None:
                 cancel=cancel,
                 progress=progress,
                 issue_id=body.issue_id,
+                count=body.count,
             )
 
         return JobModel.from_job(state.runner.start("Load", fn))

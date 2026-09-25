@@ -88,9 +88,9 @@ At most 10 hits are requested. That limit is a constant. A hit with no usable ti
 
 For MangaDex, AniList, and Jikan, `load` fetches one series record and returns the form patch. It adds `Number` when `parse_number(filename_stem)` returns a string. For Comic Vine and Nautiljon, `load` resolves an issue or volume per [06-select-issue.md](06-select-issue.md) and sets `Number` from that issue or volume. Patch keys are ComicInfo element names. A value is a string. A field the catalog does not have is absent, not `""`.
 
-`load` never adds `Volume`, `Pages`, `PageCount`, or `Notes`. `AgeRating` is set only by Nautiljon when `infos.ageConseille` is non-blank. `CommunityRating` is set only by Nautiljon when a volume page was loaded and its `rating` is a usable number. On series-only loads, `Series` and `Title` are the same preferred title. A record with no usable title raises `ProviderResponseError` and does not return a partial patch.
+`load` never adds `Pages`, `PageCount`, or `Notes`. `Count` is the catalog's released volume or issue count when that count is known (same sources as search candidate `count`, preferring volumes over chapters). `AgeRating` is set only by Nautiljon when `infos.ageConseille` is non-blank. `CommunityRating` is set only by Nautiljon when a volume page was loaded and its `rating` is a usable number. On series-only loads, `Series` and `Title` are the same preferred title. A record with no usable title raises `ProviderResponseError` and does not return a partial patch.
 
-The patch is what one accepted match loads into the form. It may include `Title`, `Number`, `Summary`, `Manga`, `Web`, `Year`, `Month`, and `Day`. `Manga` is a shared save field. `Title`, `Number`, `Summary`, `Web`, and dates are not. On a multi-volume save the shell ignores `Number` from this patch and writes each file's `Number` from that file's filename. This module does not call `save_comic_info` or `save_many`. The application shell decides which keys a later save writes.
+The patch is what one accepted match loads into the form. It may include `Title`, `Number`, `Count`, `Summary`, `Manga`, `Web`, `Year`, `Month`, and `Day`. `Manga` and `Count` are shared save fields. `Title`, `Number`, `Summary`, `Web`, and dates are not. On a multi-volume save the shell ignores `Number` from this patch and writes each file's `Number` from that file's filename. This module does not call `save_comic_info` or `save_many`. The application shell decides which keys a later save writes.
 
 `match_id` must be non-blank and must not contain `/`, `?`, `#`, or whitespace. AniList, Jikan, and Comic Vine ids must also be decimal digits with no sign and no leading zero unless the id is `0`. MangaDex and Nautiljon ids are not required to be decimal. A bad id raises `ProviderResponseError` before any request. The Comic Vine volume URL adds the `4050-` prefix and the issue URL adds the `4000-` prefix. The stored ids do not include those prefixes. The Nautiljon series id is the series slug (for example `a+town+where+you+live`).
 
@@ -162,6 +162,7 @@ The search body is `data` as a list. The load body is one manga object in `data`
 | `Writer` | Relationships of type `author`, `attributes.name` |
 | `Penciller`, `CoverArtist` | Relationships of type `artist`, `attributes.name`. Both keys receive that same list. Authors are not copied into either key |
 | `Web` | `https://mangadex.org/title/{id}` |
+| `Count` | `attributes.lastVolume` when that string is a non-blank decimal integer |
 | `Manga` | `YesAndRightToLeft` |
 
 `Publisher` is omitted. A relationship with no `attributes` is skipped. The candidate uses `attributes.year` for `year`, the first author name for `credit`, `attributes.lastVolume` for `count` when that string is a non-blank decimal integer, and `attributes.description` (same language preference as load Summary, HTML-stripped) for `summary`. The candidate cover is `https://uploads.mangadex.org/covers/{mangaId}/{fileName}.256.jpg` from a `cover_art` relationship whose `attributes.fileName` is a non-blank string. When several cover arts are included, a cover whose `volume` is null or blank is preferred; otherwise the first usable cover art in response order is used.
@@ -201,6 +202,7 @@ query ($id: Int) {
     description
     genres
     siteUrl
+    volumes
     countryOfOrigin
     startDate { year month day }
     staff(perPage: 25, sort: RELEVANCE) {
@@ -222,6 +224,7 @@ HTTP 200 with a non-empty `errors` array raises `ProviderResponseError`. Search 
 | `Writer` | Staff whose role has the whole word `story` or `creator` |
 | `Penciller`, `CoverArtist` | Staff whose role has the whole word `art`, `artist`, `illustration`, or `illustrator`. Both keys receive that same list |
 | `Web` | `siteUrl` |
+| `Count` | `volumes` when that integer is present |
 | `Manga` | `YesAndRightToLeft` |
 
 `Publisher` is omitted. One role can fill both credit groups. `Story & Art` is `Writer`, `Penciller`, and `CoverArtist`. The candidate uses `startDate.year` for `year`, the first staff name for `credit`, `volumes` when that integer is present otherwise `chapters` for `count`, and `description` (HTML-stripped) for `summary`. The candidate cover is `coverImage.large` when that string is non-blank.
@@ -243,6 +246,7 @@ Search reads `data` as a list. Load reads `data` as one object. A missing load `
 | `Writer` | `authors` whose `type` has the whole word `story` |
 | `Penciller`, `CoverArtist` | `authors` whose `type` has the whole word `art` or `artist`. Both keys receive that same list |
 | `Web` | `url` |
+| `Count` | `volumes` when that integer is present |
 | `Manga` | `YesAndRightToLeft` |
 
 `Story & Art` fills `Writer`, `Penciller`, and `CoverArtist`. The candidate uses `published.prop.from.year` for `year`, `authors[0].name` for `credit`, `volumes` when present otherwise `chapters` for `count`, and `synopsis` (HTML-stripped) for `summary`. The candidate cover is `images.jpg.image_url`, or `images.jpg.small_image_url` when the full URL is missing or blank.
@@ -251,7 +255,7 @@ Search reads `data` as a list. Load reads `data` as one object. A missing load `
 
 Search is `GET https://comicvine.gamespot.com/api/search/` with `api_key`, `format` `json`, `resources` `volume`, `query`, `limit` `10`, and `field_list` `id,name,start_year,publisher,image,count_of_issues,deck,description`.
 
-Volume load (used when building series context for credits that only appear on the volume, and historically for series-only patches) is `GET https://comicvine.gamespot.com/api/volume/4050-{id}/` with `api_key`, `format` `json`, and `field_list` `name,start_year,publisher,description,deck,site_detail_url,person_credits`.
+Volume load (used when building series context for credits that only appear on the volume, and to read `count_of_issues` for `Count` on an issue load) is `GET https://comicvine.gamespot.com/api/volume/4050-{id}/` with `api_key`, `format` `json`, and `field_list` `name,start_year,publisher,description,deck,site_detail_url,person_credits,count_of_issues`.
 
 Issue list and issue load are defined in [06-select-issue.md](06-select-issue.md). A blank key raises `ProviderUnavailableError` before any Comic Vine request. The message says the Comic Vine API key is not set.
 
@@ -264,6 +268,7 @@ HTTP 200 is still an error when `error` is not `OK` or `status_code` is not `1`.
 | `Summary` | `description` after HTML stripping. When that is empty, `deck` after HTML stripping |
 | `Year` | `start_year` when it is present. An integer becomes its decimal string. A string is trimmed, and a blank string is omitted. Month and day are omitted |
 | `Web` | `site_detail_url` |
+| `Count` | `count_of_issues` when that integer is present |
 | `Writer` | `person_credits` whose role piece is `writer` |
 | `Penciller` | Role piece `penciler`, `penciller`, or `artist` |
 | `Inker` | Role piece `inker` |
@@ -296,7 +301,8 @@ Load series requires a JSON object with a non-blank `title`. Anything else raise
 | `Penciller`, `CoverArtist` | `extra.Dessinateur` when that string is non-blank. Both keys receive that same value |
 | `AgeRating` | `infos.ageConseille` when non-blank |
 | `CommunityRating` | Volume `rating` on Nautiljon’s /10 scale as a decimal string (for example `8.45`) when a volume page was loaded and `rating` is a number. Omitted when `rating` is null or missing |
-| `Web` | series `sourceUrl` |
+| `Web` | When a volume was loaded, the matching absolute URL from series `volumeUrls` for that volume number. Otherwise series `sourceUrl` |
+| `Count` | Series `issues` when that integer is present |
 | `Manga` | `YesAndRightToLeft` |
 
 `Translator` is omitted. `infos` and `extra` that are not objects are treated as empty. List fields that are not lists are skipped. The candidate uses `dateVo` for `year`, `""` for `credit` (search hits have no auteur list), `issues` for `count`, `description` (HTML-stripped) for `summary`, and `cover` when that string is a non-blank absolute HTTPS URL.
@@ -337,13 +343,13 @@ Cover at least:
 
 - The query and number table above, including `Foo (Bar) v01` keeping `(Bar)`, `build_query("20th Century Boys", "20th Century Boys v01")` leaving the series text intact while `parse_number` returns `1`, and `Claymore Chapter 12`, `Claymore Chapitre 03`, and `Claymore Ch.12` returning query `Claymore` and number `None`.
 - `search` with query `""` or `"   "` returns `[]` and the transport sees no request, including for `comicvine` with a blank key.
-- A MangaDex fixture whose `title` has `fr` and `en` yields `Series` and `Title` `fr` when `title_languages` is `["fr", "en"]`, and `LanguageISO` `fr`. With only `ja` under `originalLanguage`, the title is that Japanese title and `LanguageISO` is `ja`. `Manga` is `YesAndRightToLeft`. A genre tag is included and a theme tag is not. An author is `Writer`. An artist is both `Penciller` and `CoverArtist`. No artist omits both, and the author is not copied. `Publisher` is absent. `Volume` is absent.
-- An AniList fixture with `english` and `native`, and `title_languages` `["fr", "en"]`, uses the English title and `LanguageISO` `en`. A fixture with only `native` and `countryOfOrigin` `JP` uses the native title and `LanguageISO` `ja`. A romaji-only fixture omits `LanguageISO`. A staff role `Story & Art` fills `Writer`, `Penciller`, and `CoverArtist`. A role `Partial coloring` fills none of those credit fields. A role `Artist` fills `Penciller` and `CoverArtist` and does not fill `Writer`. `Publisher` is absent. `Manga` is `YesAndRightToLeft`.
+- A MangaDex fixture whose `title` has `fr` and `en` yields `Series` and `Title` `fr` when `title_languages` is `["fr", "en"]`, and `LanguageISO` `fr`. With only `ja` under `originalLanguage`, the title is that Japanese title and `LanguageISO` is `ja`. `Manga` is `YesAndRightToLeft`. A genre tag is included and a theme tag is not. An author is `Writer`. An artist is both `Penciller` and `CoverArtist`. No artist omits both, and the author is not copied. `Publisher` is absent. `Count` is `attributes.lastVolume` when that count is present.
+- An AniList fixture with `english` and `native`, and `title_languages` `["fr", "en"]`, uses the English title and `LanguageISO` `en`. A fixture with only `native` and `countryOfOrigin` `JP` uses the native title and `LanguageISO` `ja`. A romaji-only fixture omits `LanguageISO`. A staff role `Story & Art` fills `Writer`, `Penciller`, and `CoverArtist`. A role `Partial coloring` fills none of those credit fields. A role `Artist` fills `Penciller` and `CoverArtist` and does not fill `Writer`. `Publisher` is absent. `Manga` is `YesAndRightToLeft`. Load requests `volumes` and sets `Count` from that integer when present.
 - A Jikan fixture with title types `French` and `English` uses the French title and `LanguageISO` `fr`. `serializations[0].name` is `Publisher`. `genres` are joined in order and a theme is not included. `published.prop.from` of year `2001`, month `6`, day `null` sets `Year` `2001` and `Month` `6` and omits `Day`. An author type `Story & Art` fills `Writer`, `Penciller`, and `CoverArtist`. An author type `Partial` fills none of those credit fields.
 - A Comic Vine load sets `Manga` to `No`, omits `LanguageISO`, uses `description` over `deck`, and maps `writer, artist` to `Writer` and `Penciller` but not `CoverArtist`. A role `cover` sets `CoverArtist`. A blank `api_key` raises `ProviderUnavailableError`, the message says the Comic Vine API key is not set, and the transport sees no request. A JSON `status_code` other than `1` raises `ProviderResponseError`.
 - A Nautiljon search fixture yields a candidate whose `id` is the series slug from `url`, with `year` from `dateVo`, `credit` `""`, `count` from `issues`, and `cover` from the cover URL. Search sends `X-Api-Key`. A blank base URL or blank API key raises `ProviderUnavailableError` with the matching message and the transport sees no request.
-- A Nautiljon load with `title_languages` `["fr", "en"]` uses `title`, sets `LanguageISO` `fr`, `Manga` `YesAndRightToLeft`, `Publisher` from `editeurVf`, `Writer` from stripped `auteurs`, and both `Penciller` and `CoverArtist` from `extra.Dessinateur`. `AgeRating` comes from `ageConseille`. Filename stem `Berserk v01` includes `Number` `1`, requests the volume endpoint, prefers the volume `description` for `Summary` and `releaseDateVf` for `Year`/`Month`/`Day`, and sets `CommunityRating` from volume `rating` when present. Volume HTTP 404 raises could not find an issue on the resolve path.
-- `load` with filename stem `Claymore v02` includes `Number` `2` and does not include `Volume`. `load` with stem `Claymore` omits `Number`. `Title` equals `Series`.
+- A Nautiljon load with `title_languages` `["fr", "en"]` uses `title`, sets `LanguageISO` `fr`, `Manga` `YesAndRightToLeft`, `Publisher` from `editeurVf`, `Writer` from stripped `auteurs`, and both `Penciller` and `CoverArtist` from `extra.Dessinateur`. `AgeRating` comes from `ageConseille`. Filename stem `Berserk v01` includes `Number` `1`, requests the volume endpoint, prefers the volume `description` for `Summary` and `releaseDateVf` for `Year`/`Month`/`Day`, sets `CommunityRating` from volume `rating` when present, sets `Count` from series `issues`, and sets `Web` to the matching `volumeUrls` entry for that number. Volume HTTP 404 raises could not find an issue on the resolve path.
+- `load` with filename stem `Claymore v02` includes `Number` `2` and includes `Count` when the catalog reports a released count. `load` with stem `Claymore` omits `Number`. `Title` equals `Series`.
 - Summary `<p>Hello&nbsp;there</p>` becomes `Hello there`.
 - Status 429 raises `ProviderRateLimitError`. A transport that raises `httpx.ConnectError` raises `ProviderTimeoutError`.
 - `load` whose `cancel` returns true raises `ProviderCancelledError` and the transport sees no request.
@@ -359,7 +365,7 @@ Cover at least:
 - The caller selects one of MangaDex, AniList, Jikan, Comic Vine, or Nautiljon. Search returns at most 10 candidates. An empty query returns no candidates and sends no request.
 - Each candidate has `id`, `title`, `year`, `credit`, `count`, `summary`, and `cover` as strings. `cover` is an absolute HTTPS URL or `""`. A missing cover does not drop the hit.
 - The query is the trimmed `Series` when that value is non-blank, without removing numbers from it. Otherwise it is the filename stem after release tags and one volume suffix. The locked stem table produces those queries and numbers.
-- `load` returns a form patch and does not write an archive. For series-only providers, `Title` and `Series` are the same preferred series title and `Number` comes from the filename when present. For Comic Vine and Nautiljon, issue or volume resolve sets `Number` per [06-select-issue.md](06-select-issue.md). `Volume` is never present.
+- `load` returns a form patch and does not write an archive. For series-only providers, `Title` and `Series` are the same preferred series title and `Number` comes from the filename when present. For Comic Vine and Nautiljon, issue or volume resolve sets `Number` per [06-select-issue.md](06-select-issue.md). `Count` is the catalog's released volume or issue count when known. `Web` is the issue or volume page URL when the catalog has one (Comic Vine issue `site_detail_url`, Nautiljon matching `volumeUrls` entry), otherwise the series page URL.
 - French, then English, then the original title, following `title_languages`. AniList has no French title slot, so `fr` is skipped there. Comic Vine uses its single name and omits `LanguageISO`. Nautiljon maps `fr` to the site title and `ja` to `titreOriginal`.
 - MangaDex, AniList, Jikan, and Nautiljon set `Manga` to `YesAndRightToLeft`. Comic Vine sets `Manga` to `No`.
 - A blank Comic Vine key, or a blank Nautiljon base URL or API key, fails before any request with a message that names the missing setting. A timeout, a connection failure, or HTTP 429 raises the matching provider error. No call sleeps or retries.
@@ -370,5 +376,5 @@ Cover at least:
 
 All resolved. Recorded here so they are not re-opened.
 
-- **What does a match fill?** Series-level fields by default. `Title` is the preferred series title on series-only loads. Comic Vine and Nautiljon can fill from a chosen issue or volume; `Number` then comes from that issue or volume. On MangaDex, AniList, and Jikan, `Number` still comes from the filename. `Volume` is not set.
+- **What does a match fill?** Series-level fields by default. `Title` is the preferred series title on series-only loads. Comic Vine and Nautiljon can fill from a chosen issue or volume; `Number` then comes from that issue or volume. On MangaDex, AniList, and Jikan, `Number` still comes from the filename. `Count` is the catalog's released volume or issue count when known. `Web` prefers the issue or volume page URL when the catalog has one.
 - **How many catalogs are searched at once?** One. The caller passes the provider id.

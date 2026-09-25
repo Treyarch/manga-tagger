@@ -57,8 +57,9 @@ XML is parsed and written with `lxml`. The model owns these child elements of `C
 | --- | --- |
 | `Title` | Volume title |
 | `Series` | Series title |
-| `Number` | Tankōbon volume number |
-| `Volume` | Stored as found. This module does not copy `Number` into `Volume` |
+| `Number` | Tankōbon volume number (inspector caption `Issue`) |
+| `Volume` | Same value as `Number`. Not shown in the inspector. Written automatically whenever `Number` is written |
+| `Count` | Total released volumes or issues in the series (inspector caption `Volumes`) |
 | `Publisher` | Publisher |
 | `PageCount` | Stored page-file count. A save does not recalculate it from the image list |
 | `LanguageISO` | Language code, such as `fr` |
@@ -76,7 +77,7 @@ XML is parsed and written with `lxml`. The model owns these child elements of `C
 
 Any other element, and any attribute this table does not name, is preserved across a save. Editing the existing tree in place is what makes that true. Serialization does not have to match the original bytes, quotes, or indentation. Preserved element text and attribute values do have to match.
 
-Provider rules that set `Manga` to `YesAndRightToLeft` or `No`, and the rule that `Volume` is not filled automatically, belong to the provider specification. This module writes the token it is given. It does not rewrite `Yes` into `YesAndRightToLeft`.
+Provider rules that set `Manga` to `YesAndRightToLeft` or `No`, and that fill `Count` with a catalog released-count, belong to the provider specification. This module writes the token it is given. It does not rewrite `Yes` into `YesAndRightToLeft`.
 
 ## Read and preview
 
@@ -101,7 +102,7 @@ A full extract, used by convert and by saving metadata on a `.cbr`, uses the sam
 
 `patch` maps owned element names to `str` or `None`, excluding `Pages`. A string value creates or replaces that element’s text. `None` or `""` removes that element. A name absent from the patch leaves the existing element as it was. `Pages` is never a patch key.
 
-`write_number` controls `Number` only. When it is false, a `Number` entry in the patch is ignored and the element already in the file stays. When it is true, `Number` is applied like any other patched field. `Volume` follows the patch rules above and is never derived from `Number`. The application shell calls `save_comic_info` once per file. It does not call `save_many`. `save_many` below is the shared-field check those per-file calls follow.
+`write_number` controls `Number` only. When it is false, a `Number` entry in the patch is ignored and the element already in the file stays. When it is true, `Number` is applied like any other patched field. Whenever `Number` is applied (including removal), `Volume` is set to the same value (or removed with it). A `Volume` key in the patch is still applied on its own when present, then overwritten if `Number` was also applied in that same call. The application shell calls `save_comic_info` once per file. It does not call `save_many`. `save_many` below is the shared-field check those per-file calls follow.
 
 ### CBZ
 
@@ -141,6 +142,7 @@ A batch save exists to stamp the same series-level ComicInfo onto every selected
 - `Inker`
 - `CoverArtist`
 - `Manga`
+- `Count`
 
 `Title`, `Number`, `Volume`, `Summary`, `PageCount`, `Pages`, dates, `Web`, `Notes`, and `CommunityRating` are not batch fields. `Number` is written per file by the shell, from that file's filename, through `save_comic_info` with `write_number` true. It is not a `save_many` key. If `patch` contains any other key, `save_many` raises `BatchFieldError` before it writes any file.
 
@@ -207,7 +209,7 @@ Cover at least:
 - The cover index is the `FrontCover` page when `Pages` says so, and `0` when `Pages` is missing or has no `FrontCover`.
 - A metadata save copies image bytes, compression method, CRC, uncompressed size, and member names unchanged, including a deflated image and a stored image in the same archive. The output central-directory order matches the input, with `ComicInfo.xml` in its original position. A first save of a missing `ComicInfo.xml` writes that member first. A member name with a non-ASCII character has general-purpose bit 11 set. Unknown elements, unknown attributes, and `Pages` are still present and unchanged. The test does not decode image pixels.
 - A patch that sets `Series` and omits `Volume` updates `Series` and leaves `Volume` in place. A patch that sets `Volume` to `None` removes `Volume`. `PageCount` changes only when the patch includes it.
-- `write_number` false leaves `Number` unchanged even when the patch contains `Number`. `write_number` true writes `Number`.
+- `write_number` false leaves `Number` unchanged even when the patch contains `Number`. `write_number` true writes `Number` and sets `Volume` to the same value.
 - A missing `ComicInfo.xml` reads as an empty model. The first save creates the member with only the patched elements.
 - Replacing the original happens by rename of a temporary file in the same directory. Forcing the write to fail before the rename leaves the original bytes intact and removes the temporary file.
 - `save_many` with `Series`, `Writer`, `Manga`, and `AgeRating` updates those elements on each selected file and leaves `Title`, `Number`, and `Volume` as they were. A patch that also contains `Title` or `Number` raises `BatchFieldError` and writes neither file.
@@ -226,8 +228,8 @@ Cover at least:
 - The cover is the `FrontCover` page when that type is present, and the first page otherwise. Choosing it does not read every image.
 - A metadata save replaces `ComicInfo.xml` and copies every other member unchanged, including compression method, page bytes, and central-directory order. Member names are marked UTF-8. `Pages` is not rebuilt. Unknown XML is still there after the save.
 - The new CBZ is written to a temporary file in the same directory and renamed into place only after `ComicInfo.xml` reads back. A failed save does not truncate the previous file.
-- `Number` is written only when `write_number` is true on a single-file save. `Volume` is written only when the patch includes it. A save never copies `Number` into `Volume` and never rewrites a stored `Manga` token on its own.
-- `save_many` writes only `Series`, `Publisher`, `LanguageISO`, `AgeRating`, `Genre`, `Writer`, `Penciller`, `Inker`, `CoverArtist`, and `Manga`. Any other patch key, including `Number`, writes nothing. A failed file does not roll back files already written. The shell does not call `save_many`.
+- `Number` is written only when `write_number` is true on a single-file save. Whenever `Number` is applied, `Volume` is set to the same value (or removed with it). A save never rewrites a stored `Manga` token on its own.
+- `save_many` writes only `Series`, `Publisher`, `LanguageISO`, `AgeRating`, `Genre`, `Writer`, `Penciller`, `Inker`, `CoverArtist`, `Manga`, and `Count`. Any other patch key, including `Number`, writes nothing. A failed file does not roll back files already written. The shell does not call `save_many`.
 - Rename uses each file’s own ComicInfo, keeps the file in the same directory, keeps its extension, and does not change archive bytes. The offered template `{Series} v{Number:02}` produces `Claymore v01.cbz` from `Number` `1`, and `Claymore v1.5.cbz` from `Number` `1.5`. A blank tag or a name collision skips that file. Poster targets are part of the same plan. An invalid template renames nothing. An existing sibling poster moves with the archive. `plan_rename` writes nothing.
 - `write_poster` writes `{stem}-poster.jpg` from the cover only, 600 pixels wide, on white when the cover has an alpha channel, without modifying the archive.
 - Saving a `.cbr`, or converting one, produces a sibling `.cbz` and removes the `.cbr` only after that `.cbz` is complete and its `ComicInfo.xml` reads back. An existing sibling `.cbz` fails the convert and leaves the `.cbr` untouched. `keep_cbr_original` true keeps the `.cbr`.

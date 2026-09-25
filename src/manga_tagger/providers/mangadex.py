@@ -107,6 +107,7 @@ def load(
     year = integer_text(attributes.get("year"))
     if year is not None:
         patch["Year"] = year
+    put(patch, "Count", count_text(attributes.get("lastVolume")) or None)
     return patch
 
 

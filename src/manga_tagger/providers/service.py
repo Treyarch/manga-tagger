@@ -8,6 +8,7 @@ import httpx
 from manga_tagger.providers.anilist import load as anilist_load
 from manga_tagger.providers.anilist import search as anilist_search
 from manga_tagger.providers.comicvine import list_issues as comicvine_list_issues
+from manga_tagger.providers.comicvine import load as comicvine_load
 from manga_tagger.providers.comicvine import load_issue as comicvine_load_issue
 from manga_tagger.providers.comicvine import resolve_issue_id as comicvine_resolve
 from manga_tagger.providers.comicvine import search as comicvine_search
@@ -178,7 +179,7 @@ def load(
         number: Preferred issue/volume number from the form when non-blank.
 
     Returns:
-        ComicInfo element names mapped to strings. ``Volume`` is never included.
+        ComicInfo element names mapped to strings.
     """
     _require_provider(provider)
     _require_enabled(provider, enabled_providers)
@@ -249,9 +250,19 @@ def _load_comicvine(
         )
     else:
         _require_match_id("comicvine", resolved)
-    return comicvine_load_issue(
+    patch = comicvine_load_issue(
         resolved, api_key=api_key, client=client, cancel=cancel
     )
+    volume = comicvine_load(
+        match_id,
+        api_key=api_key,
+        title_languages=(),
+        client=client,
+        cancel=cancel,
+    )
+    if "Count" in volume:
+        patch["Count"] = volume["Count"]
+    return patch
 
 
 def _load_nautiljon(

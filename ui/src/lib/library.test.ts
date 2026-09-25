@@ -56,6 +56,7 @@ function volume(path: string, extra: Partial<Volume> = {}): Volume {
     series: "",
     number: "",
     volume: "",
+    count: "",
     publisher: "",
     page_count: "",
     language_iso: "",
@@ -199,6 +200,8 @@ describe("form", () => {
     expect(fieldLabel("AgeRating")).toBe("Age rating");
     expect(fieldLabel("CommunityRating")).toBe("Community rating");
     expect(fieldLabel("CoverArtist")).toBe("Cover artist");
+    expect(fieldLabel("Number")).toBe("Issue");
+    expect(fieldLabel("Count")).toBe("Volumes");
     expect(fieldLabel("Title")).toBe("Title");
     expect(FORM_FIELDS.every((name) => fieldLabel(name).length > 0)).toBe(true);
   });

@@ -349,6 +349,7 @@
 
   async function chooseCandidate(id: string) {
     if (anchor === null || form === null || busy) return;
+    const series = candidates.find((item) => item.id === id);
     loadSelectionKey = selectionKey(selection);
     const job = await postJson<Job>("/api/jobs/load", {
       provider,
@@ -356,6 +357,7 @@
       filename_stem: filenameStem(anchor.name),
       mode: form.mode,
       form,
+      count: series?.count ?? "",
     });
     newestLoadId = job.id;
     watch(job);
@@ -385,6 +387,7 @@
       mode: form.mode,
       form,
       issue_id: id,
+      count: issuesSeries.count,
     });
     newestLoadId = job.id;
     watch(job);

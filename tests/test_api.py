@@ -398,12 +398,17 @@ def test_load_job_passes_issue_id(tmp_path: Path) -> None:
                 "mode": "one",
                 "form": form,
                 "issue_id": "99",
+                "count": "27",
             },
         )
     assert loaded.status_code == 200
     assert loaded.json()["state"] == "succeeded"
     assert captured["issue_id"] == "99"
     assert captured["number"] == "7"
+    assert loaded.json()["result"]["form"]["values"]["Count"] == {
+        "value": "27",
+        "dirty": True,
+    }
 
 
 def test_blank_comicvine_key_sends_no_request(tmp_path: Path) -> None:
@@ -587,6 +592,7 @@ def _volume(path: str, **overrides: object) -> Volume:
         "series": "",
         "number": "",
         "volume": "",
+        "count": "",
         "publisher": "",
         "page_count": "",
         "language_iso": "",

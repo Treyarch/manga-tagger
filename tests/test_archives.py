@@ -322,6 +322,7 @@ def test_patch_volume_number_and_page_count(tmp_path: Path) -> None:
         keep_cbr_original=False,
     )
     assert _field(archive, "Number") == "4"
+    assert _field(archive, "Volume") == "4"
     assert _field(archive, "PageCount") == "99"
 
 

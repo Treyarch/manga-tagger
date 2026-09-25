@@ -53,6 +53,7 @@ query ($id: Int) {
     description
     genres
     siteUrl
+    volumes
     countryOfOrigin
     startDate { year month day }
     staff(perPage: 25, sort: RELEVANCE) {
@@ -114,6 +115,7 @@ def load(
     put(patch, "Genre", join_names(_strings(media.get("genres"))))
     put(patch, "Summary", plain_summary(media.get("description")))
     put(patch, "Web", nonblank(media.get("siteUrl")))
+    put(patch, "Count", count_text(media.get("volumes")) or None)
     _dates(patch, media.get("startDate"))
     writers, artists = _credits(_staff(media))
     put(patch, "Writer", join_names(writers))

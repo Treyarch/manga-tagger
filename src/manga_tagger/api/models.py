@@ -44,6 +44,7 @@ class VolumeModel(BaseModel):
     series: str
     number: str
     volume: str
+    count: str
     publisher: str
     page_count: str
     language_iso: str
@@ -127,6 +128,7 @@ class LoadRequest(BaseModel):
     mode: str
     form: dict[str, Any]
     issue_id: str = ""
+    count: str = ""
 
 
 class SaveRequest(BaseModel):

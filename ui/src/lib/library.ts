@@ -8,7 +8,7 @@ export const FORM_FIELDS = [
   "Title",
   "Series",
   "Number",
-  "Volume",
+  "Count",
   "Publisher",
   "PageCount",
   "LanguageISO",
@@ -39,14 +39,15 @@ export const SHARED_FIELDS = [
   "Penciller",
   "Inker",
   "CoverArtist",
+  "Count",
 ] as const;
 
 /** Readable inspector captions for ComicInfo element keys. */
 export const FIELD_LABELS: Record<(typeof FORM_FIELDS)[number], string> = {
   Title: "Title",
   Series: "Series",
-  Number: "Number",
-  Volume: "Volume",
+  Number: "Issue",
+  Count: "Volumes",
   Publisher: "Publisher",
   PageCount: "Page count",
   LanguageISO: "Language",
@@ -127,7 +128,7 @@ const FIELD_COLUMNS: Record<string, string> = {
   Title: "title",
   Series: "series",
   Number: "number",
-  Volume: "volume",
+  Count: "count",
   Publisher: "publisher",
   PageCount: "page_count",
   LanguageISO: "language_iso",
@@ -163,6 +164,7 @@ export type Volume = {
   series: string;
   number: string;
   volume: string;
+  count: string;
   publisher: string;
   page_count: string;
   language_iso: string;
@@ -468,7 +470,7 @@ export function savePatch(form: InspectorForm): Record<string, string> {
   const patch: Record<string, string> = {};
   for (const [key, field] of Object.entries(form.values)) {
     if (!field.dirty || key === "Pages") continue;
-    if (form.mode === "many" && (key === "Number" || key === "Volume")) continue;
+    if (form.mode === "many" && key === "Number") continue;
     patch[key] = field.value;
   }
   return patch;

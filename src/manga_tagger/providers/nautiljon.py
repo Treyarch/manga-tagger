@@ -216,6 +216,7 @@ def load(
     put(patch, "Penciller", dessinateur)
     put(patch, "CoverArtist", dessinateur)
     put(patch, "AgeRating", nonblank(infos.get("ageConseille")))
+    put(patch, "Count", count_text(body.get("issues")) or None)
     put(patch, "Web", nonblank(body.get("sourceUrl")))
     volume = _volume_body(
         match_id,
@@ -234,6 +235,7 @@ def load(
         put(patch, "CommunityRating", _rating_text(volume.get("rating")))
         if volume_number is not None:
             patch["Number"] = volume_number
+            put(patch, "Web", _volume_url(body.get("volumeUrls"), volume_number))
     elif require_volume:
         raise ProviderResponseError(_NOT_FOUND)
     return patch
@@ -292,6 +294,21 @@ def _volume_number_from_url(value: object) -> str | None:
     if match is None:
         return None
     return str(int(match.group(1)))
+
+
+def _volume_url(urls: object, volume_number: str) -> str | None:
+    """Return the series volumeUrls entry whose number matches ``volume_number``."""
+    if not isinstance(urls, list):
+        return None
+    target = str(int(volume_number)) if volume_number.isdigit() else volume_number
+    for item in urls:
+        text = nonblank(item)
+        if text is None:
+            continue
+        number = _volume_number_from_url(text)
+        if number == target:
+            return text
+    return None
 
 
 def _candidate(item: object) -> Candidate | None:

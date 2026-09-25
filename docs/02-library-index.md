@@ -30,7 +30,7 @@ One row is one resolved archive path. The row stores file facts, scan status, an
 | `archive_page_count` | Number of page images. NULL when `status` is `failed` |
 | ComicInfo columns | One text column per owned element except `Pages`. A missing element is `""` |
 
-The ComicInfo columns are `title`, `series`, `number`, `volume`, `publisher`, `page_count`, `language_iso`, `age_rating`, `manga`, `genre`, `summary`, `web`, `community_rating`, `notes`, `year`, `month`, `day`, `writer`, `penciller`, `inker`, and `cover_artist`. `page_count` is the `PageCount` element text. `archive_page_count` is the number of page images. They are stored as read and are not required to match.
+The ComicInfo columns are `title`, `series`, `number`, `volume`, `count`, `publisher`, `page_count`, `language_iso`, `age_rating`, `manga`, `genre`, `summary`, `web`, `community_rating`, `notes`, `year`, `month`, `day`, `writer`, `penciller`, `inker`, and `cover_artist`. `page_count` is the `PageCount` element text. `archive_page_count` is the number of page images. They are stored as read and are not required to match.
 
 `list_volumes` returns these fields, including failed rows. The form can use the row without opening the archive.
 
@@ -40,8 +40,9 @@ Each public call opens its own connection, ensures the schema, does its work, an
 
 A missing parent directory and a missing database file are created. `PRAGMA user_version` is the schema version.
 
-- Version 0 gets the table below, then `user_version` is set to 1.
-- Version 1 is opened unchanged.
+- Version 0 gets the table below, then `user_version` is set to 2.
+- Version 1 gains a `count` column via `ALTER TABLE`, then `user_version` is set to 2.
+- Version 2 is opened unchanged.
 - Any other version raises `IndexVersionError` and does not modify the file.
 
 ```sql
@@ -61,6 +62,7 @@ CREATE TABLE volumes (
   series TEXT NOT NULL,
   number TEXT NOT NULL,
   volume TEXT NOT NULL,
+  count TEXT NOT NULL,
   publisher TEXT NOT NULL,
   page_count TEXT NOT NULL,
   language_iso TEXT NOT NULL,
@@ -170,7 +172,7 @@ The JPEG is written to a temporary file in `cache_dir` and renamed into place. T
 | Exception | When |
 | --- | --- |
 | `LibraryIndexError` | The database cannot be opened or written, a path that must be absolute is relative, or thumbnail encoding fails. A failed encode removes its temporary file and leaves an older thumbnail in place |
-| `IndexVersionError` | `user_version` is neither 0 nor 1. The schema is not rewritten and existing rows stay |
+| `IndexVersionError` | `user_version` is neither 0, 1, nor 2. The schema is not rewritten and existing rows stay |
 
 `IndexVersionError` is a subclass of `LibraryIndexError`. The base name is not the builtin `IndexError`.
 
@@ -201,7 +203,7 @@ Cover at least:
 - `refresh_volume` updates one file after its ComicInfo changes and does not walk a sibling. `forget_volume` removes the row and the thumbnail. A missing path returns no row.
 - `thumbnail_for` reads only the cover page, writes a JPEG 256 pixels wide, and leaves the archive bytes unchanged. It does not write `{stem}-poster.jpg`. A cover narrower than 256 pixels is not enlarged. A cover with an alpha channel encodes on white. The test may decode that JPEG. A second call for the same size and mtime does not open the archive. A `failed` row returns no path. `list_volumes` creates no thumbnail.
 - When `unar` is absent, a `.cbr` row is `failed` with `error_type` `MissingUnarError` and a message that names `unar`, and a `.cbz` row is `ok`.
-- `user_version` 2 raises `IndexVersionError`. The version stays 2 and a sentinel row is still present.
+- `user_version` 3 raises `IndexVersionError`. The version stays 3 and a sentinel row is still present.
 
 ## Acceptance criteria
 
@@ -213,4 +215,4 @@ Cover at least:
 - A finished scan drops files that disappeared and drops roots that are no longer in the list, including a finished scan of an empty root list. A root that is not an existing directory keeps its rows. A root whose directory cannot be listed is not pruned.
 - `refresh_volume` updates one archive. `forget_volume` drops one path and its thumbnail. The module does not watch the filesystem and does not start a thread.
 - A thumbnail is built when asked, from the cover page only, as a 256-pixel-wide JPEG at quality 80 on a white matte when the cover has an alpha channel, by rename inside the cache directory. The sibling poster is left alone. A scan does not build thumbnails.
-- A database whose `user_version` is neither 0 nor 1 is refused. The schema is not rewritten and existing rows stay.
+- A database whose `user_version` is neither 0, 1, nor 2 is refused. The schema is not rewritten and existing rows stay. Version 1 is migrated to 2 by adding `count`.

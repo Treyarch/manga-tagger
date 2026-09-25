@@ -415,12 +415,72 @@ def test_user_version_is_refused(tmp_path: Path) -> None:
     connection = sqlite3.connect(database)
     connection.execute("CREATE TABLE volumes (path TEXT PRIMARY KEY)")
     connection.execute("INSERT INTO volumes (path) VALUES ('sentinel')")
-    connection.execute("PRAGMA user_version = 2")
+    connection.execute("PRAGMA user_version = 3")
     connection.commit()
     connection.close()
     with pytest.raises(IndexVersionError):
         list_volumes(database)
     connection = sqlite3.connect(database)
-    assert connection.execute("PRAGMA user_version").fetchone()[0] == 2
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == 3
     assert connection.execute("SELECT path FROM volumes").fetchone()[0] == "sentinel"
+    connection.close()
+
+
+def test_user_version_1_gains_count(tmp_path: Path) -> None:
+    database = tmp_path / "index.db"
+    connection = sqlite3.connect(database)
+    connection.executescript(
+        """
+        CREATE TABLE volumes (
+          path TEXT PRIMARY KEY,
+          root TEXT NOT NULL,
+          name TEXT NOT NULL,
+          extension TEXT NOT NULL,
+          size INTEGER NOT NULL,
+          mtime_ns INTEGER NOT NULL,
+          status TEXT NOT NULL,
+          error_type TEXT NOT NULL,
+          error_message TEXT NOT NULL,
+          cover_index INTEGER,
+          archive_page_count INTEGER,
+          title TEXT NOT NULL,
+          series TEXT NOT NULL,
+          number TEXT NOT NULL,
+          volume TEXT NOT NULL,
+          publisher TEXT NOT NULL,
+          page_count TEXT NOT NULL,
+          language_iso TEXT NOT NULL,
+          age_rating TEXT NOT NULL,
+          manga TEXT NOT NULL,
+          genre TEXT NOT NULL,
+          summary TEXT NOT NULL,
+          web TEXT NOT NULL,
+          community_rating TEXT NOT NULL,
+          notes TEXT NOT NULL,
+          year TEXT NOT NULL,
+          month TEXT NOT NULL,
+          day TEXT NOT NULL,
+          writer TEXT NOT NULL,
+          penciller TEXT NOT NULL,
+          inker TEXT NOT NULL,
+          cover_artist TEXT NOT NULL
+        );
+        """
+    )
+    connection.execute(
+        """
+        INSERT INTO volumes VALUES (
+          '/books/a.cbz', '/books', 'a.cbz', 'cbz', 1, 1, 'ok', '', '',
+          0, 1, '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+          '', '', '', '', '', '', ''
+        )
+        """
+    )
+    connection.execute("PRAGMA user_version = 1")
+    connection.commit()
+    connection.close()
+    rows = list_volumes(database)
+    assert rows[0].count == ""
+    connection = sqlite3.connect(database)
+    assert connection.execute("PRAGMA user_version").fetchone()[0] == 2
     connection.close()

@@ -22,7 +22,6 @@ from manga_tagger.providers import (
 
 MD_ID = "6b1eb93e-473a-4ab3-9922-1a66d2a29a4b"
 _FORBIDDEN = (
-    "Volume",
     "Pages",
     "PageCount",
     "Notes",
@@ -217,6 +216,7 @@ def test_mangadex_load_french_title_and_credits() -> None:
                 "title": {"fr": "Titre", "en": "Title"},
                 "originalLanguage": "ja",
                 "year": 2001,
+                "lastVolume": "27",
                 "description": {"fr": "Résumé", "en": "English blurb"},
                 "tags": [
                     {"attributes": {"group": "theme", "name": {"en": "School Life"}}},
@@ -264,7 +264,7 @@ def test_mangadex_load_french_title_and_credits() -> None:
     assert patch["Web"] == f"https://mangadex.org/title/{MD_ID}"
     assert "Publisher" not in patch
     assert patch["Number"] == "2"
-    assert "Volume" not in patch
+    assert patch["Count"] == "27"
     request = seen[0]
     assert _bare(request) == f"https://api.mangadex.org/manga/{MD_ID}"
     assert request.url.params.get_list("includes[]") == ["author", "artist"]
@@ -390,6 +390,7 @@ def test_anilist_english_credits_and_summary() -> None:
                 "description": "<p>Hello&nbsp;there</p>",
                 "genres": ["Action", "Drama"],
                 "siteUrl": "https://anilist.co/manga/42",
+                "volumes": 27,
                 "countryOfOrigin": "JP",
                 "startDate": {"year": 2001, "month": 6, "day": 5},
                 "staff": {
@@ -434,6 +435,7 @@ def test_anilist_english_credits_and_summary() -> None:
     assert "Publisher" not in patch
     assert patch["Manga"] == "YesAndRightToLeft"
     assert "Number" not in patch
+    assert patch["Count"] == "27"
     request = seen[0]
     assert request.method == "POST"
     assert _bare(request) == "https://graphql.anilist.co"
@@ -443,6 +445,7 @@ def test_anilist_english_credits_and_summary() -> None:
     payload = json.loads(request.content)
     assert "perPage: 25" in payload["query"]
     assert "type: MANGA" in payload["query"]
+    assert "volumes" in payload["query"]
     assert payload["variables"] == {"id": 42}
 
 
@@ -596,6 +599,7 @@ def test_jikan_french_title_dates_and_credits() -> None:
             "explicit_genres": [{"name": "Erotica"}],
             "synopsis": "<p>Hello&nbsp;there</p>",
             "url": "https://myanimelist.net/manga/26",
+            "volumes": 18,
             "published": {"prop": {"from": {"year": 2001, "month": 6, "day": None}}},
             "authors": [
                 {"name": "Tsugumi Ohba", "type": "Story & Art"},
@@ -630,7 +634,7 @@ def test_jikan_french_title_dates_and_credits() -> None:
     assert patch["Web"] == "https://myanimelist.net/manga/26"
     assert patch["Manga"] == "YesAndRightToLeft"
     assert patch["Number"] == "1"
-    assert "Volume" not in patch
+    assert patch["Count"] == "18"
     request = seen[0]
     assert request.method == "GET"
     assert _bare(request) == "https://api.tenrai.org/v1/manga/26/full"
@@ -743,7 +747,7 @@ def test_jikan_search_original_title_and_unique_names() -> None:
 
 
 def test_comicvine_load_roles_and_summary() -> None:
-    body = {
+    issue = {
         "error": "OK",
         "status_code": 1,
         "results": {
@@ -762,7 +766,25 @@ def test_comicvine_load_roles_and_summary() -> None:
             ],
         },
     }
-    client, seen = _client(body)
+    volume = {
+        "error": "OK",
+        "status_code": 1,
+        "results": {
+            "name": "Sandman",
+            "count_of_issues": 75,
+            "site_detail_url": "https://comicvine.gamespot.com/sandman/4050-12345/",
+            "person_credits": [],
+        },
+    }
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if "/api/volume/" in str(request.url):
+            return httpx.Response(200, json=volume)
+        return httpx.Response(200, json=issue)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
     with client:
         patch = load(
             "comicvine",
@@ -779,6 +801,7 @@ def test_comicvine_load_roles_and_summary() -> None:
     assert patch["Series"] == "Sandman"
     assert patch["Title"] == "The Sleep of the Just"
     assert patch["Number"] == "1"
+    assert patch["Count"] == "75"
     assert patch["Manga"] == "No"
     assert "LanguageISO" not in patch
     assert "Publisher" not in patch
@@ -792,12 +815,12 @@ def test_comicvine_load_roles_and_summary() -> None:
     assert "Alan Moore" not in patch["CoverArtist"]
     assert patch["Inker"] == "Joe"
     assert patch["Web"] == "https://comicvine.gamespot.com/sandman/4000-99/"
-    assert "Volume" not in patch
-    request = seen[0]
-    assert _bare(request) == "https://comicvine.gamespot.com/api/issue/4000-99/"
-    assert request.url.params.get("api_key") == "secret"
-    assert request.url.params.get("format") == "json"
-    assert request.headers["user-agent"] == "manga-tagger"
+    assert _bare(seen[0]) == "https://comicvine.gamespot.com/api/issue/4000-99/"
+    assert seen[0].url.params.get("api_key") == "secret"
+    assert seen[0].url.params.get("format") == "json"
+    assert seen[0].headers["user-agent"] == "manga-tagger"
+    assert _bare(seen[1]) == "https://comicvine.gamespot.com/api/volume/4050-12345/"
+    assert "count_of_issues" in (seen[1].url.params.get("field_list") or "")
 
 
 def test_comicvine_search_deck_and_year_string() -> None:
@@ -1218,6 +1241,10 @@ def test_nautiljon_load_french_credits_and_volume() -> None:
     series = {
         "sourceUrl": "https://www.nautiljon.com/mangas/berserk.html",
         "title": "Berserk",
+        "issues": 41,
+        "volumeUrls": [
+            "https://www.nautiljon.com/mangas/berserk/volume-1,3278.html",
+        ],
         "infos": {
             "titreOriginal": "ベルセルク",
             "origine": "Japon - 1989",
@@ -1271,14 +1298,14 @@ def test_nautiljon_load_french_credits_and_volume() -> None:
     assert patch["Penciller"] == patch["CoverArtist"] == "Studio Gaga"
     assert patch["Genre"] == "Action, Horreur, Vengeance"
     assert patch["AgeRating"] == "18 ans et +"
-    assert patch["Web"] == "https://www.nautiljon.com/mangas/berserk.html"
+    assert patch["Web"] == "https://www.nautiljon.com/mangas/berserk/volume-1,3278.html"
     assert patch["Summary"] == "Volume one résumé"
     assert patch["Year"] == "2004"
     assert patch["Month"] == "10"
     assert patch["Day"] == "6"
     assert patch["Number"] == "1"
+    assert patch["Count"] == "41"
     assert patch["CommunityRating"] == "8.45"
-    assert "Volume" not in patch
     _assert_patch(patch)
 
 
@@ -1404,12 +1431,24 @@ def test_comicvine_list_issues_and_load_by_number() -> None:
             "person_credits": [],
         },
     }
+    volume = {
+        "error": "OK",
+        "status_code": 1,
+        "results": {
+            "name": "Claymore",
+            "count_of_issues": 27,
+            "person_credits": [],
+        },
+    }
     seen: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         seen.append(request)
-        if "/api/issues/" in str(request.url):
+        url = str(request.url)
+        if "/api/issues/" in url:
             return httpx.Response(200, json=page)
+        if "/api/volume/" in url:
+            return httpx.Response(200, json=volume)
         return httpx.Response(200, json=issue)
 
     client = httpx.Client(transport=httpx.MockTransport(handler))
@@ -1456,6 +1495,8 @@ def test_comicvine_list_issues_and_load_by_number() -> None:
     assert patch["Number"] == "1"
     assert patch["Series"] == "Claymore"
     assert patch["Title"] == "First"
+    assert patch["Count"] == "27"
+    assert patch["Web"] == "https://comicvine.gamespot.com/i/4000-10/"
 
 
 def test_comicvine_load_by_number_misses() -> None:
@@ -1499,6 +1540,7 @@ def test_nautiljon_list_issues_and_load_issue_id() -> None:
             "https://www.nautiljon.com/mangas/berserk/volume-2,3279.html",
             "https://www.nautiljon.com/mangas/volumes/berserk,2.html",
         ],
+        "issues": 41,
     }
     volumes = {
         "1": {
@@ -1575,6 +1617,8 @@ def test_nautiljon_list_issues_and_load_issue_id() -> None:
     assert patch["Number"] == "2"
     assert patch["Summary"] == "Volume two"
     assert patch["CommunityRating"] == "7.5"
+    assert patch["Count"] == "41"
+    assert patch["Web"] == "https://www.nautiljon.com/mangas/berserk/volume-2,3279.html"
     assert any(request.url.path.endswith("/volumes/2") for request in seen)
 
 def _assert_patch(patch: dict[str, str]) -> None:

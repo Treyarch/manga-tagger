@@ -33,8 +33,8 @@ def save_comic_info(
     """Write a ComicInfo patch for one archive.
 
     A ``.cbz`` is replaced atomically. A ``.cbr`` becomes a sibling ``.cbz``.
-    ``Number`` is written only when ``write_number`` is true. ``Volume`` is
-    written only when the patch includes it.
+    ``Number`` is written only when ``write_number`` is true. Whenever
+    ``Number`` is written, ``Volume`` is set to the same value.
 
     Args:
         path: Archive to update.

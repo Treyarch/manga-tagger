@@ -11,6 +11,7 @@ OWNED_ELEMENTS: tuple[str, ...] = (
     "Series",
     "Number",
     "Volume",
+    "Count",
     "Publisher",
     "PageCount",
     "LanguageISO",
@@ -42,6 +43,7 @@ BATCH_FIELDS: frozenset[str] = frozenset(
         "Inker",
         "CoverArtist",
         "Manga",
+        "Count",
     }
 )
 
@@ -170,6 +172,14 @@ class ComicInfo:
                 raise ArchiveError(f"{name} must be a string or None")
             _set_child_text(self._root, name, value)
             applied[name] = value
+        if "Number" in applied:
+            number = applied["Number"]
+            if number is None:
+                _remove_child(self._root, "Volume")
+                applied["Volume"] = None
+            else:
+                _set_child_text(self._root, "Volume", number)
+                applied["Volume"] = number
         return applied
 
     def to_bytes(self) -> bytes:
