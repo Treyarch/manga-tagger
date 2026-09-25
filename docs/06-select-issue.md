@@ -61,34 +61,34 @@ For each remaining number, `cancel` is checked and then `GET {base}/v1/series/{s
 ## load with issue_id and number
 
 ```text
-load(provider, match_id, *, filename_stem, title_languages, api_key="", nautiljon_base_url="", nautiljon_api_key="", client, cancel=None, issue_id="", number=None) -> dict[str, str]
+load(provider, match_id, *, filename_stem, title_languages, api_key="", nautiljon_base_url="", nautiljon_api_key="", client, cancel=None, issue_id="", number=None, mode="one") -> dict[str, str]
 ```
 
-`issue_id` defaults to `""`. `number` defaults to `None` (caller omitted a preferred number).
+`issue_id` defaults to `""`. `number` defaults to `None` (caller omitted a preferred number). `mode` is the inspector form mode (`one` or `many`) from the load job.
 
 ### Unsupported providers (MangaDex, AniList, Jikan)
 
-Behavior is unchanged from [03-metadata-providers.md](03-metadata-providers.md): series `load`, then `Number` from `parse_number(filename_stem)` when that returns a string. `issue_id` and `number` are ignored.
+Behavior is unchanged from [03-metadata-providers.md](03-metadata-providers.md): series `load`, then `Number` from `parse_number(filename_stem)` when that returns a string. `issue_id`, `number`, and `mode` are ignored for resolution (series load always).
 
 ### Comic Vine
 
 1. When `issue_id` is non-blank after trim: validate it like a Comic Vine numeric id. Fetch `GET …/api/issue/4000-{issue_id}/` with `field_list` `id,issue_number,name,description,cover_date,site_detail_url,person_credits,volume,image`. Build the patch from the issue: `Series` from `volume.name` when that object has a non-blank name, else the issue `name`; `Title` equals `Series` when the issue has no usable `name`, otherwise the issue `name`; `Number` from `issue_number`; `Summary` from description; dates from `cover_date` (`YYYY-MM-DD` or `YYYY-MM` or year); `Web` from `site_detail_url`; credits from `person_credits` with the same role rules as volume load; `Manga` `No`. Then fetch the parent volume (`match_id`) with the volume load field list and set `Count` from `count_of_issues` when present. Publisher is omitted from the issue payload unless a follow-up is unnecessary — when `volume` includes no publisher, omit `Publisher`. A missing usable series title (neither volume name nor issue name) raises `ProviderResponseError`.
-2. When `issue_id` is blank: take the preferred number as trimmed `number` when that argument is a non-blank string, else `parse_number(filename_stem)`. When that preferred number is missing, raise `ProviderResponseError` with message `comicvine: could not find an issue`. Call `list_issues` for `match_id`, find the first issue whose `number` equals the preferred number after normalizing leading zeros on the integer part (same rule as `parse_number` storage). When none match, raise `ProviderResponseError` with message `comicvine: could not find an issue`. Then load that issue as in step 1 (`issue_id` = matched `id`), including the parent-volume `Count` fill.
+2. When `issue_id` is blank and `mode` is `many`: load the parent volume (`match_id`) only (series/volume patch). Do not resolve or fetch an issue. Preferred `number` is ignored.
+3. When `issue_id` is blank and `mode` is `one`: take the preferred number as trimmed `number` when that argument is a non-blank string, else `parse_number(filename_stem)`. When that preferred number is missing, raise `ProviderResponseError` with message `comicvine: could not find an issue`. Call `list_issues` for `match_id`, find the first issue whose `number` equals the preferred number after normalizing leading zeros on the integer part (same rule as `parse_number` storage). When none match, raise `ProviderResponseError` with message `comicvine: could not find an issue`. Then load that issue as in step 1 (`issue_id` = matched `id`), including the parent-volume `Count` fill.
 
 ### Nautiljon
 
 1. When `issue_id` is non-blank: it must be digits with integer value at least `1` (same rule as today's volume fetch). Series load runs as today, then the volume page for that number is requested. A volume HTTP 404 raises `ProviderResponseError` with message `nautiljon: could not find an issue` (unlike the silent 404 when enriching from filename alone on unsupported-style series OK paths — here an explicit issue id must resolve). Set patch `Number` to that volume number string.
-2. When `issue_id` is blank: preferred number is trimmed `number` when non-blank, else `parse_number(filename_stem)`. When missing, or not a positive integer string, raise `ProviderResponseError` with message `nautiljon: could not find an issue`. Otherwise behave as step 1 with that number as `issue_id`. Fractional filename numbers still skip the volume GET only on the old series-only path; for Nautiljon issue resolve they fail with could not find an issue.
+2. When `issue_id` is blank and `mode` is `many`: series load only (`volume_number` omitted, `require_volume` false). Preferred `number` is ignored.
+3. When `issue_id` is blank and `mode` is `one`: preferred number is trimmed `number` when non-blank, else `parse_number(filename_stem)`. When missing, or not a positive integer string, raise `ProviderResponseError` with message `nautiljon: could not find an issue`. Otherwise behave as step 1 with that number as `issue_id`. Fractional filename numbers fail with could not find an issue on this single-volume OK path.
 
-For Nautiljon Select Issue / OK-by-number, a volume 404 is an error. The legacy series scrape path that only had `filename_stem` without going through issue resolve is replaced for Nautiljon by this resolve path when the shell always passes preferred `number` or empty `issue_id` through the new rules above.
-
-Clarification for Nautiljon OK: the shell always uses issue resolve (preferred number or stem). There is no separate “series-only OK” for Nautiljon once this specification is active. MangaDex/AniList/Jikan remain series-only on OK.
+For Nautiljon Select Issue / single-volume OK-by-number, a volume 404 is an error. Multi-volume Matches OK uses the series-only path (step 2). MangaDex/AniList/Jikan remain series-only on OK for both modes.
 
 ## Shell and jobs
 
 `POST /api/jobs/issues` body `{ "provider", "match_id" }` runs `list_issues` with the same config and client rules as search/load. Progress is `0/1` then `1/1`. Result is `{ "issues": [{ "id", "number", "title", "date", "cover", "summary" }] }`. Job name is `Issues`.
 
-`POST /api/jobs/load` body gains optional `issue_id` (default `""`) and optional `count` (default `""`). The job derives preferred `number` from the form: when form `Number` is non-blank and not mixed, that trimmed value; otherwise `None` so the provider falls back to `parse_number(filename_stem)`. It passes `issue_id` and that `number` into `load`. When `count` is non-blank after trim, the shell sets patch `Count` to that string after the provider returns (the Matches series candidate's issue/volume total).
+`POST /api/jobs/load` body gains optional `issue_id` (default `""`) and optional `count` (default `""`). The job derives preferred `number` from the form: when form `Number` is non-blank and not mixed, that trimmed value; otherwise `None` so the provider falls back to `parse_number(filename_stem)`. It passes `issue_id`, that `number`, and `mode` into `load`. When `count` is non-blank after trim, the shell sets patch `Count` to that string after the provider returns (the Matches series candidate's issue/volume total).
 
 Search and Issues progress live in the Matches / Issues dialogs, not the header. A failed Issues job leaves Matches open. An empty Issues result is success; the client toasts `No issues available.` and does not open the Issues dialog (or closes it if it was showing a loading state).
 
@@ -98,15 +98,18 @@ Search and Issues progress live in the Matches / Issues dialogs, not the header.
 
 Load success still toasts `Metadata loaded.` and clears candidates (and issues) so both dialogs close. A failed load with Matches still open leaves candidates; if Issues was open it stays open until dismiss.
 
-Preferred number for OK: form `Number` when non-blank and not mixed, else filename stem via provider `parse_number`.
+Preferred number for single-volume OK (`mode` `one`): form `Number` when non-blank and not mixed, else filename stem via provider `parse_number`. Multi-volume OK (`mode` `many`) does not require a preferred number for Comic Vine or Nautiljon; those catalogs load series metadata only.
 
 ## UI
 
-Matches footer actions, leading to trailing: secondary **Select Issue**, secondary **Cancel**, primary **OK**.
+When the inspector form mode is `one` (one volume selected), Matches footer actions, leading to trailing: secondary **Select Issue**, secondary **Cancel**, primary **OK**.
 
 - **OK** / Enter: start Load for the highlighted series id without `issue_id` (number from form/stem; `count` from that series candidate).
 - **Select Issue** / double-click on a series row: start the Issues job for that id. While Issues is queued or running, Matches shows busy (Select Issue and OK disabled) or the client may show the Issues dialog in a loading state; either is acceptable if Cancel on Matches can still dismiss and cancel.
-- Dismiss Matches clears candidates and issues and cancels a running Search or Issues job started from that flow.
+
+When the form mode is `many` (several volumes selected), Matches omits **Select Issue**. Double-click on a series row acts like **OK**. **OK** / Enter / double-click start Load without `issue_id` so shared series fields batch-fill; Comic Vine and Nautiljon use the series-only path above.
+
+Dismiss Matches clears candidates and issues and cancels a running Search or Issues job started from that flow.
 
 Issues dialog (`IssuesDialog.svelte`), `xl` size, title `{Series} ({Year}) - Select Issue` using the highlighted candidate's title and year (omit ` (Year)` when year is blank). Lucide `ListOrdered` (or `ScanSearch`) as the title icon. Body: loading spinner `Loading issues…`, or the same two-column layout as Matches with table columns **Issue** / **Date** / **Title**, cover left, summary below the table. Preselect the row whose `number` matches the preferred number (form or stem); if none, the first row. OK / double-click / Enter starts Load with that `issue_id` and the parent series candidate's `count`. Cancel closes Issues only and returns to Matches with candidates kept.
 
@@ -122,16 +125,19 @@ Hermetic MockTransport tests. Cover at least:
 
 - Comic Vine `list_issues` returns candidates from one or more pages; blank key raises `ProviderUnavailableError` with no request.
 - Comic Vine `load` with `issue_id` hits `/issue/4000-…` and sets `Number` from `issue_number`.
-- Comic Vine `load` without `issue_id` matches preferred `number` (and form-preferred number over stem when the shell passes it); missing or unmatched number raises `ProviderResponseError` (`could not find an issue`).
+- Comic Vine `load` without `issue_id` and `mode` `one` matches preferred `number` (and form-preferred number over stem when the shell passes it); missing or unmatched number raises `ProviderResponseError` (`could not find an issue`).
+- Comic Vine `load` without `issue_id` and `mode` `many` hits the volume endpoint only (no issue list or issue fetch).
 - Nautiljon `list_issues` parses `volumeUrls`, sets `title` to `Tome {n}`, and enriches `date`/`summary`/`cover` from each volume page (volume 404 leaves those blank); `load` with `issue_id` `"2"` requests volumes/2 and sets `Number` `2` and `CommunityRating` from `rating` when present; volume 404 raises could not find an issue when resolving by issue.
+- Nautiljon `load` without `issue_id` and `mode` `many` requests the series only (no volume GET).
 - MangaDex, AniList, and Jikan `list_issues` return `[]` with no HTTP.
 - Issues job returns `{ "issues": [...] }`; empty list is success.
-- Load job passes `issue_id` through; preferred number from non-blank form `Number`.
+- Load job passes `issue_id` and `mode` through; preferred number from non-blank form `Number`.
 
 ## Acceptance criteria
 
-- Matches always shows **Select Issue**. Double-click opens the issue flow; OK loads by number (or series-only on unsupported catalogs).
-- Comic Vine and Nautiljon can list issues/volumes and load one by id or by preferred number.
+- Matches shows **Select Issue** only when one volume is selected. Double-click then opens the issue flow; OK loads by number (or series-only on unsupported catalogs).
+- When several volumes are selected, Matches hides **Select Issue**; OK and double-click batch-fill shared series fields (Comic Vine and Nautiljon series-only).
+- Comic Vine and Nautiljon can list issues/volumes and load one by id or by preferred number when a single volume is selected.
 - MangaDex, AniList, and Jikan return an empty issue list; the client toasts `No issues available.`
 - A successful issue or number load merges a form patch and does not write an archive. `Number` comes from the chosen issue/volume when that path ran.
 - Cancel checks run before each new HTTP request. Multi-volume save still ignores patch `Number` per the shell shared-field rules.

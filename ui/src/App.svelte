@@ -364,7 +364,7 @@
   }
 
   async function selectIssue(id: string) {
-    if (busy) return;
+    if (busy || form?.mode !== "one") return;
     const series = candidates.find((item) => item.id === id);
     if (series === undefined) return;
     issues = [];
@@ -784,6 +784,7 @@
     {searching}
     {busy}
     {provider}
+    selectIssueEnabled={form?.mode === "one"}
     onDismiss={dismissMatches}
     onCandidate={chooseCandidate}
     onSelectIssue={selectIssue}

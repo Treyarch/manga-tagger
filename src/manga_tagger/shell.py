@@ -17,6 +17,7 @@ FORM_FIELDS: tuple[str, ...] = tuple(
 )
 SHARED_FIELDS: tuple[str, ...] = (
     "Series",
+    "Count",
     "Publisher",
     "LanguageISO",
     "AgeRating",
@@ -26,7 +27,6 @@ SHARED_FIELDS: tuple[str, ...] = (
     "Penciller",
     "Inker",
     "CoverArtist",
-    "Count",
 )
 if set(SHARED_FIELDS) != BATCH_FIELDS:
     raise RuntimeError("SHARED_FIELDS does not match the archive batch fields")
@@ -628,6 +628,7 @@ def run_load(
                 cancel=cancel,
                 issue_id=issue_id,
                 number=preferred_load_number(form),
+                mode=mode,
             )
         )
     finally:

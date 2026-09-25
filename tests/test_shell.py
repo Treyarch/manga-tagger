@@ -583,6 +583,7 @@ def test_list_issues_and_preferred_number() -> None:
     )
     assert captured["issue_id"] == "99"
     assert captured["number"] == "3"
+    assert captured["mode"] == "one"
 
 
 def test_scan_cancel_and_index_error() -> None:

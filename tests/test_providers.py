@@ -1352,6 +1352,48 @@ def test_nautiljon_missing_number_raises() -> None:
                 nautiljon_api_key="secret",
             )
 
+
+def test_nautiljon_load_many_mode_series_only() -> None:
+    series = {
+        "sourceUrl": "https://www.nautiljon.com/mangas/berserk.html",
+        "title": "Berserk",
+        "issues": 41,
+        "infos": {
+            "titreOriginal": "ベルセルク",
+            "origine": "Japon - 1989",
+            "editeurVf": "Glénat",
+            "auteurs": ["Miura Kentaro (auteur)"],
+        },
+        "synopsis": "Series only",
+    }
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if "/volumes/" in request.url.path:
+            raise AssertionError(f"unexpected volume request {request.url.path}")
+        return httpx.Response(200, json=series)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    with client:
+        patch = load(
+            "nautiljon",
+            "berserk",
+            filename_stem="Berserk v02",
+            title_languages=["ja", "fr"],
+            client=client,
+            nautiljon_base_url="https://nj.example",
+            nautiljon_api_key="secret",
+            mode="many",
+        )
+    assert [request.url.path for request in seen] == ["/v1/series/berserk"]
+    assert patch["Series"] == "ベルセルク"
+    assert patch["Publisher"] == "Glénat"
+    assert patch["Count"] == "41"
+    assert patch["Summary"] == "Series only"
+    assert "Number" not in patch
+
+
 def test_nautiljon_blank_settings_send_nothing() -> None:
     with _forbid_client() as client:
         with pytest.raises(
@@ -1527,6 +1569,48 @@ def test_comicvine_load_by_number_misses() -> None:
                 client=client,
                 api_key="secret",
             )
+
+
+def test_comicvine_load_many_mode_series_only() -> None:
+    volume = {
+        "error": "OK",
+        "status_code": 1,
+        "results": {
+            "name": "Claymore",
+            "start_year": "2001",
+            "count_of_issues": 27,
+            "publisher": {"name": "Viz"},
+            "description": "<p>Series</p>",
+            "site_detail_url": "https://comicvine.gamespot.com/claymore/4050-12345/",
+            "person_credits": [{"name": "Norihiro Yagi", "role": "writer"}],
+        },
+    }
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if "/api/volume/" in str(request.url):
+            return httpx.Response(200, json=volume)
+        raise AssertionError(f"unexpected request {request.method} {request.url}")
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    with client:
+        patch = load(
+            "comicvine",
+            "12345",
+            filename_stem="Claymore v02",
+            title_languages=["en"],
+            client=client,
+            api_key="secret",
+            mode="many",
+        )
+    assert len(seen) == 1
+    assert _bare(seen[0]) == "https://comicvine.gamespot.com/api/volume/4050-12345/"
+    assert patch["Series"] == "Claymore"
+    assert patch["Publisher"] == "Viz"
+    assert patch["Count"] == "27"
+    assert patch["Manga"] == "No"
+    assert "Number" not in patch
 
 
 def test_nautiljon_list_issues_and_load_issue_id() -> None:

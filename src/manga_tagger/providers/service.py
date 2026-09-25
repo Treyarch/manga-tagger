@@ -160,6 +160,7 @@ def load(
     cancel: Callable[[], bool] | None = None,
     issue_id: str = "",
     number: str | None = None,
+    mode: str = "one",
 ) -> dict[str, str]:
     """Return a form patch for one series or issue. Does not write an archive.
 
@@ -177,6 +178,8 @@ def load(
         cancel: Checked once, immediately before each request.
         issue_id: Comic Vine issue id or Nautiljon volume number when set.
         number: Preferred issue/volume number from the form when non-blank.
+        mode: Inspector form mode. ``many`` with a blank ``issue_id`` loads
+            series metadata only for Comic Vine and Nautiljon.
 
     Returns:
         ComicInfo element names mapped to strings.
@@ -188,12 +191,14 @@ def load(
     _require_nautiljon(provider, nautiljon_base_url, nautiljon_api_key)
     issue = issue_id.strip()
     preferred = _preferred_number(number, filename_stem)
+    series_only = mode == "many" and issue == ""
 
     if provider == "comicvine":
         return _load_comicvine(
             match_id,
             issue_id=issue,
             preferred_number=preferred,
+            series_only=series_only,
             api_key=api_key,
             client=client,
             cancel=cancel,
@@ -203,6 +208,7 @@ def load(
             match_id,
             issue_id=issue,
             preferred_number=preferred,
+            series_only=series_only,
             title_languages=title_languages,
             base_url=nautiljon_base_url,
             api_key=nautiljon_api_key,
@@ -233,10 +239,19 @@ def _load_comicvine(
     *,
     issue_id: str,
     preferred_number: str | None,
+    series_only: bool,
     api_key: str,
     client: httpx.Client,
     cancel: Callable[[], bool] | None,
 ) -> dict[str, str]:
+    if series_only:
+        return comicvine_load(
+            match_id,
+            api_key=api_key,
+            title_languages=(),
+            client=client,
+            cancel=cancel,
+        )
     resolved = issue_id
     if resolved == "":
         if preferred_number is None:
@@ -270,12 +285,24 @@ def _load_nautiljon(
     *,
     issue_id: str,
     preferred_number: str | None,
+    series_only: bool,
     title_languages: Sequence[str],
     base_url: str,
     api_key: str,
     client: httpx.Client,
     cancel: Callable[[], bool] | None,
 ) -> dict[str, str]:
+    if series_only:
+        return nautiljon_load(
+            match_id,
+            base_url=base_url,
+            api_key=api_key,
+            title_languages=title_languages,
+            client=client,
+            volume_number=None,
+            require_volume=False,
+            cancel=cancel,
+        )
     volume = issue_id if issue_id != "" else preferred_number
     if volume is None or volume.strip() == "":
         raise ProviderResponseError(_NJ_NOT_FOUND)

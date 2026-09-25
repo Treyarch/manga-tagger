@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   POLL_MS,
   FORM_FIELDS,
+  SHARED_FIELDS,
   candidatesOf,
   clampProvider,
   convertConfirmMessage,
@@ -179,6 +180,7 @@ describe("form", () => {
     ]);
     expect(Object.keys(many?.values ?? [])).toContain("Manga");
     expect(Object.keys(many?.values ?? [])).toContain("AgeRating");
+    expect(Object.keys(many!.values)).toEqual([...SHARED_FIELDS]);
     expect(many?.values.Series).toEqual({ value: "", mixed: true, dirty: false });
     expect(many?.values.Publisher).toEqual({
       value: "Shueisha",

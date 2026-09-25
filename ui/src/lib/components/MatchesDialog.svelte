@@ -9,6 +9,7 @@
     searching,
     busy,
     provider,
+    selectIssueEnabled = true,
     onDismiss,
     onCandidate,
     onSelectIssue,
@@ -17,6 +18,7 @@
     searching: boolean;
     busy: boolean;
     provider: string;
+    selectIssueEnabled?: boolean;
     onDismiss: () => void;
     onCandidate: (id: string) => void;
     onSelectIssue: (id: string) => void;
@@ -63,8 +65,18 @@
   }
 
   function selectIssue(): void {
-    if (selected === null || busy || searching) return;
+    if (!selectIssueEnabled || selected === null || busy || searching) return;
     onSelectIssue(selected.id);
+  }
+
+  function activateRow(id: string): void {
+    if (busy || searching) return;
+    selectRow(id);
+    if (selectIssueEnabled) {
+      onSelectIssue(id);
+      return;
+    }
+    onCandidate(id);
   }
 
   function onRowKeydown(event: KeyboardEvent): void {
@@ -89,9 +101,9 @@
 <Dialog
   title="Matches"
   size="xl"
-  leadingLabel="Select Issue"
+  leadingLabel={selectIssueEnabled ? "Select Issue" : undefined}
   leadingDisabled={searching || busy || selected === null}
-  onLeading={selectIssue}
+  onLeading={selectIssueEnabled ? selectIssue : undefined}
   confirmLabel="OK"
   confirmDisabled={searching || busy || selected === null}
   {onDismiss}
@@ -159,12 +171,7 @@
                   onclick={() => {
                     if (!busy) selectRow(candidate.id);
                   }}
-                  ondblclick={() => {
-                    if (!busy) {
-                      selectRow(candidate.id);
-                      onSelectIssue(candidate.id);
-                    }
-                  }}
+                  ondblclick={() => activateRow(candidate.id)}
                 >
                   <td
                     class="max-w-0 truncate px-2 py-1.5 text-zinc-900 dark:text-zinc-100"

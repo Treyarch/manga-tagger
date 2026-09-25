@@ -30,6 +30,7 @@ export const FORM_FIELDS = [
 
 export const SHARED_FIELDS = [
   "Series",
+  "Count",
   "Publisher",
   "LanguageISO",
   "AgeRating",
@@ -39,7 +40,6 @@ export const SHARED_FIELDS = [
   "Penciller",
   "Inker",
   "CoverArtist",
-  "Count",
 ] as const;
 
 /** Readable inspector captions for ComicInfo element keys. */
