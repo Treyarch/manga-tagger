@@ -13,6 +13,7 @@ import {
   formFromVolumes,
   groupVolumesBySeries,
   initialPageIndex,
+  issuesOf,
   jobLabel,
   folderDropRequest,
   mangaChoices,
@@ -20,6 +21,7 @@ import {
   matchCoverSrc,
   parseRootLines,
   placeAfterLibrary,
+  preferredIssueNumber,
   renamePlanLines,
   requestsPage,
   savePatch,
@@ -353,5 +355,50 @@ describe("jobs and dialogs", () => {
     ]);
     expect(candidatesOf(null)).toEqual([]);
     expect(candidatesOf({ candidates: "nope" })).toEqual([]);
+  });
+
+  it("maps issues from the job result", () => {
+    expect(
+      issuesOf({
+        issues: [
+          {
+            id: 10,
+            number: 1,
+            title: "First",
+            date: "2001-03",
+            cover: "https://example.com/1.jpg",
+            summary: "One",
+          },
+          null,
+          { number: "2" },
+        ],
+      }),
+    ).toEqual([
+      {
+        id: "10",
+        number: "1",
+        title: "First",
+        date: "2001-03",
+        cover: "https://example.com/1.jpg",
+        summary: "One",
+      },
+      {
+        id: "",
+        number: "2",
+        title: "",
+        date: "",
+        cover: "",
+        summary: "",
+      },
+    ]);
+    expect(issuesOf(null)).toEqual([]);
+    expect(issuesOf({ issues: "nope" })).toEqual([]);
+  });
+
+  it("reads preferred issue number from the form", () => {
+    expect(preferredIssueNumber(formFromVolumes([volume("/a.cbz", { number: "3" })]))).toBe(
+      "3",
+    );
+    expect(preferredIssueNumber(null)).toBe("");
   });
 });

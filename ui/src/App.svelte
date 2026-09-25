@@ -22,6 +22,7 @@
   import Dialog from "./lib/components/Dialog.svelte";
   import Inspector from "./lib/components/Inspector.svelte";
   import MatchesDialog from "./lib/components/MatchesDialog.svelte";
+  import IssuesDialog from "./lib/components/IssuesDialog.svelte";
   import Menu from "./lib/components/Menu.svelte";
   import RenameDialog from "./lib/components/RenameDialog.svelte";
   import Select from "./lib/components/Select.svelte";
@@ -46,8 +47,10 @@
     formIsDirty,
     formOf,
     isBusy,
+    issuesOf,
     jobLabel,
     placeAfterLibrary,
+    preferredIssueNumber,
     renamePlanLines,
     savePatch,
     scanRootLines,
@@ -60,6 +63,7 @@
     volumesForShelf,
     type Candidate,
     type InspectorForm,
+    type IssueCandidate,
     type Job,
     type Place,
     type Selection,
@@ -79,6 +83,8 @@
   let provider = $state("mangadex");
   let headerJob = $state<Job | null>(null);
   let candidates = $state<Candidate[]>([]);
+  let issues = $state<IssueCandidate[]>([]);
+  let issuesSeries = $state<Candidate | null>(null);
   let inspectorLines = $state<string[]>([]);
   let folderError = $state("");
   let dragDepth = $state(0);
@@ -91,6 +97,7 @@
   let renameError = $state("");
   let activeId = $state<string | null>(null);
   let newestSearchId = $state<string | null>(null);
+  let newestIssuesId = $state<string | null>(null);
   let newestLoadId = $state<string | null>(null);
   let loadSelectionKey = $state("");
   let planToken = 0;
@@ -113,11 +120,16 @@
   const searching = $derived(
     headerJob !== null && isBusy(headerJob) && headerJob.name === "Search",
   );
+  const listingIssues = $derived(
+    headerJob !== null && isBusy(headerJob) && headerJob.name === "Issues",
+  );
   const matchesOpen = $derived(searching || candidates.length > 0);
+  const issuesOpen = $derived(listingIssues || issues.length > 0);
   const headerChromeJob = $derived(
     headerJob !== null &&
       isBusy(headerJob) &&
       headerJob.name !== "Search" &&
+      headerJob.name !== "Issues" &&
       headerJob.name !== "Load"
       ? headerJob
       : null,
@@ -211,12 +223,33 @@
       if (job.id !== newestSearchId) return;
       if (job.state === "failed" || job.state === "cancelled") {
         candidates = [];
+        issues = [];
+        issuesSeries = null;
         if (job.state === "failed") toastFrom(job);
         return;
       }
       if (job.state !== "succeeded") return;
       candidates = candidatesOf(job.result);
       toastFrom(job);
+      return;
+    }
+    if (job.name === "Issues") {
+      if (job.id !== newestIssuesId) return;
+      if (job.state === "failed" || job.state === "cancelled") {
+        issues = [];
+        issuesSeries = null;
+        if (job.state === "failed") toastFrom(job);
+        return;
+      }
+      if (job.state !== "succeeded") return;
+      const found = issuesOf(job.result);
+      if (found.length === 0) {
+        issues = [];
+        issuesSeries = null;
+        toastFrom(job);
+        return;
+      }
+      issues = found;
       return;
     }
     if (job.name === "Load") {
@@ -229,6 +262,8 @@
       const next = formOf(job.result);
       if (next) form = next;
       candidates = [];
+      issues = [];
+      issuesSeries = null;
       toastFrom(job);
       return;
     }
@@ -269,6 +304,8 @@
     selectedPlace = path === selectedPlace ? null : path;
     selection = { paths: [], anchor: null };
     candidates = [];
+    issues = [];
+    issuesSeries = null;
     rebuildForm();
   }
 
@@ -280,6 +317,8 @@
     });
     if (selection.anchor !== previous) {
       candidates = [];
+      issues = [];
+      issuesSeries = null;
     }
     rebuildForm();
   }
@@ -292,6 +331,8 @@
   async function scrape() {
     if (anchor === null || busy) return;
     candidates = [];
+    issues = [];
+    issuesSeries = null;
     const job = await postJson<Job>("/api/jobs/search", {
       provider,
       series: seriesForSearch(form),
@@ -310,6 +351,35 @@
       filename_stem: filenameStem(anchor.name),
       mode: form.mode,
       form,
+    });
+    newestLoadId = job.id;
+    watch(job);
+  }
+
+  async function selectIssue(id: string) {
+    if (busy) return;
+    const series = candidates.find((item) => item.id === id);
+    if (series === undefined) return;
+    issues = [];
+    issuesSeries = series;
+    const job = await postJson<Job>("/api/jobs/issues", {
+      provider,
+      match_id: id,
+    });
+    newestIssuesId = job.id;
+    watch(job);
+  }
+
+  async function chooseIssue(id: string) {
+    if (anchor === null || form === null || issuesSeries === null || busy) return;
+    loadSelectionKey = selectionKey(selection);
+    const job = await postJson<Job>("/api/jobs/load", {
+      provider,
+      match_id: issuesSeries.id,
+      filename_stem: filenameStem(anchor.name),
+      mode: form.mode,
+      form,
+      issue_id: id,
     });
     newestLoadId = job.id;
     watch(job);
@@ -394,8 +464,16 @@
   }
 
   async function dismissMatches() {
-    if (searching) await cancelJob();
+    if (searching || listingIssues) await cancelJob();
     candidates = [];
+    issues = [];
+    issuesSeries = null;
+  }
+
+  async function dismissIssues() {
+    if (listingIssues) await cancelJob();
+    issues = [];
+    issuesSeries = null;
   }
 
   async function cancelJob() {
@@ -751,6 +829,18 @@
     {provider}
     onDismiss={dismissMatches}
     onCandidate={chooseCandidate}
+    onSelectIssue={selectIssue}
+  />
+{/if}
+{#if issuesOpen && issuesSeries !== null}
+  <IssuesDialog
+    series={issuesSeries}
+    {issues}
+    loading={listingIssues}
+    {busy}
+    preferredNumber={preferredIssueNumber(form)}
+    onDismiss={dismissIssues}
+    onIssue={chooseIssue}
   />
 {/if}
 {#if settingsOpen}

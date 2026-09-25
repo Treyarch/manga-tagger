@@ -18,6 +18,7 @@ from manga_tagger.api.models import (
     ConfigPut,
     ConvertRequest,
     FolderDialogModel,
+    IssuesRequest,
     JobModel,
     LibraryResponse,
     LoadRequest,
@@ -49,7 +50,7 @@ from manga_tagger.jobs import (
     JobNotFoundError,
     JobRunner,
 )
-from manga_tagger.providers import build_query, load, parse_number, search
+from manga_tagger.providers import build_query, list_issues, load, parse_number, search
 from manga_tagger.providers.remote_cover import RemoteCoverError, remote_cover_bytes
 from manga_tagger.shell import (
     NoThumbnailError,
@@ -62,6 +63,7 @@ from manga_tagger.shell import (
     preview_rename,
     read_page_bytes,
     run_convert,
+    run_list_issues,
     run_load,
     run_rename,
     run_save,
@@ -97,6 +99,7 @@ class Services:
     rename_in_directory: Callable[..., object]
     convert_cbr: Callable[..., object]
     search: Callable[..., object]
+    list_issues: Callable[..., object]
     load: Callable[..., object]
     build_query: Callable[..., object]
     parse_number: Callable[..., object]
@@ -133,6 +136,7 @@ def default_services() -> Services:
         rename_in_directory=rename_in_directory,
         convert_cbr=convert_cbr,
         search=search,
+        list_issues=list_issues,
         load=load,
         build_query=build_query,
         parse_number=parse_number,
@@ -400,6 +404,27 @@ def _register_routes(app: FastAPI) -> None:
 
         return JobModel.from_job(state.runner.start("Search", fn))
 
+    @app.post("/api/jobs/issues", response_model=JobModel)
+    def post_issues(body: IssuesRequest) -> JobModel:
+        state = _state(app)
+
+        def fn(cancel, progress):
+            config = state.config
+            return run_list_issues(
+                provider=body.provider,
+                match_id=body.match_id,
+                title_languages=list(config.title_languages),
+                api_key=config.comicvine_api_key,
+                nautiljon_base_url=config.nautiljon_base_url,
+                nautiljon_api_key=config.nautiljon_api_key,
+                list_issues=state.services.list_issues,
+                client_factory=state.services.client_factory,
+                cancel=cancel,
+                progress=progress,
+            )
+
+        return JobModel.from_job(state.runner.start("Issues", fn))
+
     @app.post("/api/jobs/load", response_model=JobModel)
     def post_load(body: LoadRequest) -> JobModel:
         state = _state(app)
@@ -420,6 +445,7 @@ def _register_routes(app: FastAPI) -> None:
                 client_factory=state.services.client_factory,
                 cancel=cancel,
                 progress=progress,
+                issue_id=body.issue_id,
             )
 
         return JobModel.from_job(state.runner.start("Load", fn))

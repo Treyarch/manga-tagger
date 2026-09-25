@@ -1,4 +1,4 @@
-"""Nautiljon wrapper search and series load."""
+"""Nautiljon wrapper search, volume list, and series load."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ import httpx
 
 from manga_tagger.providers.errors import ProviderResponseError
 from manga_tagger.providers.http import send
-from manga_tagger.providers.service_types import Candidate
+from manga_tagger.providers.service_types import Candidate, IssueCandidate
 from manga_tagger.providers.text import (
     count_text,
     first_url,
@@ -22,10 +22,13 @@ from manga_tagger.providers.text import (
 )
 
 _SLUG_PATH = re.compile(r"/mangas/([^/]+)\.html(?:$|\?)")
+_VOLUME_PATH = re.compile(r"/volume-(\d+),\d+\.html(?:$|\?)", re.I)
+_LEGACY_VOLUME_PATH = re.compile(r"/mangas/volumes/[^/]+,(\d+)\.html(?:$|\?)", re.I)
 _ROLE_SUFFIX = re.compile(r"\s*\([^)]*\)\s*$")
 _ORIGINE_YEAR = re.compile(r"\b(1[0-9]{3}|20[0-9]{2})\b")
 _VF_DATE = re.compile(r"^(\d{1,2})/(\d{1,2})/(\d{4})$")
 _PROVIDER = "nautiljon"
+_NOT_FOUND = "nautiljon: could not find an issue"
 
 
 def search(
@@ -65,6 +68,95 @@ def search(
     return candidates
 
 
+def list_issues(
+    match_id: str,
+    *,
+    base_url: str,
+    api_key: str,
+    client: httpx.Client,
+    cancel: Callable[[], bool] | None = None,
+) -> list[IssueCandidate]:
+    """Return tankōbon rows from series ``volumeUrls``, enriched per volume."""
+    body = send(
+        client,
+        _PROVIDER,
+        "GET",
+        _join(base_url, f"/v1/series/{quote(match_id, safe='+')}"),
+        extra_headers={"X-Api-Key": api_key},
+        cancel=cancel,
+    )
+    if not isinstance(body, dict):
+        raise ProviderResponseError("nautiljon: response was not an object")
+    urls = body.get("volumeUrls")
+    if not isinstance(urls, list):
+        return []
+    numbers: list[str] = []
+    seen: set[str] = set()
+    for item in urls:
+        number = _volume_number_from_url(item)
+        if number is None or number in seen:
+            continue
+        seen.add(number)
+        numbers.append(number)
+    issues: list[IssueCandidate] = []
+    for number in numbers:
+        title = f"Tome {number}"
+        date = ""
+        summary = ""
+        cover = ""
+        volume = _volume_body(
+            match_id,
+            number,
+            base_url=base_url,
+            api_key=api_key,
+            client=client,
+            cancel=cancel,
+            require=False,
+        )
+        if volume is not None:
+            date = _volume_date_label(volume.get("releaseDateVf"))
+            summary = plain_summary(volume.get("description")) or ""
+            cover = _volume_cover(volume.get("cover"))
+        issues.append(
+            IssueCandidate(
+                id=number,
+                number=number,
+                title=title,
+                date=date,
+                cover=cover,
+                summary=summary,
+            )
+        )
+    return issues
+
+
+def _volume_date_label(value: object) -> str:
+    text = nonblank(value)
+    if text is None:
+        return ""
+    match = _VF_DATE.fullmatch(text)
+    if match is None:
+        return ""
+    _day, month, year = match.groups()
+    return f"{int(year):04d}-{int(month):02d}"
+
+
+def _volume_cover(value: object) -> str:
+    cover = first_url(value)
+    if cover and not cover.startswith("https://"):
+        return ""
+    return cover
+
+
+def _rating_text(value: object) -> str | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        text = f"{value:.2f}".rstrip("0").rstrip(".")
+        return text or None
+    return nonblank(value)
 def load(
     match_id: str,
     *,
@@ -73,9 +165,14 @@ def load(
     title_languages: Sequence[str],
     client: httpx.Client,
     volume_number: str | None = None,
+    require_volume: bool = False,
     cancel: Callable[[], bool] | None = None,
 ) -> dict[str, str]:
-    """Return a ComicInfo patch for one Nautiljon series."""
+    """Return a ComicInfo patch for one Nautiljon series.
+
+    When ``require_volume`` is true, a missing or 404 volume raises
+    ``ProviderResponseError``. When false, a volume 404 leaves the series patch.
+    """
     body = send(
         client,
         _PROVIDER,
@@ -127,12 +224,18 @@ def load(
         api_key=api_key,
         client=client,
         cancel=cancel,
+        require=require_volume,
     )
     if volume is not None:
         summary = plain_summary(volume.get("description"))
         if summary is not None:
             patch["Summary"] = summary
         _apply_vf_date(patch, volume.get("releaseDateVf"))
+        put(patch, "CommunityRating", _rating_text(volume.get("rating")))
+        if volume_number is not None:
+            patch["Number"] = volume_number
+    elif require_volume:
+        raise ProviderResponseError(_NOT_FOUND)
     return patch
 
 
@@ -144,11 +247,16 @@ def _volume_body(
     api_key: str,
     client: httpx.Client,
     cancel: Callable[[], bool] | None,
+    require: bool,
 ) -> dict[str, object] | None:
     if volume_number is None or not volume_number.isdigit():
+        if require:
+            raise ProviderResponseError(_NOT_FOUND)
         return None
     number = int(volume_number)
     if number < 1:
+        if require:
+            raise ProviderResponseError(_NOT_FOUND)
         return None
     try:
         body = send(
@@ -164,11 +272,26 @@ def _volume_body(
         )
     except ProviderResponseError as exc:
         if str(exc) == "nautiljon: HTTP 404":
+            if require:
+                raise ProviderResponseError(_NOT_FOUND) from exc
             return None
         raise
     if not isinstance(body, dict):
         raise ProviderResponseError("nautiljon: volume response was not an object")
     return body
+
+
+def _volume_number_from_url(value: object) -> str | None:
+    text = nonblank(value)
+    if text is None:
+        return None
+    path = urlparse(text).path
+    match = _VOLUME_PATH.search(path)
+    if match is None and "/volume-" not in path.casefold():
+        match = _LEGACY_VOLUME_PATH.search(path)
+    if match is None:
+        return None
+    return str(int(match.group(1)))
 
 
 def _candidate(item: object) -> Candidate | None:

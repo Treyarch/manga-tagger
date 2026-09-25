@@ -109,6 +109,13 @@ class SearchRequest(BaseModel):
     filename_stem: str
 
 
+class IssuesRequest(BaseModel):
+    """Body for ``POST /api/jobs/issues``."""
+
+    provider: str
+    match_id: str
+
+
 class LoadRequest(BaseModel):
     """Body for ``POST /api/jobs/load``."""
 
@@ -117,6 +124,7 @@ class LoadRequest(BaseModel):
     filename_stem: str
     mode: str
     form: dict[str, Any]
+    issue_id: str = ""
 
 
 class SaveRequest(BaseModel):

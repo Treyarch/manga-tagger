@@ -355,6 +355,57 @@ def test_search_and_load_jobs(tmp_path: Path) -> None:
     assert writes == []
 
 
+def test_issues_job(tmp_path: Path) -> None:
+    def list_issues(*_args, **_kwargs):
+        class Hit:
+            id = "10"
+            number = "1"
+            title = "First"
+            date = "2001-03"
+            cover = ""
+            summary = "One"
+
+        return [Hit()]
+
+    app = _app(tmp_path, list_issues=list_issues, roots=["/books"])
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/jobs/issues",
+            json={"provider": "comicvine", "match_id": "12345"},
+        )
+    assert response.status_code == 200
+    assert response.json()["state"] == "succeeded"
+    assert response.json()["name"] == "Issues"
+    assert response.json()["result"]["issues"][0]["id"] == "10"
+
+
+def test_load_job_passes_issue_id(tmp_path: Path) -> None:
+    captured: dict[str, object] = {}
+
+    def load(*_args, **kwargs):
+        captured.update(kwargs)
+        return {"Series": "Claymore", "Number": "1"}
+
+    app = _app(tmp_path, load=load, roots=["/books"])
+    form = form_from_volumes([_volume("/books/a.cbz", series="A", number="7")])
+    with TestClient(app) as client:
+        loaded = client.post(
+            "/api/jobs/load",
+            json={
+                "provider": "comicvine",
+                "match_id": "12345",
+                "filename_stem": "Claymore v02",
+                "mode": "one",
+                "form": form,
+                "issue_id": "99",
+            },
+        )
+    assert loaded.status_code == 200
+    assert loaded.json()["state"] == "succeeded"
+    assert captured["issue_id"] == "99"
+    assert captured["number"] == "7"
+
+
 def test_blank_comicvine_key_sends_no_request(tmp_path: Path) -> None:
     seen: list[httpx.Request] = []
 

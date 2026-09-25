@@ -1,46 +1,66 @@
 <script lang="ts">
-  import { Book, LoaderCircle, ScanSearch } from "lucide-svelte";
+  import { Book, ListOrdered, LoaderCircle } from "lucide-svelte";
   import Dialog from "./Dialog.svelte";
-  import type { Candidate } from "../library";
+  import type { Candidate, IssueCandidate } from "../library";
   import { matchCoverSrc } from "../library";
 
   let {
-    candidates,
-    searching,
+    series,
+    issues,
+    loading,
     busy,
-    provider,
+    preferredNumber,
     onDismiss,
-    onCandidate,
-    onSelectIssue,
+    onIssue,
   }: {
-    candidates: Candidate[];
-    searching: boolean;
+    series: Candidate;
+    issues: IssueCandidate[];
+    loading: boolean;
     busy: boolean;
-    provider: string;
+    preferredNumber: string;
     onDismiss: () => void;
-    onCandidate: (id: string) => void;
-    onSelectIssue: (id: string) => void;
+    onIssue: (id: string) => void;
   } = $props();
 
   let selectedId = $state("");
   let failedCovers = $state(new Set<string>());
 
-  const creditHeading = $derived(
-    provider === "comicvine" ? "Publisher" : "Author",
+  const title = $derived(
+    series.year.trim() !== ""
+      ? `${series.title} (${series.year}) - Select Issue`
+      : `${series.title} - Select Issue`,
   );
   const selected = $derived(
-    candidates.find((item) => item.id === selectedId) ?? candidates[0] ?? null,
+    issues.find((item) => item.id === selectedId) ?? issues[0] ?? null,
+  );
+  const previewCover = $derived(
+    selected !== null && selected.cover.trim() !== ""
+      ? selected.cover
+      : series.cover,
   );
 
   $effect(() => {
-    if (searching || candidates.length === 0) {
+    if (loading || issues.length === 0) {
       selectedId = "";
       return;
     }
-    if (!candidates.some((item) => item.id === selectedId)) {
-      selectedId = candidates[0].id;
-    }
+    if (issues.some((item) => item.id === selectedId)) return;
+    const preferred = preferredNumber.trim();
+    const match =
+      preferred !== ""
+        ? issues.find((item) => normalizeNumber(item.number) === normalizeNumber(preferred))
+        : undefined;
+    selectedId = (match ?? issues[0]).id;
   });
+
+  function normalizeNumber(value: string): string {
+    const text = value.trim();
+    if (text.includes(".")) {
+      const [whole, frac] = text.split(".", 2);
+      return `${whole.replace(/^0+(?=\d)/, "") || "0"}.${frac}`;
+    }
+    return text.replace(/^0+(?=\d)/, "") || "0";
+  }
 
   function coverFailed(url: string): boolean {
     return failedCovers.has(url);
@@ -58,26 +78,21 @@
   }
 
   function confirmSelected(): void {
-    if (selected === null || busy || searching) return;
-    onCandidate(selected.id);
-  }
-
-  function selectIssue(): void {
-    if (selected === null || busy || searching) return;
-    onSelectIssue(selected.id);
+    if (selected === null || busy || loading) return;
+    onIssue(selected.id);
   }
 
   function onRowKeydown(event: KeyboardEvent): void {
-    if (candidates.length === 0 || searching) return;
-    const current = selected?.id ?? candidates[0].id;
-    const index = candidates.findIndex((item) => item.id === current);
+    if (issues.length === 0 || loading) return;
+    const current = selected?.id ?? issues[0].id;
+    const index = issues.findIndex((item) => item.id === current);
     if (event.key === "ArrowDown") {
       event.preventDefault();
-      const next = candidates[Math.min(index + 1, candidates.length - 1)];
+      const next = issues[Math.min(index + 1, issues.length - 1)];
       selectedId = next.id;
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
-      const prev = candidates[Math.max(index - 1, 0)];
+      const prev = issues[Math.max(index - 1, 0)];
       selectedId = prev.id;
     } else if (event.key === "Enter") {
       event.preventDefault();
@@ -87,27 +102,24 @@
 </script>
 
 <Dialog
-  title="Matches"
+  {title}
   size="xl"
-  leadingLabel="Select Issue"
-  leadingDisabled={searching || busy || selected === null}
-  onLeading={selectIssue}
   confirmLabel="OK"
-  confirmDisabled={searching || busy || selected === null}
+  confirmDisabled={loading || busy || selected === null}
   {onDismiss}
   onConfirm={confirmSelected}
 >
   {#snippet icon()}
-    <ScanSearch size={20} />
+    <ListOrdered size={20} />
   {/snippet}
-  {#if searching}
+  {#if loading}
     <div
       class="flex items-center justify-center gap-2 py-8 text-sm text-zinc-500 dark:text-zinc-400"
       aria-busy="true"
       role="status"
     >
       <LoaderCircle size={20} class="animate-spin" aria-hidden="true" />
-      <span>Searching…</span>
+      <span>Loading issues…</span>
     </div>
   {:else}
     <div class="grid gap-3 sm:grid-cols-[minmax(10rem,14rem)_minmax(0,1fr)]">
@@ -115,13 +127,13 @@
         class="flex aspect-[2/3] max-h-[28rem] items-center justify-center overflow-hidden rounded-sm bg-zinc-100 text-zinc-400 dark:bg-zinc-700 dark:text-zinc-500"
         aria-hidden="true"
       >
-        {#if selected !== null && selected.cover.trim() !== "" && !coverFailed(selected.cover)}
+        {#if previewCover.trim() !== "" && !coverFailed(previewCover)}
           <img
-            src={matchCoverSrc(selected.cover)}
+            src={matchCoverSrc(previewCover)}
             alt=""
             referrerpolicy="no-referrer"
             class="h-full w-full object-contain"
-            onerror={() => markCoverFailed(selected.cover)}
+            onerror={() => markCoverFailed(previewCover)}
           />
         {:else}
           <Book size={40} />
@@ -131,7 +143,7 @@
         <div
           class="max-h-64 overflow-auto rounded-sm border border-zinc-200 dark:border-zinc-600"
           role="listbox"
-          aria-label="Matches"
+          aria-label="Issues"
           tabindex="0"
           onkeydown={onRowKeydown}
         >
@@ -140,45 +152,40 @@
               class="sticky top-0 bg-white text-xs text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
             >
               <tr>
-                <th class="px-2 py-1.5 font-medium">Series</th>
-                <th class="w-16 px-2 py-1.5 font-medium">Year</th>
-                <th class="w-16 px-2 py-1.5 font-medium">Issues</th>
-                <th class="px-2 py-1.5 font-medium">{creditHeading}</th>
+                <th class="w-20 px-2 py-1.5 font-medium">Issue</th>
+                <th class="w-24 px-2 py-1.5 font-medium">Date</th>
+                <th class="px-2 py-1.5 font-medium">Title</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
-              {#each candidates as candidate (candidate.id)}
+              {#each issues as issue (issue.id)}
                 <tr
                   role="option"
-                  aria-selected={selected?.id === candidate.id}
-                  class="cursor-pointer {selected?.id === candidate.id
+                  aria-selected={selected?.id === issue.id}
+                  class="cursor-pointer {selected?.id === issue.id
                     ? 'bg-blue-600/10 dark:bg-blue-500/15'
                     : 'hover:bg-blue-600/10 dark:hover:bg-blue-500/15'} {busy
                     ? 'opacity-40'
                     : ''}"
                   onclick={() => {
-                    if (!busy) selectRow(candidate.id);
+                    if (!busy) selectRow(issue.id);
                   }}
                   ondblclick={() => {
                     if (!busy) {
-                      selectRow(candidate.id);
-                      onSelectIssue(candidate.id);
+                      selectRow(issue.id);
+                      onIssue(issue.id);
                     }
                   }}
                 >
-                  <td
-                    class="max-w-0 truncate px-2 py-1.5 text-zinc-900 dark:text-zinc-100"
-                    >{candidate.title}</td
+                  <td class="px-2 py-1.5 text-zinc-900 dark:text-zinc-100"
+                    >{issue.number}</td
                   >
                   <td class="px-2 py-1.5 text-zinc-500 dark:text-zinc-400"
-                    >{candidate.year}</td
-                  >
-                  <td class="px-2 py-1.5 text-zinc-500 dark:text-zinc-400"
-                    >{candidate.count}</td
+                    >{issue.date}</td
                   >
                   <td
                     class="max-w-0 truncate px-2 py-1.5 text-zinc-500 dark:text-zinc-400"
-                    >{candidate.credit}</td
+                    >{issue.title}</td
                   >
                 </tr>
               {/each}

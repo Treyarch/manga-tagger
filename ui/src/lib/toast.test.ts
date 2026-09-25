@@ -86,6 +86,26 @@ describe("jobToastMessage", () => {
     ).toEqual({ message: "boom", tone: "error" });
   });
 
+  it("summarizes issues", () => {
+    expect(
+      jobToastMessage(
+        job({ name: "Issues", state: "succeeded", result: { issues: [] } }),
+      ),
+    ).toEqual({ message: "No issues available.", tone: "ok" });
+    expect(
+      jobToastMessage(
+        job({
+          name: "Issues",
+          state: "succeeded",
+          result: { issues: [{ id: "1", number: "1" }] },
+        }),
+      ),
+    ).toBeNull();
+    expect(
+      jobToastMessage(job({ name: "Issues", state: "failed" })),
+    ).toEqual({ message: "Issues failed.", tone: "error" });
+  });
+
   it("counts save rename and convert entries", () => {
     expect(
       jobToastMessage(

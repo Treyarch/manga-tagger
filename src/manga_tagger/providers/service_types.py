@@ -1,4 +1,4 @@
-"""Shared candidate type so provider modules do not import the service."""
+"""Shared candidate types so provider modules do not import the service."""
 
 from dataclasses import dataclass
 
@@ -25,3 +25,24 @@ class Candidate:
     count: str
     summary: str
     cover: str
+
+
+@dataclass(frozen=True)
+class IssueCandidate:
+    """One issue or tankōbon row for Select Issue.
+
+    Attributes:
+        id: Comic Vine issue id, or Nautiljon volume number as text.
+        number: Display and match key.
+        title: Issue or volume title, or ``""``.
+        date: ``YYYY-MM`` or year, or ``""``.
+        cover: Absolute HTTPS cover URL, or ``""``.
+        summary: Plain synopsis, or ``""``.
+    """
+
+    id: str
+    number: str
+    title: str
+    date: str
+    cover: str
+    summary: str

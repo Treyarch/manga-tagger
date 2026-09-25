@@ -3,6 +3,7 @@
 import {
   candidatesOf,
   entriesOf,
+  issuesOf,
   type Job,
   type WorkEntry,
 } from "./library";
@@ -111,6 +112,14 @@ export function jobToastMessage(job: Job): JobToast | null {
       message: n === 0 ? "No matches." : `Found ${n} matches.`,
       tone: "ok",
     };
+  }
+
+  if (job.name === "Issues") {
+    if (job.state === "failed") return failedToast("Issues failed.", job);
+    if (issuesOf(job.result).length === 0) {
+      return { message: "No issues available.", tone: "ok" };
+    }
+    return null;
   }
 
   if (job.name === "Load") {

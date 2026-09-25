@@ -7,12 +7,14 @@ import pytest
 
 from manga_tagger.providers import (
     Candidate,
+    IssueCandidate,
     ProviderCancelledError,
     ProviderRateLimitError,
     ProviderResponseError,
     ProviderTimeoutError,
     ProviderUnavailableError,
     build_query,
+    list_issues,
     load,
     parse_number,
     search,
@@ -23,7 +25,6 @@ _FORBIDDEN = (
     "Volume",
     "Pages",
     "PageCount",
-    "CommunityRating",
     "Notes",
 )
 
@@ -746,12 +747,13 @@ def test_comicvine_load_roles_and_summary() -> None:
         "error": "OK",
         "status_code": 1,
         "results": {
-            "name": "Sandman",
-            "start_year": 1989,
-            "publisher": {"name": "DC Comics"},
+            "id": 99,
+            "issue_number": "1",
+            "name": "The Sleep of the Just",
             "description": "<b>Plot</b>",
-            "deck": "Deck text",
-            "site_detail_url": "https://comicvine.gamespot.com/sandman/4050-12345/",
+            "cover_date": "1989-01-01",
+            "site_detail_url": "https://comicvine.gamespot.com/sandman/4000-99/",
+            "volume": {"id": 12345, "name": "Sandman"},
             "person_credits": [
                 {"name": "Alan Moore", "role": "writer, artist"},
                 {"name": "Dave Gibbons", "role": "cover"},
@@ -769,33 +771,32 @@ def test_comicvine_load_roles_and_summary() -> None:
             title_languages=["fr", "en"],
             client=client,
             api_key="secret",
+            issue_id="99",
         )
-    _assert_patch(patch)
+    assert all(isinstance(value, str) and value for value in patch.values())
+    for key in _FORBIDDEN:
+        assert key not in patch
     assert patch["Series"] == "Sandman"
-    assert patch["Title"] == "Sandman"
+    assert patch["Title"] == "The Sleep of the Just"
+    assert patch["Number"] == "1"
     assert patch["Manga"] == "No"
     assert "LanguageISO" not in patch
-    assert patch["Publisher"] == "DC Comics"
+    assert "Publisher" not in patch
     assert patch["Summary"] == "Plot"
-    assert "Deck" not in patch["Summary"]
     assert patch["Year"] == "1989"
-    assert "Month" not in patch
-    assert "Day" not in patch
+    assert patch["Month"] == "1"
+    assert patch["Day"] == "1"
     assert patch["Writer"] == "Alan Moore"
     assert patch["Penciller"] == "Alan Moore"
     assert patch["CoverArtist"] == "Dave Gibbons, Kim"
     assert "Alan Moore" not in patch["CoverArtist"]
     assert patch["Inker"] == "Joe"
-    assert patch["Web"] == "https://comicvine.gamespot.com/sandman/4050-12345/"
-    assert "Number" not in patch
+    assert patch["Web"] == "https://comicvine.gamespot.com/sandman/4000-99/"
     assert "Volume" not in patch
     request = seen[0]
-    assert _bare(request) == "https://comicvine.gamespot.com/api/volume/4050-12345/"
+    assert _bare(request) == "https://comicvine.gamespot.com/api/issue/4000-99/"
     assert request.url.params.get("api_key") == "secret"
     assert request.url.params.get("format") == "json"
-    assert request.url.params.get("field_list") == (
-        "name,start_year,publisher,description,deck,site_detail_url,person_credits"
-    )
     assert request.headers["user-agent"] == "manga-tagger"
 
 
@@ -856,10 +857,12 @@ def test_comicvine_search_deck_and_year_string() -> None:
         "error": "OK",
         "status_code": 1,
         "results": {
+            "id": 99,
+            "issue_number": "1",
             "name": "Sandman",
             "description": "<p></p>",
-            "deck": "Deck text",
-            "start_year": " 2001 ",
+            "volume": {"name": "Sandman"},
+            "cover_date": "2001-06",
         },
     }
     client, _seen = _client(deck)
@@ -871,14 +874,22 @@ def test_comicvine_search_deck_and_year_string() -> None:
             title_languages=["en"],
             client=client,
             api_key="secret",
+            issue_id="99",
         )
-    assert patch["Summary"] == "Deck text"
+    assert "Summary" not in patch
     assert patch["Year"] == "2001"
+    assert patch["Month"] == "6"
 
     blank_year = {
         "error": "OK",
         "status_code": 1,
-        "results": {"name": "Sandman", "start_year": "  "},
+        "results": {
+            "id": 99,
+            "issue_number": "1",
+            "name": "Sandman",
+            "volume": {"name": "Sandman"},
+            "cover_date": "  ",
+        },
     }
     client, _seen = _client(blank_year)
     with client:
@@ -889,6 +900,7 @@ def test_comicvine_search_deck_and_year_string() -> None:
             title_languages=["en"],
             client=client,
             api_key="secret",
+            issue_id="99",
         )
     assert "Year" not in patch
 
@@ -916,9 +928,19 @@ def test_comicvine_blank_key_and_api_error() -> None:
                     title_languages=["en"],
                     client=client,
                     api_key=api_key,
+                    issue_id="99",
                 )
     client, seen = _client(
-        {"error": "OK", "status_code": 2, "results": {"name": "Sandman"}}
+        {
+            "error": "OK",
+            "status_code": 2,
+            "results": {
+                "id": 99,
+                "issue_number": "1",
+                "name": "Sandman",
+                "volume": {"name": "Sandman"},
+            },
+        }
     )
     with client:
         with pytest.raises(ProviderResponseError, match="comicvine"):
@@ -929,6 +951,7 @@ def test_comicvine_blank_key_and_api_error() -> None:
                 title_languages=["en"],
                 client=client,
                 api_key="secret",
+                issue_id="99",
             )
     assert len(seen) == 1
     client, _seen = _client(
@@ -1154,6 +1177,8 @@ def test_nautiljon_load_french_credits_and_volume() -> None:
     }
     volume = {
         "number": 1,
+        "cover": "https://www.nautiljon.com/images/manga_volumes/00/87/3278.webp",
+        "rating": 8.45,
         "releaseDateVf": "06/10/2004",
         "description": "Volume <b>one</b> résumé",
     }
@@ -1195,11 +1220,12 @@ def test_nautiljon_load_french_credits_and_volume() -> None:
     assert patch["Month"] == "10"
     assert patch["Day"] == "6"
     assert patch["Number"] == "1"
+    assert patch["CommunityRating"] == "8.45"
     assert "Volume" not in patch
     _assert_patch(patch)
 
 
-def test_nautiljon_volume_404_keeps_series_summary() -> None:
+def test_nautiljon_volume_404_raises_on_resolve() -> None:
     series = {
         "sourceUrl": "https://www.nautiljon.com/mangas/berserk.html",
         "title": "Berserk",
@@ -1216,44 +1242,31 @@ def test_nautiljon_volume_404_keeps_series_summary() -> None:
 
     client = httpx.Client(transport=httpx.MockTransport(handler))
     with client:
-        patch = load(
-            "nautiljon",
-            "berserk",
-            filename_stem="Berserk v01",
-            title_languages=["fr"],
-            client=client,
-            nautiljon_base_url="https://nj.example",
-            nautiljon_api_key="secret",
-        )
+        with pytest.raises(ProviderResponseError, match="could not find an issue"):
+            load(
+                "nautiljon",
+                "berserk",
+                filename_stem="Berserk v01",
+                title_languages=["fr"],
+                client=client,
+                nautiljon_base_url="https://nj.example",
+                nautiljon_api_key="secret",
+            )
     assert len(seen) == 2
-    assert patch["Summary"] == "Series only"
-    assert patch["Number"] == "1"
 
 
-def test_nautiljon_ja_title_and_no_volume_without_number() -> None:
-    series = {
-        "title": "Berserk",
-        "infos": {"titreOriginal": "ベルセルク", "origine": "Japon - 1989"},
-        "synopsis": "Only series",
-        "sourceUrl": "https://www.nautiljon.com/mangas/berserk.html",
-    }
-    client, seen = _client(series)
-    with client:
-        patch = load(
-            "nautiljon",
-            "berserk",
-            filename_stem="Berserk",
-            title_languages=["ja", "fr"],
-            client=client,
-            nautiljon_base_url="https://nj.example",
-            nautiljon_api_key="secret",
-        )
-    assert len(seen) == 1
-    assert patch["Series"] == "ベルセルク"
-    assert patch["LanguageISO"] == "ja"
-    assert patch["Year"] == "1989"
-    assert "Number" not in patch
-
+def test_nautiljon_missing_number_raises() -> None:
+    with _forbid_client() as client:
+        with pytest.raises(ProviderResponseError, match="could not find an issue"):
+            load(
+                "nautiljon",
+                "berserk",
+                filename_stem="Berserk",
+                title_languages=["ja", "fr"],
+                client=client,
+                nautiljon_base_url="https://nj.example",
+                nautiljon_api_key="secret",
+            )
 
 def test_nautiljon_blank_settings_send_nothing() -> None:
     with _forbid_client() as client:
@@ -1281,6 +1294,231 @@ def test_nautiljon_blank_settings_send_nothing() -> None:
                 nautiljon_api_key="   ",
             )
 
+
+def test_list_issues_unsupported_providers_send_nothing() -> None:
+    with _forbid_client() as client:
+        for provider in ("mangadex", "anilist", "jikan"):
+            assert (
+                list_issues(
+                    provider,
+                    MD_ID if provider == "mangadex" else "42",
+                    title_languages=["fr"],
+                    client=client,
+                )
+                == []
+            )
+
+
+def test_comicvine_list_issues_and_load_by_number() -> None:
+    page = {
+        "error": "OK",
+        "status_code": 1,
+        "number_of_total_results": 2,
+        "results": [
+            {
+                "id": 10,
+                "issue_number": "01",
+                "name": "First",
+                "cover_date": "2001-03-15",
+                "description": "<p>One</p>",
+                "image": {"super_url": "https://example.com/1.jpg"},
+            },
+            {
+                "id": 11,
+                "issue_number": "2",
+                "name": "Second",
+                "cover_date": "2001",
+                "description": "",
+                "image": {},
+            },
+        ],
+    }
+    issue = {
+        "error": "OK",
+        "status_code": 1,
+        "results": {
+            "id": 10,
+            "issue_number": "1",
+            "name": "First",
+            "description": "<p>One</p>",
+            "cover_date": "2001-03-15",
+            "site_detail_url": "https://comicvine.gamespot.com/i/4000-10/",
+            "volume": {"name": "Claymore"},
+            "person_credits": [],
+        },
+    }
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if "/api/issues/" in str(request.url):
+            return httpx.Response(200, json=page)
+        return httpx.Response(200, json=issue)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    with client:
+        found = list_issues(
+            "comicvine",
+            "12345",
+            title_languages=["en"],
+            client=client,
+            api_key="secret",
+        )
+        patch = load(
+            "comicvine",
+            "12345",
+            filename_stem="Claymore v99",
+            title_languages=["en"],
+            client=client,
+            api_key="secret",
+            number="1",
+        )
+    assert found == [
+        IssueCandidate(
+            id="10",
+            number="01",
+            title="First",
+            date="2001-03",
+            cover="https://example.com/1.jpg",
+            summary="One",
+        ),
+        IssueCandidate(
+            id="11",
+            number="2",
+            title="Second",
+            date="2001",
+            cover="",
+            summary="",
+        ),
+    ]
+    assert seen[0].url.params.get("filter") == "volume:12345"
+    assert any(
+        _bare(request) == "https://comicvine.gamespot.com/api/issue/4000-10/"
+        for request in seen
+    )
+    assert patch["Number"] == "1"
+    assert patch["Series"] == "Claymore"
+    assert patch["Title"] == "First"
+
+
+def test_comicvine_load_by_number_misses() -> None:
+    page = {
+        "error": "OK",
+        "status_code": 1,
+        "number_of_total_results": 0,
+        "results": [],
+    }
+    client, _seen = _client(page)
+    with client:
+        with pytest.raises(ProviderResponseError, match="could not find an issue"):
+            load(
+                "comicvine",
+                "12345",
+                filename_stem="Claymore",
+                title_languages=["en"],
+                client=client,
+                api_key="secret",
+                number="9",
+            )
+        with pytest.raises(ProviderResponseError, match="could not find an issue"):
+            load(
+                "comicvine",
+                "12345",
+                filename_stem="Claymore",
+                title_languages=["en"],
+                client=client,
+                api_key="secret",
+            )
+
+
+def test_nautiljon_list_issues_and_load_issue_id() -> None:
+    series = {
+        "title": "Berserk",
+        "infos": {"titreOriginal": "ベルセルク", "origine": "Japon - 1989"},
+        "synopsis": "Series",
+        "sourceUrl": "https://www.nautiljon.com/mangas/berserk.html",
+        "volumeUrls": [
+            "https://www.nautiljon.com/mangas/berserk/volume-1,3278.html",
+            "https://www.nautiljon.com/mangas/berserk/volume-2,3279.html",
+            "https://www.nautiljon.com/mangas/volumes/berserk,2.html",
+        ],
+    }
+    volumes = {
+        "1": {
+            "number": 1,
+            "cover": "https://www.nautiljon.com/images/manga_volumes/00/87/3278.webp",
+            "rating": 8.0,
+            "releaseDateVf": "06/10/2004",
+            "description": "Volume <b>one</b>",
+        },
+        "2": {
+            "number": 2,
+            "cover": "https://www.nautiljon.com/images/manga_volumes/00/88/3279.webp",
+            "rating": 7.5,
+            "releaseDateVf": "15/01/2005",
+            "description": "Volume <b>two</b>",
+        },
+    }
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        path = request.url.path
+        if path.endswith("/volumes/1"):
+            return httpx.Response(200, json=volumes["1"])
+        if path.endswith("/volumes/2"):
+            return httpx.Response(200, json=volumes["2"])
+        return httpx.Response(200, json=series)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    with client:
+        found = list_issues(
+            "nautiljon",
+            "berserk",
+            title_languages=["fr"],
+            client=client,
+            nautiljon_base_url="https://nj.example",
+            nautiljon_api_key="secret",
+        )
+        patch = load(
+            "nautiljon",
+            "berserk",
+            filename_stem="Berserk",
+            title_languages=["ja", "fr"],
+            client=client,
+            nautiljon_base_url="https://nj.example",
+            nautiljon_api_key="secret",
+            issue_id="2",
+        )
+    assert found == [
+        IssueCandidate(
+            id="1",
+            number="1",
+            title="Tome 1",
+            date="2004-10",
+            cover="https://www.nautiljon.com/images/manga_volumes/00/87/3278.webp",
+            summary="Volume one",
+        ),
+        IssueCandidate(
+            id="2",
+            number="2",
+            title="Tome 2",
+            date="2005-01",
+            cover="https://www.nautiljon.com/images/manga_volumes/00/88/3279.webp",
+            summary="Volume two",
+        ),
+    ]
+    assert [request.url.path for request in seen[:3]] == [
+        "/v1/series/berserk",
+        "/v1/series/berserk/volumes/1",
+        "/v1/series/berserk/volumes/2",
+    ]
+    assert patch["Series"] == "ベルセルク"
+    assert patch["LanguageISO"] == "ja"
+    assert patch["Number"] == "2"
+    assert patch["Summary"] == "Volume two"
+    assert patch["CommunityRating"] == "7.5"
+    assert any(request.url.path.endswith("/volumes/2") for request in seen)
 
 def _assert_patch(patch: dict[str, str]) -> None:
     assert patch["Title"] == patch["Series"]

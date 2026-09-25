@@ -204,14 +204,26 @@ export type Candidate = {
   cover: string;
 };
 
+export type IssueCandidate = {
+  id: string;
+  number: string;
+  title: string;
+  date: string;
+  cover: string;
+  summary: string;
+};
 
-/** Same-origin img src for a candidate cover. MangaDex CDN is proxied. */
+/** Same-origin img src for a candidate cover. Proxied hosts stay same-origin. */
 export function matchCoverSrc(cover: string): string {
   const trimmed = cover.trim();
   if (trimmed === "") return "";
   try {
     const host = new URL(trimmed).hostname;
-    if (host === "uploads.mangadex.org") {
+    if (
+      host === "uploads.mangadex.org" ||
+      host === "www.nautiljon.com" ||
+      host === "nautiljon.com"
+    ) {
       return `/api/cover?url=${encodeURIComponent(trimmed)}`;
     }
   } catch {
@@ -617,6 +629,43 @@ export function candidatesOf(result: unknown): Candidate[] {
       },
     ];
   });
+}
+
+export function issuesOf(result: unknown): IssueCandidate[] {
+  if (result === null || typeof result !== "object" || !("issues" in result)) {
+    return [];
+  }
+  const raw = (result as { issues?: unknown }).issues;
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((item) => {
+    if (item === null || typeof item !== "object") return [];
+    const row = item as {
+      id?: unknown;
+      number?: unknown;
+      title?: unknown;
+      date?: unknown;
+      cover?: unknown;
+      summary?: unknown;
+    };
+    return [
+      {
+        id: String(row.id ?? ""),
+        number: String(row.number ?? ""),
+        title: String(row.title ?? ""),
+        date: String(row.date ?? ""),
+        cover: String(row.cover ?? ""),
+        summary: String(row.summary ?? ""),
+      },
+    ];
+  });
+}
+
+/** Form Number when non-blank and not mixed, else empty string. */
+export function preferredIssueNumber(form: InspectorForm | null): string {
+  if (form === null) return "";
+  const field = form.values.Number;
+  if (field === undefined || field.mixed) return "";
+  return field.value.trim();
 }
 
 export function entriesOf(result: unknown): WorkEntry[] {

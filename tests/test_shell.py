@@ -20,8 +20,10 @@ from manga_tagger.shell import (
     form_from_volumes,
     merge_load_patch,
     places_from_volumes,
+    preferred_load_number,
     preview_rename,
     run_convert,
+    run_list_issues,
     run_load,
     run_rename,
     run_save,
@@ -464,6 +466,73 @@ def test_search_and_load_do_not_write() -> None:
     assert "Number" not in loaded["form"]["values"]
     assert loaded["form"]["values"]["Series"]["value"] == "Claymore"
     assert writes == ["progress", "progress"]
+
+
+def test_list_issues_and_preferred_number() -> None:
+    form = form_from_volumes([_volume("/books/a.cbz", series="A", number="3")])
+    assert preferred_load_number(form) == "3"
+    blank = form_from_volumes([_volume("/books/a.cbz", series="A", number="")])
+    assert preferred_load_number(blank) is None
+
+    def list_issues(*_args, **_kwargs):
+        class Hit:
+            id = "10"
+            number = "1"
+            title = "First"
+            date = "2001-03"
+            cover = ""
+            summary = ""
+
+        return [Hit()]
+
+    result = run_list_issues(
+        provider="comicvine",
+        match_id="12345",
+        title_languages=["en"],
+        api_key="secret",
+        nautiljon_base_url="",
+        nautiljon_api_key="",
+        list_issues=list_issues,
+        client_factory=default_client,
+        cancel=lambda: False,
+        progress=lambda _completed, _total: None,
+    )
+    assert result["issues"] == [
+        {
+            "id": "10",
+            "number": "1",
+            "title": "First",
+            "date": "2001-03",
+            "cover": "",
+            "summary": "",
+        }
+    ]
+
+    captured: dict[str, object] = {}
+
+    def load(*_args, **kwargs):
+        captured.update(kwargs)
+        return {"Series": "Claymore", "Number": "3"}
+
+    one = form_from_volumes([_volume("/books/a.cbz", series="A", number="3")])
+    run_load(
+        provider="comicvine",
+        match_id="12345",
+        filename_stem="Claymore v02",
+        mode="one",
+        form=one,
+        title_languages=["en"],
+        api_key="secret",
+        nautiljon_base_url="",
+        nautiljon_api_key="",
+        load=load,
+        client_factory=default_client,
+        cancel=lambda: False,
+        progress=lambda _completed, _total: None,
+        issue_id="99",
+    )
+    assert captured["issue_id"] == "99"
+    assert captured["number"] == "3"
 
 
 def test_scan_cancel_and_index_error() -> None:

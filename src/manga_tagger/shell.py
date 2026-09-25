@@ -509,6 +509,68 @@ def run_search(
     }
 
 
+def preferred_load_number(form: Mapping[str, object]) -> str | None:
+    """Return form ``Number`` when non-blank and not mixed, else ``None``."""
+    values = form.get("values")
+    if not isinstance(values, Mapping):
+        return None
+    field = values.get("Number")
+    if not isinstance(field, Mapping):
+        return None
+    if field.get("mixed") is True:
+        return None
+    value = field.get("value")
+    if not isinstance(value, str):
+        return None
+    trimmed = value.strip()
+    return trimmed or None
+
+
+def run_list_issues(
+    *,
+    provider: str,
+    match_id: str,
+    title_languages: Sequence[str],
+    api_key: str,
+    nautiljon_base_url: str,
+    nautiljon_api_key: str,
+    list_issues: Callable[..., list[object]],
+    client_factory: Callable[[], httpx.Client],
+    cancel: Cancel,
+    progress: Progress,
+) -> dict[str, object]:
+    """List issues or volumes for one series. Does not write an archive."""
+    progress(0, 1)
+    client = client_factory()
+    try:
+        found = list_issues(
+            provider,
+            match_id,
+            title_languages=list(title_languages),
+            client=client,
+            api_key=api_key,
+            nautiljon_base_url=nautiljon_base_url,
+            nautiljon_api_key=nautiljon_api_key,
+            cancel=cancel,
+        )
+    finally:
+        client.close()
+    progress(1, 1)
+    return {
+        "issues": [
+            {
+                "id": item.id,
+                "number": item.number,
+                "title": item.title,
+                "date": item.date,
+                "cover": item.cover,
+                "summary": item.summary,
+            }
+            for item in found
+        ]
+    }
+
+
 def run_load(
     *,
     provider: str,
@@ -524,8 +586,9 @@ def run_load(
     client_factory: Callable[[], httpx.Client],
     cancel: Cancel,
     progress: Progress,
+    issue_id: str = "",
 ) -> dict[str, object]:
-    """Load one series and merge the patch into the form. Writes nothing."""
+    """Load one series or issue and merge the patch into the form. Writes nothing."""
     progress(0, 1)
     client = client_factory()
     try:
@@ -539,6 +602,8 @@ def run_load(
             nautiljon_base_url=nautiljon_base_url,
             nautiljon_api_key=nautiljon_api_key,
             cancel=cancel,
+            issue_id=issue_id,
+            number=preferred_load_number(form),
         )
     finally:
         client.close()

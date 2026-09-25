@@ -12,6 +12,9 @@
     confirmLabel,
     confirmVariant = "primary",
     confirmDisabled = false,
+    leadingLabel,
+    leadingDisabled = false,
+    onLeading,
     onDismiss,
     onConfirm,
     children,
@@ -22,6 +25,9 @@
     confirmLabel?: string;
     confirmVariant?: "primary" | "danger";
     confirmDisabled?: boolean;
+    leadingLabel?: string;
+    leadingDisabled?: boolean;
+    onLeading?: () => void;
     onDismiss: () => void;
     onConfirm?: () => void;
     children?: Snippet;
@@ -60,6 +66,11 @@
       {@render children?.()}
     </div>
     <div class="mt-4 flex justify-end gap-2">
+      {#if leadingLabel !== undefined && onLeading}
+        <Button variant="quiet" disabled={leadingDisabled} onclick={onLeading}
+          >{leadingLabel}</Button
+        >
+      {/if}
       <Button variant="quiet" onclick={onDismiss}>Cancel</Button>
       {#if confirmLabel !== undefined && onConfirm}
         <Button
