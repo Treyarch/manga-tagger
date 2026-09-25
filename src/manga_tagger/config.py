@@ -11,6 +11,8 @@ _KNOWN_KEYS = (
     "library_roots",
     "keep_cbr_original",
     "comicvine_api_key",
+    "nautiljon_base_url",
+    "nautiljon_api_key",
     "title_languages",
     "theme",
 )
@@ -33,22 +35,26 @@ class AppPaths:
 
 @dataclass
 class AppConfig:
-    """The five known keys plus unknown keys from the last successful load."""
+    """The seven known keys plus unknown keys from the last successful load."""
 
     path: Path
     library_roots: list[str] = field(default_factory=list)
     keep_cbr_original: bool = False
     comicvine_api_key: str = ""
+    nautiljon_base_url: str = ""
+    nautiljon_api_key: str = ""
     title_languages: list[str] = field(default_factory=lambda: list(_DEFAULT_LANGUAGES))
     theme: str = "system"
     extra: dict[str, object] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, object]:
-        """Return the five known keys."""
+        """Return the seven known keys."""
         return {
             "library_roots": list(self.library_roots),
             "keep_cbr_original": self.keep_cbr_original,
             "comicvine_api_key": self.comicvine_api_key,
+            "nautiljon_base_url": self.nautiljon_base_url,
+            "nautiljon_api_key": self.nautiljon_api_key,
             "title_languages": list(self.title_languages),
             "theme": self.theme,
         }
@@ -128,6 +134,16 @@ def load_config(path: Path) -> AppConfig:
             if isinstance(data.get("comicvine_api_key"), str)
             else ""
         ),
+        nautiljon_base_url=(
+            data["nautiljon_base_url"]
+            if isinstance(data.get("nautiljon_base_url"), str)
+            else ""
+        ),
+        nautiljon_api_key=(
+            data["nautiljon_api_key"]
+            if isinstance(data.get("nautiljon_api_key"), str)
+            else ""
+        ),
         title_languages=_clean_languages(languages, fallback=True),
         theme=_load_theme(data.get("theme", "system")),
         extra=extra,
@@ -175,6 +191,8 @@ def apply_put(config: AppConfig, updates: Mapping[str, object]) -> AppConfig:
         library_roots=list(current["library_roots"]),  # type: ignore[arg-type]
         keep_cbr_original=bool(current["keep_cbr_original"]),
         comicvine_api_key=str(current["comicvine_api_key"]),
+        nautiljon_base_url=str(current["nautiljon_base_url"]),
+        nautiljon_api_key=str(current["nautiljon_api_key"]),
         title_languages=list(current["title_languages"]),  # type: ignore[arg-type]
         theme=str(current["theme"]),
         extra=dict(config.extra),
@@ -193,6 +211,14 @@ def _put_value(key: str, value: object) -> object:
     if key == "comicvine_api_key":
         if not isinstance(value, str):
             raise ConfigError("comicvine_api_key must be a string")
+        return value
+    if key == "nautiljon_base_url":
+        if not isinstance(value, str):
+            raise ConfigError("nautiljon_base_url must be a string")
+        return value
+    if key == "nautiljon_api_key":
+        if not isinstance(value, str):
+            raise ConfigError("nautiljon_api_key must be a string")
         return value
     if key == "title_languages":
         if not isinstance(value, list):

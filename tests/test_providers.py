@@ -23,7 +23,6 @@ _FORBIDDEN = (
     "Volume",
     "Pages",
     "PageCount",
-    "AgeRating",
     "CommunityRating",
     "Notes",
 )
@@ -74,7 +73,7 @@ def test_blank_query_sends_nothing() -> None:
         return True
 
     with _forbid_client() as client:
-        for provider in ("mangadex", "anilist", "jikan", "comicvine"):
+        for provider in ("mangadex", "anilist", "jikan", "comicvine", "nautiljon"):
             for query in ("", "   "):
                 assert (
                     search(
@@ -83,6 +82,8 @@ def test_blank_query_sends_nothing() -> None:
                         title_languages=["fr", "en"],
                         client=client,
                         api_key="",
+                        nautiljon_base_url="",
+                        nautiljon_api_key="",
                         cancel=cancel,
                     )
                     == []
@@ -965,6 +966,8 @@ def test_illegal_match_id_sends_nothing() -> None:
             ("comicvine", "12/3"),
             ("comicvine", "bad id"),
             ("mangadex", "abc def"),
+            ("nautiljon", "slug with space"),
+            ("nautiljon", "slug/path"),
             ("anilist", ""),
             ("jikan", " 12"),
         ):
@@ -976,6 +979,8 @@ def test_illegal_match_id_sends_nothing() -> None:
                     title_languages=["en"],
                     client=client,
                     api_key="",
+                    nautiljon_base_url="https://nj.example",
+                    nautiljon_api_key="secret",
                 )
 
 
@@ -1081,6 +1086,200 @@ def test_search_and_load_write_nothing(tmp_path, monkeypatch) -> None:
     assert patch["Number"] == "2"
     assert patch["Title"] == patch["Series"] == "Claymore"
     assert list(tmp_path.iterdir()) == []
+
+
+def test_nautiljon_search_request_and_candidate() -> None:
+    payload = {
+        "sourceUrl": "https://www.nautiljon.com/mangas/?q=town",
+        "results": [
+            {
+                "cover": "https://www.nautiljon.com/images/manga/00/cover.jpg",
+                "title": "A town where you live",
+                "url": "https://www.nautiljon.com/mangas/a+town+where+you+live.html",
+                "description": "Haruto <b>Kirishima</b>",
+                "issues": 27,
+                "dateVo": "2008",
+            },
+            {
+                "title": "",
+                "url": "https://www.nautiljon.com/mangas/empty.html",
+            },
+        ],
+    }
+    client, seen = _client(payload)
+    with client:
+        found = search(
+            "nautiljon",
+            "town",
+            title_languages=["fr", "en"],
+            client=client,
+            nautiljon_base_url="https://nj.example/",
+            nautiljon_api_key="secret",
+        )
+    assert len(seen) == 1
+    assert _bare(seen[0]) == "https://nj.example/v1/search"
+    assert seen[0].url.params["q"] == "town"
+    assert seen[0].headers["x-api-key"] == "secret"
+    assert seen[0].headers["user-agent"] == "manga-tagger"
+    assert found == [
+        Candidate(
+            id="a+town+where+you+live",
+            title="A town where you live",
+            year="2008",
+            credit="",
+            count="27",
+            summary="Haruto Kirishima",
+            cover="https://www.nautiljon.com/images/manga/00/cover.jpg",
+        )
+    ]
+
+
+def test_nautiljon_load_french_credits_and_volume() -> None:
+    series = {
+        "sourceUrl": "https://www.nautiljon.com/mangas/berserk.html",
+        "title": "Berserk",
+        "infos": {
+            "titreOriginal": "ベルセルク",
+            "origine": "Japon - 1989",
+            "anneeVf": "2004",
+            "genres": ["Action", "Horreur"],
+            "themes": ["Vengeance"],
+            "auteurs": ["Miura Kentaro (auteur)"],
+            "editeurVo": "Hakusensha",
+            "editeurVf": "Glénat ( Seinen )",
+            "ageConseille": "18 ans et +",
+        },
+        "extra": {"Dessinateur": "Studio Gaga"},
+        "synopsis": "Series <i>synopsis</i>",
+    }
+    volume = {
+        "number": 1,
+        "releaseDateVf": "06/10/2004",
+        "description": "Volume <b>one</b> résumé",
+    }
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if "/volumes/" in request.url.path:
+            return httpx.Response(200, json=volume)
+        return httpx.Response(200, json=series)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    with client:
+        patch = load(
+            "nautiljon",
+            "berserk",
+            filename_stem="Berserk v01",
+            title_languages=["fr", "en"],
+            client=client,
+            nautiljon_base_url="https://nj.example",
+            nautiljon_api_key="secret",
+        )
+    assert [request.url.path for request in seen] == [
+        "/v1/series/berserk",
+        "/v1/series/berserk/volumes/1",
+    ]
+    assert seen[0].headers["x-api-key"] == "secret"
+    assert patch["Series"] == patch["Title"] == "Berserk"
+    assert patch["LanguageISO"] == "fr"
+    assert patch["Manga"] == "YesAndRightToLeft"
+    assert patch["Publisher"] == "Glénat ( Seinen )"
+    assert patch["Writer"] == "Miura Kentaro"
+    assert patch["Penciller"] == patch["CoverArtist"] == "Studio Gaga"
+    assert patch["Genre"] == "Action, Horreur, Vengeance"
+    assert patch["AgeRating"] == "18 ans et +"
+    assert patch["Web"] == "https://www.nautiljon.com/mangas/berserk.html"
+    assert patch["Summary"] == "Volume one résumé"
+    assert patch["Year"] == "2004"
+    assert patch["Month"] == "10"
+    assert patch["Day"] == "6"
+    assert patch["Number"] == "1"
+    assert "Volume" not in patch
+    _assert_patch(patch)
+
+
+def test_nautiljon_volume_404_keeps_series_summary() -> None:
+    series = {
+        "sourceUrl": "https://www.nautiljon.com/mangas/berserk.html",
+        "title": "Berserk",
+        "infos": {},
+        "synopsis": "Series only",
+    }
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if "/volumes/" in request.url.path:
+            return httpx.Response(404, json={"detail": "missing"})
+        return httpx.Response(200, json=series)
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    with client:
+        patch = load(
+            "nautiljon",
+            "berserk",
+            filename_stem="Berserk v01",
+            title_languages=["fr"],
+            client=client,
+            nautiljon_base_url="https://nj.example",
+            nautiljon_api_key="secret",
+        )
+    assert len(seen) == 2
+    assert patch["Summary"] == "Series only"
+    assert patch["Number"] == "1"
+
+
+def test_nautiljon_ja_title_and_no_volume_without_number() -> None:
+    series = {
+        "title": "Berserk",
+        "infos": {"titreOriginal": "ベルセルク", "origine": "Japon - 1989"},
+        "synopsis": "Only series",
+        "sourceUrl": "https://www.nautiljon.com/mangas/berserk.html",
+    }
+    client, seen = _client(series)
+    with client:
+        patch = load(
+            "nautiljon",
+            "berserk",
+            filename_stem="Berserk",
+            title_languages=["ja", "fr"],
+            client=client,
+            nautiljon_base_url="https://nj.example",
+            nautiljon_api_key="secret",
+        )
+    assert len(seen) == 1
+    assert patch["Series"] == "ベルセルク"
+    assert patch["LanguageISO"] == "ja"
+    assert patch["Year"] == "1989"
+    assert "Number" not in patch
+
+
+def test_nautiljon_blank_settings_send_nothing() -> None:
+    with _forbid_client() as client:
+        with pytest.raises(
+            ProviderUnavailableError, match="Nautiljon base URL is not set"
+        ):
+            search(
+                "nautiljon",
+                "Berserk",
+                title_languages=["fr"],
+                client=client,
+                nautiljon_base_url="",
+                nautiljon_api_key="secret",
+            )
+        with pytest.raises(
+            ProviderUnavailableError, match="Nautiljon API key is not set"
+        ):
+            load(
+                "nautiljon",
+                "berserk",
+                filename_stem="Berserk",
+                title_languages=["fr"],
+                client=client,
+                nautiljon_base_url="https://nj.example",
+                nautiljon_api_key="   ",
+            )
 
 
 def _assert_patch(patch: dict[str, str]) -> None:

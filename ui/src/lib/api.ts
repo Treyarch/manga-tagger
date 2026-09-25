@@ -14,6 +14,8 @@ export type Config = {
   library_roots: string[];
   keep_cbr_original: boolean;
   comicvine_api_key: string;
+  nautiljon_base_url: string;
+  nautiljon_api_key: string;
   title_languages: string[];
   theme: string;
 };

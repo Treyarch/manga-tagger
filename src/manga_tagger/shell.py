@@ -467,6 +467,8 @@ def run_search(
     filename_stem: str,
     title_languages: Sequence[str],
     api_key: str,
+    nautiljon_base_url: str,
+    nautiljon_api_key: str,
     build_query: Callable[[str, str], str],
     search: Callable[..., list[object]],
     client_factory: Callable[[], httpx.Client],
@@ -484,6 +486,8 @@ def run_search(
             title_languages=list(title_languages),
             client=client,
             api_key=api_key,
+            nautiljon_base_url=nautiljon_base_url,
+            nautiljon_api_key=nautiljon_api_key,
             cancel=cancel,
         )
     finally:
@@ -514,6 +518,8 @@ def run_load(
     form: Mapping[str, object],
     title_languages: Sequence[str],
     api_key: str,
+    nautiljon_base_url: str,
+    nautiljon_api_key: str,
     load: Callable[..., Mapping[str, str]],
     client_factory: Callable[[], httpx.Client],
     cancel: Cancel,
@@ -530,6 +536,8 @@ def run_load(
             title_languages=list(title_languages),
             client=client,
             api_key=api_key,
+            nautiljon_base_url=nautiljon_base_url,
+            nautiljon_api_key=nautiljon_api_key,
             cancel=cancel,
         )
     finally:

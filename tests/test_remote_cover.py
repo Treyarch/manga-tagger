@@ -24,6 +24,23 @@ def test_remote_cover_bytes_allows_mangadex_host() -> None:
     assert media == "image/jpeg"
 
 
+def test_remote_cover_bytes_allows_nautiljon_host() -> None:
+    jpeg = b"\xff\xd8\xff\xd9"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert request.url.host == "www.nautiljon.com"
+        return httpx.Response(200, content=jpeg, headers={"content-type": "image/jpeg"})
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    with client:
+        payload, media = remote_cover_bytes(
+            "https://www.nautiljon.com/images/manga/00/cover.jpg",
+            client=client,
+        )
+    assert payload == jpeg
+    assert media == "image/jpeg"
+
+
 def test_remote_cover_bytes_rejects_other_hosts_and_non_images() -> None:
     with pytest.raises(RemoteCoverError, match="not allowed"):
         remote_cover_bytes("https://example.com/cover.jpg")

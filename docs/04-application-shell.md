@@ -39,7 +39,7 @@ When this specification is implemented, `pyproject.toml` gains `fastapi`, `uvico
 
 `load_config(path)` reads UTF-8 TOML with the standard-library `tomllib`. A missing file returns the defaults below and does not create the file. Invalid TOML raises `ConfigError`. The message includes the path and says the TOML could not be parsed. Startup then exits with status 1 and does not open the window.
 
-`save_config(path, config)` creates the parent directory and writes UTF-8 TOML with `tomli-w`. Unknown keys from the last successful load are written back. Comments are not preserved. A missing file's first save writes the five known keys.
+`save_config(path, config)` creates the parent directory and writes UTF-8 TOML with `tomli-w`. Unknown keys from the last successful load are written back. Comments are not preserved. A missing file's first save writes the seven known keys.
 
 The process keeps the loaded config in memory. `GET /api/config` returns that memory. `PUT /api/config` writes the file and, only after the write succeeds, replaces memory. A failed write leaves memory and the previous file unchanged and does not enqueue a scan.
 
@@ -50,6 +50,8 @@ A TOML value of the wrong type falls back on load. The file is not rewritten jus
 | `library_roots` | Not a list becomes `[]`. Non-strings are dropped. Relative paths are dropped. Duplicates keep the first. Stored paths are `resolve(strict=False)` | Same dropping rules. A provided non-list is `400` `ConfigError` and writes nothing |
 | `keep_cbr_original` | Not a boolean becomes `false` | Not a boolean is `400` `ConfigError` |
 | `comicvine_api_key` | Not a string becomes `""` | Not a string is `400` `ConfigError` |
+| `nautiljon_base_url` | Not a string becomes `""` | Not a string is `400` `ConfigError` |
+| `nautiljon_api_key` | Not a string becomes `""` | Not a string is `400` `ConfigError` |
 | `title_languages` | Not a list becomes `["fr", "en"]`. Non-strings are dropped. An empty list stays `[]` | Not a list is `400` `ConfigError`. Non-strings are dropped |
 | `theme` | Not a string becomes `system`. Any string is kept, including one the UI treats as `system` | `system`, `light`, or `dark` are stored. Any other value is stored as `system` |
 
@@ -155,8 +157,8 @@ Archive, page, thumbnail, save, rename, and convert paths must be absolute. A re
 | `GET /api/library` | `{ "places": [{ "path", "label" }], "volumes": [row] }`. Volume keys are the index columns. SQL NULL is JSON null. Does not scan |
 | `GET /api/page?path=&index=` | One page. `index` is a non-negative integer. A missing or negative index is `ShellError` |
 | `GET /api/thumbnail?path=` | The cached cover JPEG, building it on demand through `thumbnail_for` |
-| `GET /api/cover?url=` | Bytes of one allow-listed remote catalog cover. Only `https` URLs whose host is `uploads.mangadex.org` are accepted. Used by Matches for MangaDex covers so the WebView loads a same-origin image |
-| `GET /api/config` | The five known keys |
+| `GET /api/cover?url=` | Bytes of one allow-listed remote catalog cover. Only `https` URLs whose host is `uploads.mangadex.org`, `www.nautiljon.com`, or `nautiljon.com` are accepted. Used by Matches so the WebView loads a same-origin image |
+| `GET /api/config` | The seven known keys |
 | `PUT /api/config` | A partial object of those keys. Returns the full config. Roots in the body enqueue a scan after a successful write |
 | `POST /api/dialogs/folder` | Calls the injected `pick_folder`. Returns `{ "path" }` or `{ "path": null }` when the dialog is cancelled. No picker is HTTP 503 |
 | `POST /api/window/close` | Calls the injected `destroy_window`. Returns an empty 204. No closer is HTTP 503 |
@@ -197,7 +199,7 @@ For save, rename, and convert, `N` is the number of counted entries with a blank
 
 The provider select lists MangaDex (`mangadex`), AniList (`anilist`), MyAnimeList (`jikan`), and Comic Vine (`comicvine`). The choice is session state and defaults to `mangadex`. It is not a config key.
 
-Scrape uses the anchor. It does nothing when there is no anchor. The request `series` is the form's `Series` when that control is non-blank and not mixed. Otherwise `series` is `""`. `filename_stem` is the anchor `name` with its extension removed. The job calls `build_query(series, filename_stem)` and then `search`. It passes `title_languages` and `comicvine_api_key` from config at the start of the job, the cancel callable, and an `httpx.Client` with a 15 second timeout. The client is closed when the job ends. The shell does not set `User-Agent` and does not retry.
+Scrape uses the anchor. It does nothing when there is no anchor. The request `series` is the form's `Series` when that control is non-blank and not mixed. Otherwise `series` is `""`. `filename_stem` is the anchor `name` with its extension removed. The job calls `build_query(series, filename_stem)` and then `search`. It passes `title_languages`, `comicvine_api_key`, `nautiljon_base_url`, and `nautiljon_api_key` from config at the start of the job, the cancel callable, and an `httpx.Client` with a 15 second timeout. The client is closed when the job ends. The shell does not set `User-Agent` and does not retry.
 
 The result is `{ "candidates": [{ "id", "title", "year", "credit", "count", "summary", "cover" }] }`. When Scrape starts, the client opens a centered Matches dialog in a searching state (see [05-ui-design.md](05-ui-design.md)). When the list is non-empty, the dialog replaces that body with a cover preview, a candidate table, and a summary pane. The first candidate is highlighted. A single click or arrow key changes the highlight (cover and summary follow) and does not start `load`. OK or a double-click on a row starts `load` for that highlighted id. Dismiss while searching cancels the Search job and closes the dialog. Dismiss after results clears the candidate list without loading. An empty list is success, not an error. The toast shows `No matches.`, the dialog closes, and the form is unchanged. The inspector does not show match rows or a no-matches line.
 
@@ -205,7 +207,7 @@ The result is `{ "candidates": [{ "id", "title", "year", "credit", "count", "sum
 
 `ProviderUnavailableError`, `ProviderTimeoutError`, `ProviderRateLimitError`, and `ProviderResponseError` fail the job. `ProviderCancelledError` cancels it. The form is unchanged and the archive is unchanged. A new search clears the candidate list when it starts and shows the Matches searching body again. A failed or cancelled search closes the Matches dialog; a failed search also clears candidates and the toast shows `error_message` (or `Scrape failed.`). A failed load leaves the candidate list so the Matches dialog stays open and another row can be chosen; its toast shows `error_message` (or `Load failed.`). Search and load do not write those messages into the inspector.
 
-A blank Comic Vine key fails inside `search` or `load` with `ProviderUnavailableError` before a request. The shell does not replace that error.
+A blank Comic Vine key, or a blank Nautiljon base URL or API key, fails inside `search` or `load` with `ProviderUnavailableError` before a request. The shell does not replace that error.
 
 ## Save
 
@@ -264,7 +266,7 @@ The first sidebar row is Add folder. It calls `POST /api/dialogs/folder`. A canc
 
 Dropping a folder on the sidebar does not call into Python from the client. `window.py` reads the native drop on `#places` and dispatches a `folders-dropped` window event whose `detail.paths` are absolute paths. The client posts those paths to `POST /api/library/roots`.
 
-Settings is a dialog. It edits library roots, one absolute path per line, the Comic Vine key, `keep_cbr_original` as a checkbox labeled `Keep the original CBR`, and `title_languages` as comma-separated codes in order. It does not edit `theme`. Dismiss writes nothing. Save drops blank root lines. If a non-blank root line is not absolute, the dialog does not send the request and shows `Paths must be absolute.` A successful save calls `PUT /api/config`.
+Settings is a dialog. It edits library roots, one absolute path per line, the Comic Vine key, the Nautiljon base URL, the Nautiljon API key, `keep_cbr_original` as a checkbox labeled `Keep the original CBR`, and `title_languages` as comma-separated codes in order. It does not edit `theme`. Dismiss writes nothing. Save drops blank root lines. If a non-blank root line is not absolute, the dialog does not send the request and shows `Paths must be absolute.` A successful save calls `PUT /api/config`.
 
 Per-file save, rename, and convert errors, and scan-root lines, are listed at the top of the inspector, above the form. Search and load status (match count, no matches, provider errors) is toast-only and is not repeated in the inspector. Scrape opens the Matches dialog (searching, then rows when any); match rows are not listed in the inspector. The toast for every finished job is the short summary in the jobs client section.
 
@@ -287,7 +289,7 @@ Per-file save, rename, and convert errors, and scan-root lines, are listed at th
 
 This specification adds no configuration keys.
 
-It is the only reader and writer of `library_roots`, `keep_cbr_original`, `comicvine_api_key`, and `title_languages` from [00-project-overview.md](00-project-overview.md), and of `theme` from [05-ui-design.md](05-ui-design.md). Defaults stay those documents' defaults. View mode, the selected place, the provider choice, and the rename template are not keys. The HTTP port is not a key. The `httpx` timeout of 15 seconds is not a key. The job poll interval of 500 milliseconds is not a key.
+It is the only reader and writer of `library_roots`, `keep_cbr_original`, `comicvine_api_key`, `nautiljon_base_url`, `nautiljon_api_key`, and `title_languages` from [00-project-overview.md](00-project-overview.md), and of `theme` from [05-ui-design.md](05-ui-design.md). Defaults stay those documents' defaults. View mode, the selected place, the provider choice, and the rename template are not keys. The HTTP port is not a key. The `httpx` timeout of 15 seconds is not a key. The job poll interval of 500 milliseconds is not a key.
 
 ## Testing
 
@@ -297,7 +299,7 @@ Importing `manga_tagger.config`, `manga_tagger.shell`, `manga_tagger.jobs`, or `
 
 Cover at least:
 
-- `load_config` on a missing path returns the five defaults and does not create the file. A relative `library_roots` entry is absent from the result and the file bytes are unchanged. An unknown key is still present after a `PUT` that changes `theme`. Invalid TOML raises `ConfigError` and the message includes the path.
+- `load_config` on a missing path returns the seven defaults and does not create the file. A relative `library_roots` entry is absent from the result and the file bytes are unchanged. An unknown key is still present after a `PUT` that changes `theme`. Invalid TOML raises `ConfigError` and the message includes the path.
 - `app_paths("linux", {}, home)` uses `home/.config`, `home/.local/share`, and `home/.cache`. A set absolute `XDG_CONFIG_HOME` replaces only the config root. A relative `XDG_DATA_HOME` is ignored. `darwin` and `win32` use their table, including the `APPDATA` fallback under `home`.
 - Two volumes in `/books/Claymore` and one in `/books/Other/Claymore` produce two places. The colliding labels are `books / Claymore` and `Other / Claymore`. `/books/Claymore/extra/v01.cbz` is a place `/books/Claymore/extra` and is not listed for `/books/Claymore`. A volume directly in `/books` makes `/books` a place. Empty roots return no volumes and do not delete a row that is already in the index. `volumes_for_shelf` with `null` returns every row ordered by `name`. A missing place selection stays `null` after a library refresh; a place that left the list becomes `null`.
 - `selection_after_filter` drops a path that left `visible`. Hiding the anchor assigns the anchor to the first remaining selected path.
@@ -311,6 +313,7 @@ Cover at least:
 - A save cancel flag that becomes true after the first file leaves the second file's service uncalled. The first file's `refresh_volume` has run. The job state is `cancelled`.
 - `search` and `load` jobs call no archive write and no `scan`. A load job for `many` returns a form without `Number`.
 - Comic Vine with `comicvine_api_key` `""` fails the search job as `ProviderUnavailableError`. The mock transport sees no request. The message says the Comic Vine API key is not set.
+- Nautiljon with `nautiljon_base_url` `""` or `nautiljon_api_key` `""` fails the search job as `ProviderUnavailableError`. The mock transport sees no request. The message names the missing setting.
 - `GET /api/page` calls the page read once for the requested index and does not read another index. A path outside the roots calls neither the page read nor `save_comic_info`.
 - A rename preview calls `plan_rename` and does not call `rename_in_directory`. A rename job calls `rename_in_directory` on the place and calls `write_poster` on each success path. A convert job skips a `.cbz` and calls `convert_cbr` for a `.cbr`. It does not call `write_poster`.
 - `serve` binds `127.0.0.1`, returns a non-zero port, and `close()` stops it. A missing UI directory makes `GET /` return the plain sentence `UI build is missing.` and leaves `GET /api/library` working.
@@ -323,7 +326,7 @@ Cover at least:
 - The shelf is `GET /api/library`. That response does not scan, open an archive, or build a thumbnail. A missing config file is the defaults, is not created, and paints no volumes.
 - A place is a directory that directly contains indexed volumes. With no place selected, the main pane lists every volume under the current roots, ordered by name and grouped by series alphabetically. With a place selected, it lists that place's volumes only. List and grid both group by series with a muted header above shared volumes; a list row shows the filename only with a tree marker, and a grid cell shows the cover and filename with no tree marker. Nested volumes are a different place. There is no library filter field in the header.
 - One selected volume shows that volume's form and one preview page. Several selected volumes show one shared form for `Series`, `Publisher`, `LanguageISO`, `AgeRating`, `Genre`, `Manga`, `Writer`, `Penciller`, `Inker`, and `CoverArtist`. Field captions are the readable names (`Language`, `Cover artist`, and the rest), not the ComicInfo element names. A field is written only after the user edits it or a load sets it, except each file's `Number`, which a save takes from that file's filename when the stored number differs, and each file's `PageCount`, which a save takes from `archive_page_count` when ComicInfo `page_count` is blank. The form shows that archive count in `Page count` when ComicInfo left it blank. An override or a value already in ComicInfo is left alone. An unchanged save does not rewrite the archive. The preview follows the anchor.
-- Search and load fill the form and do not write an archive. Scrape opens the centered Matches dialog in a searching state; results replace that body with a large cover, a Series/Year/Issues/(Publisher or Author) table, and a summary pane; the first row is highlighted, OK or double-click starts load, dismiss while searching cancels the job, an empty or failed search closes the dialog, and a successful load clears the list so the dialog closes. A load marks the fields it sets dirty, including `Manga` on a shared form. A blank Comic Vine key fails before a request.
+- Search and load fill the form and do not write an archive. Scrape opens the centered Matches dialog in a searching state; results replace that body with a large cover, a Series/Year/Issues/(Publisher or Author) table, and a summary pane; the first row is highlighted, OK or double-click starts load, dismiss while searching cancels the job, an empty or failed search closes the dialog, and a successful load clears the list so the dialog closes. A load marks the fields it sets dirty, including `Manga` on a shared form. A blank Comic Vine key, or a blank Nautiljon base URL or API key, fails before a request.
 - Save writes through `save_comic_info` and does not call `save_many`. One volume writes dirty fields, `Number` from the filename when that field was not edited and the stored value differs, and `PageCount` from `archive_page_count` when that field was not in the patch and ComicInfo left it blank. Several volumes write the dirty shared fields, including `Manga`, each file's `Number` from its filename, and each file's blank `PageCount` from its archive count. `Volume` is not written. Cancel stops before the next file. A failed file does not stop the rest, and files already written stay written. A successful save writes the sibling poster.
 - Rename shows the planned names, then runs on the selected place with the offered template `{Series} v{Number:02}`, then `write_poster` on each success. Convert asks before deleting `.cbr` files, turns selected `.cbr` files into `.cbz`, and skips `.cbz`. A path outside the library is rejected before any read or write.
 - Scrapes, saves, converts, and rescans are jobs on one worker. A new job is refused while one is queued or running. For Save, Rename, Convert, and Scan the header shows `completed/total` and Cancel. Search and Load progress stay in the Matches dialog, not the header. The user can cancel a batch job from the header, or a Search from Matches dismiss. A finished scrape, load, save, rename, convert, or scan that succeeded or failed shows one toast summary; cancelled jobs do not. A finished scan names a skipped or incomplete root in the inspector. Closing the window asks the worker to stop and does not leave a truncated archive from this process killing a write.

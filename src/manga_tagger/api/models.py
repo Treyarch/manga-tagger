@@ -76,11 +76,13 @@ class LibraryResponse(BaseModel):
 
 
 class ConfigModel(BaseModel):
-    """The five known config keys."""
+    """The seven known config keys."""
 
     library_roots: list[str]
     keep_cbr_original: bool
     comicvine_api_key: str
+    nautiljon_base_url: str
+    nautiljon_api_key: str
     title_languages: list[str]
     theme: str
 
@@ -93,6 +95,8 @@ class ConfigPut(BaseModel):
     library_roots: Any = None
     keep_cbr_original: Any = None
     comicvine_api_key: Any = None
+    nautiljon_base_url: Any = None
+    nautiljon_api_key: Any = None
     title_languages: Any = None
     theme: Any = None
 

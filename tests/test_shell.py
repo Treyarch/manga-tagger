@@ -412,6 +412,8 @@ def test_search_and_load_do_not_write() -> None:
         filename_stem="Claymore v02",
         title_languages=["fr", "en"],
         api_key="",
+        nautiljon_base_url="",
+        nautiljon_api_key="",
         build_query=lambda series, stem: series or stem,
         search=search,
         client_factory=default_client,
@@ -447,6 +449,8 @@ def test_search_and_load_do_not_write() -> None:
         form=form,
         title_languages=["fr", "en"],
         api_key="",
+        nautiljon_base_url="",
+        nautiljon_api_key="",
         load=lambda *_args, **_kwargs: {
             "Series": "Claymore",
             "Manga": "YesAndRightToLeft",

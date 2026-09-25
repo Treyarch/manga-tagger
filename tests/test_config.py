@@ -20,6 +20,8 @@ def test_missing_config_returns_defaults(tmp_path: Path) -> None:
     assert config.library_roots == []
     assert config.keep_cbr_original is False
     assert config.comicvine_api_key == ""
+    assert config.nautiljon_base_url == ""
+    assert config.nautiljon_api_key == ""
     assert config.title_languages == ["fr", "en"]
     assert config.theme == "system"
     assert config.extra == {}
@@ -30,6 +32,8 @@ def test_missing_config_returns_defaults(tmp_path: Path) -> None:
         "library_roots",
         "keep_cbr_original",
         "comicvine_api_key",
+        "nautiljon_base_url",
+        "nautiljon_api_key",
         "title_languages",
         "theme",
     }
@@ -84,6 +88,10 @@ def test_put_rejects_wrong_json_types(tmp_path: Path) -> None:
         apply_put(config, {"keep_cbr_original": "yes"})
     with pytest.raises(ConfigError):
         apply_put(config, {"comicvine_api_key": 5})
+    with pytest.raises(ConfigError):
+        apply_put(config, {"nautiljon_base_url": 5})
+    with pytest.raises(ConfigError):
+        apply_put(config, {"nautiljon_api_key": 5})
     with pytest.raises(ConfigError):
         apply_put(config, {"title_languages": "fr"})
 

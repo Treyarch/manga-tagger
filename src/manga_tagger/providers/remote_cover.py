@@ -6,7 +6,9 @@ import httpx
 
 from manga_tagger.providers.constants import USER_AGENT
 
-ALLOWED_COVER_HOSTS = frozenset({"uploads.mangadex.org"})
+ALLOWED_COVER_HOSTS = frozenset(
+    {"uploads.mangadex.org", "www.nautiljon.com", "nautiljon.com"}
+)
 
 
 class RemoteCoverError(Exception):

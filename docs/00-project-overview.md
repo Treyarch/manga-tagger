@@ -44,7 +44,7 @@ The API is FastAPI. Do not add Flask. Do not add Electron, a bundled Chromium, o
 Version 1 does three jobs:
 
 1. **ComicInfo.** Read and edit `ComicInfo.xml` inside an archive, and rename that archive in place from those tags. Preserve XML elements the app does not edit.
-2. **Scrape.** Search MangaDex, AniList, MyAnimeList (through Jikan), and Comic Vine. An accepted match loads the form. Save is what writes the archive.
+2. **Scrape.** Search MangaDex, AniList, MyAnimeList (through Jikan), Comic Vine, and Nautiljon (through a wrapper API). An accepted match loads the form. Save is what writes the archive.
 3. **Check a page.** Show the cover and individual pages while tagging, by reading those entries from the archive. This is a check of the file, not a reading mode.
 
 Each archive is one tankōbon. The volume number is stored in ComicInfo `Number`. `Volume` is not filled automatically.
@@ -55,7 +55,7 @@ The user can rename the archives sitting directly in one opened series folder. T
 
 Title text uses the first language the catalog actually has, in this order: French, then English, then the original title.
 
-A match from MangaDex, AniList, or MyAnimeList sets reading direction to right to left (`Manga` = `YesAndRightToLeft`). A Comic Vine match sets it to left to right (`Manga` = `No`). The form shows that value. Save writes the value still on the form.
+A match from MangaDex, AniList, MyAnimeList, or Nautiljon sets reading direction to right to left (`Manga` = `YesAndRightToLeft`). A Comic Vine match sets it to left to right (`Manga` = `No`). The form shows that value. Save writes the value still on the form.
 
 Saving metadata for a `.cbr`, or an explicit convert action, produces a `.cbz` beside it. The original `.cbr` is removed only after the `.cbz` is complete and its `ComicInfo.xml` can be read back. `Foo.cbr` becomes `Foo.cbz` in the same directory. If `Foo.cbz` already exists, the convert fails for that file and leaves the `.cbr` untouched. The default is to delete the `.cbr` so one book stays one file. `keep_cbr_original` keeps it.
 
@@ -100,6 +100,7 @@ Background failures are reported per file and leave that file unchanged. Expecte
 - `unar` is missing. CBZ features still work. Any CBR read or convert fails with an error that names `unar`.
 - A provider times out, rate-limits, or returns no match. The form shows the failure. `ComicInfo.xml` is unchanged.
 - Comic Vine is selected and `comicvine_api_key` is empty. The provider is unavailable until a key is set.
+- Nautiljon is selected and `nautiljon_base_url` or `nautiljon_api_key` is empty. The provider is unavailable until both are set.
 
 ## Configuration
 
@@ -117,7 +118,9 @@ On Linux, unset XDG variables mean `~/.config`, `~/.local/share`, and `~/.cache`
 | --- | --- | --- | --- |
 | `library_roots` | list of absolute paths | `[]` | Folders scanned for `.cbz` and `.cbr` files. An empty list means an empty shelf. |
 | `keep_cbr_original` | boolean | `false` | When `false`, delete the `.cbr` after its `.cbz` has been written and read back. When `true`, keep the `.cbr` next to the new `.cbz`. |
-| `comicvine_api_key` | string | `""` | Comic Vine API key. Empty disables that provider. The other three providers need no key. |
+| `comicvine_api_key` | string | `""` | Comic Vine API key. Empty disables that provider. |
+| `nautiljon_base_url` | string | `""` | Absolute origin of the Nautiljon wrapper API. Empty disables that provider. |
+| `nautiljon_api_key` | string | `""` | Nautiljon wrapper API key (`X-Api-Key`). Empty disables that provider. |
 | `title_languages` | list of strings | `["fr", "en"]` | Title preference order. Each entry is a language the catalog may have. The original title is used when none of them exist. |
 | `theme` | string | `system` | `system` follows `prefers-color-scheme`. `light` and `dark` force that theme. Any other value is treated as `system`. Defined in [05-ui-design.md](05-ui-design.md). |
 
@@ -140,7 +143,7 @@ Write these before the code they describe. Each one is a normal spec: YAML front
 | --- | --- |
 | `01-archives-and-comicinfo.md` | Partial read, preview, ComicInfo edit, `Number` as the volume, atomic CBZ save, batch save of shared series fields, in-place filename template, CBR convert |
 | `02-library-index.md` | SQLite index, recursive scan, thumbnail cache, first paint |
-| `03-metadata-providers.md` | MangaDex, AniList, Jikan, Comic Vine, title language order, reading direction, accept-before-write |
+| `03-metadata-providers.md` | MangaDex, AniList, Jikan, Comic Vine, Nautiljon, title language order, reading direction, accept-before-write |
 | `04-application-shell.md` | Single process, local FastAPI, pywebview, the one-screen layout, multi-volume selection |
 | `05-ui-design.md` | Nautilus-like light and dark theme, header bar, sidebar, list or cover grid, inspector, Lucide icons, local Tailwind components |
 
@@ -169,13 +172,13 @@ All resolved. Recorded here so they are not re-opened in feature specs.
 
 - **What is the UI?** A Svelte web UI inside a pywebview window. Chosen for a real web frontend and a single desktop window, without shipping Chromium.
 - **Which language?** Python 3.12. The library is a few hundred volumes, so the speed goal is avoiding full extracts and recompression, not a native rewrite.
-- **What must v1 do?** Edit ComicInfo, scrape the four catalogs, preview pages, apply shared series fields to every volume in the current selection, and rename archives in place from a filename template.
+- **What must v1 do?** Edit ComicInfo, scrape the five catalogs, preview pages, apply shared series fields to every volume in the current selection, and rename archives in place from a filename template.
 - **How does a batch save work?** One shared form is reviewed, then a multi-volume save writes the dirty shared fields `Series`, `Publisher`, `LanguageISO`, `AgeRating`, `Genre`, `Manga`, `Writer`, `Penciller`, `Inker`, and `CoverArtist` to each selected file. Each file also takes `Number` from its own filename when that name has a volume marker. `Volume` is not filled. A single selected volume writes the fields the user edited or a load set. An unchanged save does not rewrite the archive. This is still a confirmed save, not an unattended auto-tag.
 - **How does rename work?** The dialog shows the planned names first. The template offered is `{Series} v{Number:02}`. Each archive directly in the opened folder gets a new filename from its own ComicInfo. `{Number}` is the `Number` element, not `Volume`. `:02` zero-pads an integer to at least two digits. A fractional number such as `1.5` is kept as written and is not padded. The file is not moved to another directory. A successful save or rename also writes `{stem}-poster.jpg` at 600 pixels wide.
 - **What is one file?** One tankōbon. ComicInfo `Number` is the volume number. `Volume` is not auto-filled.
-- **Which catalogs?** MangaDex, AniList, MyAnimeList via Jikan, and Comic Vine when an API key is set.
+- **Which catalogs?** MangaDex, AniList, MyAnimeList via Jikan, Comic Vine when an API key is set, and Nautiljon when the wrapper base URL and API key are set.
 - **Which title?** French, then English, then the original. The order is `title_languages`, default `["fr", "en"]`, with the original title as the fallback.
-- **Which reading direction?** Right to left for MangaDex, AniList, and MyAnimeList. Left to right for Comic Vine. The form can change it before save.
+- **Which reading direction?** Right to left for MangaDex, AniList, MyAnimeList, and Nautiljon. Left to right for Comic Vine. The form can change it before save.
 - **What happens when ComicInfo already exists?** The match loads the form. Disk changes only on save. A single-volume save writes the fields the user edited or a load set, plus `Number` from the filename when that field was not edited and the stored value differs. A multi-volume save writes the dirty shared fields, including `Manga`, and each file's `Number` from its filename. `Volume` is not filled. An unchanged save does not rewrite the archive.
 - **What happens to `.cbr`?** Convert to `.cbz` on save or explicit convert. Delete the `.cbr` after a verified write unless `keep_cbr_original` is true.
 - **Which files are scanned?** `.cbz` and `.cbr` only, recursively inside each library root. Symlinks that leave the root are ignored.

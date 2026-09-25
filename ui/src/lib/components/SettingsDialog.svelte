@@ -20,6 +20,8 @@
 
   let roots = $state(untrack(() => config.library_roots.join("\n")));
   let apiKey = $state(untrack(() => config.comicvine_api_key));
+  let nautiljonBaseUrl = $state(untrack(() => config.nautiljon_base_url));
+  let nautiljonApiKey = $state(untrack(() => config.nautiljon_api_key));
   let keepOriginal = $state(untrack(() => config.keep_cbr_original));
   let languages = $state(untrack(() => config.title_languages.join(", ")));
   let error = $state("");
@@ -34,6 +36,8 @@
       const next = await putConfig({
         library_roots: parsed.roots,
         comicvine_api_key: apiKey,
+        nautiljon_base_url: nautiljonBaseUrl,
+        nautiljon_api_key: nautiljonApiKey,
         keep_cbr_original: keepOriginal,
         title_languages: parseLanguages(languages),
       });
@@ -56,6 +60,20 @@
     <label class="flex flex-col gap-1">
       <span class="text-xs text-zinc-500 dark:text-zinc-400">Comic Vine API key</span>
       <TextInput value={apiKey} onValue={(value) => (apiKey = value)} />
+    </label>
+    <label class="flex flex-col gap-1">
+      <span class="text-xs text-zinc-500 dark:text-zinc-400">Nautiljon base URL</span>
+      <TextInput
+        value={nautiljonBaseUrl}
+        onValue={(value) => (nautiljonBaseUrl = value)}
+      />
+    </label>
+    <label class="flex flex-col gap-1">
+      <span class="text-xs text-zinc-500 dark:text-zinc-400">Nautiljon API key</span>
+      <TextInput
+        value={nautiljonApiKey}
+        onValue={(value) => (nautiljonApiKey = value)}
+      />
     </label>
     <Checkbox label="Keep the original CBR" bind:checked={keepOriginal} />
     <label class="flex flex-col gap-1">

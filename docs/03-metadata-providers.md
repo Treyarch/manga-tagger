@@ -5,9 +5,9 @@ status: active
 
 # Metadata providers
 
-This specification owns the scrape query, the volume number parsed from a filename, and the four catalogs: MangaDex, AniList, MyAnimeList through Jikan, and Comic Vine. An accepted match is a form patch. It implements performance rule 8 from [00-project-overview.md](00-project-overview.md), and the cancel check the application shell uses for the scrape clause of performance rule 7.
+This specification owns the scrape query, the volume number parsed from a filename, and the five catalogs: MangaDex, AniList, MyAnimeList through Jikan, Comic Vine, and Nautiljon (through a local wrapper API). An accepted match is a form patch. It implements performance rule 8 from [00-project-overview.md](00-project-overview.md), and the cancel check the application shell uses for the scrape clause of performance rule 7.
 
-The core lives in `src/manga_tagger/providers/` and imports without FastAPI and without pywebview. Callers pass `title_languages`, the Comic Vine key, an `httpx.Client`, and an optional `cancel` callable. This module does not read the TOML config file, does not open an archive, and does not start a thread.
+The core lives in `src/manga_tagger/providers/` and imports without FastAPI and without pywebview. Callers pass `title_languages`, the Comic Vine key, the Nautiljon base URL and API key, an `httpx.Client`, and an optional `cancel` callable. This module does not read the TOML config file, does not open an archive, and does not start a thread.
 
 Archive writes stay in [01-archives-and-comicinfo.md](01-archives-and-comicinfo.md). The window, the provider picker, and which patch keys a multi-volume save keeps belong to the application-shell specification.
 
@@ -72,24 +72,24 @@ The query remainder is the tag-stripped stem without that matched suffix, includ
 
 ## Search and load
 
-The caller chooses one provider: `mangadex`, `anilist`, `jikan`, or `comicvine`. Any other name raises `ProviderResponseError` and sends no request.
+The caller chooses one provider: `mangadex`, `anilist`, `jikan`, `comicvine`, or `nautiljon`. Any other name raises `ProviderResponseError` and sends no request.
 
 ```text
-search(provider, query, *, title_languages, api_key="", client, cancel=None) -> list[Candidate]
-load(provider, match_id, *, filename_stem, title_languages, api_key="", client, cancel=None) -> dict[str, str]
+search(provider, query, *, title_languages, api_key="", nautiljon_base_url="", nautiljon_api_key="", client, cancel=None) -> list[Candidate]
+load(provider, match_id, *, filename_stem, title_languages, api_key="", nautiljon_base_url="", nautiljon_api_key="", client, cancel=None) -> dict[str, str]
 ```
 
-A `Candidate` has `id`, `title`, `year`, `credit`, `count`, `summary`, and `cover`, all strings. `id` is the catalog id in decimal digits for AniList, Jikan, and Comic Vine, and the MangaDex UUID for MangaDex. `title` is the preferred series title. `year` is the start or publish year from the search payload when present, otherwise `""`. `credit` is the first author for MangaDex and Jikan, the first staff name for AniList, and the publisher name for Comic Vine, otherwise `""`. `count` is an issue or volume count from the search payload when present, otherwise `""`. `summary` is a plain-text synopsis or deck from the search payload when present (HTML-stripped), otherwise `""`. `cover` is an absolute HTTPS image URL from the search payload, or `""` when that URL is missing, blank, or not a string. A missing cover does not drop the candidate.
+A `Candidate` has `id`, `title`, `year`, `credit`, `count`, `summary`, and `cover`, all strings. `id` is the catalog id in decimal digits for AniList, Jikan, and Comic Vine, the MangaDex UUID for MangaDex, and the Nautiljon series slug for Nautiljon. `title` is the preferred series title. `year` is the start or publish year from the search payload when present, otherwise `""`. `credit` is the first author for MangaDex and Jikan, the first staff name for AniList, the publisher name for Comic Vine, and `""` for Nautiljon search hits, otherwise `""`. `count` is an issue or volume count from the search payload when present, otherwise `""`. `summary` is a plain-text synopsis or deck from the search payload when present (HTML-stripped), otherwise `""`. `cover` is an absolute HTTPS image URL from the search payload, or `""` when that URL is missing, blank, or not a string. A missing cover does not drop the candidate.
 
 At most 10 hits are requested. That limit is a constant. A hit with no usable title is dropped. The module then keeps at most the first 10 remaining hits, in API order. An empty list is not an error.
 
 `search` does not call `load`. `load` fetches one series record and returns the form patch. Patch keys are ComicInfo element names. A value is a string. A field the catalog does not have is absent, not `""`.
 
-`load` adds `Number` when `parse_number(filename_stem)` returns a string. It never adds `Volume`, `Pages`, `PageCount`, `AgeRating`, `CommunityRating`, or `Notes`. `Series` and `Title` are the same preferred title. A record with no usable title raises `ProviderResponseError` and does not return a partial patch.
+`load` adds `Number` when `parse_number(filename_stem)` returns a string. It never adds `Volume`, `Pages`, `PageCount`, `CommunityRating`, or `Notes`. `AgeRating` is set only by Nautiljon when `infos.ageConseille` is non-blank. `Series` and `Title` are the same preferred title. A record with no usable title raises `ProviderResponseError` and does not return a partial patch.
 
 The patch is what one accepted match loads into the form. It may include `Title`, `Number`, `Summary`, `Manga`, `Web`, `Year`, `Month`, and `Day`. `Manga` is a shared save field. `Title`, `Number`, `Summary`, `Web`, and dates are not. On a multi-volume save the shell ignores `Number` from this patch and writes each file's `Number` from that file's filename. This module does not call `save_comic_info` or `save_many`. The application shell decides which keys a later save writes.
 
-`match_id` must be non-blank and must not contain `/`, `?`, `#`, or whitespace. AniList, Jikan, and Comic Vine ids must also be decimal digits with no sign and no leading zero unless the id is `0`. A bad id raises `ProviderResponseError` before any request. The Comic Vine URL adds the `4050-` prefix. The stored id does not include it.
+`match_id` must be non-blank and must not contain `/`, `?`, `#`, or whitespace. AniList, Jikan, and Comic Vine ids must also be decimal digits with no sign and no leading zero unless the id is `0`. MangaDex and Nautiljon ids are not required to be decimal. A bad id raises `ProviderResponseError` before any request. The Comic Vine URL adds the `4050-` prefix. The stored id does not include it. The Nautiljon id is the series slug (for example `a+town+where+you+live`).
 
 ### Call order
 
@@ -98,12 +98,13 @@ The patch is what one accepted match loads into the form. It may include `Title`
 1. Unknown provider: `ProviderResponseError`.
 2. `query` blank after trim: return `[]`.
 3. Comic Vine with `api_key` blank after trim: `ProviderUnavailableError`.
-4. `cancel` is not `None` and returns true: `ProviderCancelledError`.
-5. Send one request.
+4. Nautiljon with `nautiljon_base_url` or `nautiljon_api_key` blank after trim: `ProviderUnavailableError`.
+5. `cancel` is not `None` and returns true: `ProviderCancelledError`.
+6. Send the request(s).
 
-`load` uses the same order, except step 2 is a blank or illegal `match_id`, which raises `ProviderResponseError`. An empty search query does not check the key and does not call `cancel`.
+`load` uses the same order, except step 2 is a blank or illegal `match_id`, which raises `ProviderResponseError`. An empty search query does not check keys and does not call `cancel`.
 
-`cancel` is checked once, immediately before the request. A request already started is not aborted.
+`cancel` is checked once, immediately before each request. A request already started is not aborted. Nautiljon `load` may send a second request for a volume page; `cancel` is checked again before that request.
 
 ## Titles
 
@@ -115,8 +116,9 @@ The patch is what one accepted match loads into the form. It may include `Title`
 | AniList | `en` is `title.english`. Every other code, including `fr`, has no slot and is skipped | `title.native`, else `title.romaji` | `en` when the English title was chosen. For native, `JP` is `ja`, `KR` is `ko`, `CN` is `zh`, and `TW` is `zh`. Any other country, and a romaji fallback, omit `LanguageISO` |
 | Jikan | `fr` is a title whose `type` is `French`. `en` is `English`. Every other code is skipped | `type` `Japanese`, else `type` `Default` | `fr`, `en`, or `ja` for those three types. `Default` omits `LanguageISO` |
 | Comic Vine | No language slots. `name` is the title | `name` | Omitted |
+| Nautiljon | `fr` is `title`. `ja` is `infos.titreOriginal`. Every other code is skipped | `title` | `fr` when the French title won. `ja` when the original title won through the `ja` slot. Omitted when the original `title` is used as fallback |
 
-MangaDex, AniList, and Jikan set `Manga` to `YesAndRightToLeft`. Comic Vine sets `Manga` to `No`.
+MangaDex, AniList, Jikan, and Nautiljon set `Manga` to `YesAndRightToLeft`. Comic Vine sets `Manga` to `No`.
 
 ## Shared field rules
 
@@ -264,6 +266,34 @@ HTTP 200 is still an error when `error` is not `OK` or `status_code` is not `1`.
 
 `LanguageISO` is omitted. A role is split on commas. Each piece is trimmed and compared case-insensitively, as a whole piece. `writer, artist` fills `Writer` and `Penciller`. It does not fill `CoverArtist`. `artist` is not copied into `CoverArtist`. The candidate uses `start_year` for `year`, `publisher.name` for `credit`, `count_of_issues` for `count`, and `deck` (or `description` when deck is empty) HTML-stripped for `summary`. The candidate cover is `image.super_url`, or `image.medium_url`, or `image.small_url`, or `image.thumb_url`, taking the first non-blank in that order.
 
+## Nautiljon
+
+Nautiljon is reached through a separate wrapper API. The caller passes `nautiljon_base_url` (absolute origin, trailing slash optional) and `nautiljon_api_key`. Every request sets header `X-Api-Key` to that key. A blank base URL or blank API key raises `ProviderUnavailableError` before any request. The message names the missing setting: `The Nautiljon base URL is not set` or `The Nautiljon API key is not set`. When both are blank, the base URL message wins.
+
+Search is `GET {base}/v1/search` with query `q`. Load series is `GET {base}/v1/series/{slug}`. When `parse_number(filename_stem)` returns a positive integer string (digits only, value at least `1`), load also requests `GET {base}/v1/series/{slug}/volumes/{number}` after the series response. A fractional number such as `1.5` skips the volume request. HTTP 404 on the volume request leaves the series patch unchanged and is not an error. Any other volume HTTP error raises `ProviderResponseError`.
+
+The base URL is trimmed and has a trailing `/` removed before paths are joined. The slug in the path is the `match_id` (percent-encoded path segment).
+
+Search reads `results` as a list. Missing or non-list `results` raises `ProviderResponseError`. `[]` returns no candidates. A hit without a usable title or without a slug parsed from `url` is dropped. The slug is the path segment of `/mangas/{slug}.html` on the result `url`.
+
+Load series requires a JSON object with a non-blank `title`. Anything else raises `ProviderResponseError`.
+
+| Patch key | Source |
+| --- | --- |
+| `Series`, `Title` | Preferred title |
+| `LanguageISO` | From the title rule |
+| `Summary` | Series `synopsis`, HTML-stripped. When a volume page was loaded and its `description` is non-blank after HTML stripping, that text replaces the series synopsis |
+| `Publisher` | `infos.editeurVf`, else `infos.editeurVo` |
+| `Year` | `infos.anneeVf` when that string is a non-blank year. Else a 4-digit year found in `infos.origine`. When a volume page was loaded and `releaseDateVf` matches `DD/MM/YYYY`, that date sets `Year`, `Month`, and `Day` (overwriting series year) |
+| `Genre` | `infos.genres` then `infos.themes`, joined in that order |
+| `Writer` | `infos.auteurs` names with a trailing ` (…)` role suffix removed |
+| `Penciller`, `CoverArtist` | `extra.Dessinateur` when that string is non-blank. Both keys receive that same value |
+| `AgeRating` | `infos.ageConseille` when non-blank |
+| `Web` | series `sourceUrl` |
+| `Manga` | `YesAndRightToLeft` |
+
+`Translator` is omitted. `infos` and `extra` that are not objects are treated as empty. List fields that are not lists are skipped. The candidate uses `dateVo` for `year`, `""` for `credit` (search hits have no auteur list), `issues` for `count`, `description` (HTML-stripped) for `summary`, and `cover` when that string is a non-blank absolute HTTPS URL.
+
 ## HTTP
 
 Every request sets `User-Agent` to `manga-tagger`, including when the client already has another default. The module does not build a client and does not set a timeout. The application shell builds the client with a 15 second timeout. Tests pass their own client.
@@ -274,11 +304,11 @@ There is no sleep and no retry. `httpx.TransportError`, including timeouts, rais
 
 | Exception | When |
 | --- | --- |
-| `ProviderUnavailableError` | The provider is `comicvine` and `api_key` is blank. The message says the Comic Vine API key is not set. No request is sent |
+| `ProviderUnavailableError` | The provider is `comicvine` and `api_key` is blank, or the provider is `nautiljon` and `nautiljon_base_url` or `nautiljon_api_key` is blank. The message names the missing setting. No request is sent |
 | `ProviderCancelledError` | `cancel` returns true immediately before a request. That request is not sent |
 | `ProviderTimeoutError` | The client raises `httpx.TransportError` |
 | `ProviderRateLimitError` | The response status is 429 |
-| `ProviderResponseError` | The provider name is unknown, `match_id` is illegal, the status is a different HTTP error, Comic Vine reports failure, or the body has no usable record |
+| `ProviderResponseError` | The provider name is unknown, `match_id` is illegal, the status is a different HTTP error (except Nautiljon volume 404), Comic Vine reports failure, or the body has no usable record |
 
 All of these are subclasses of `ProviderError`. `ProviderRateLimitError`, `ProviderTimeoutError`, and `ProviderResponseError` name the provider in the message. None of them write a file.
 
@@ -286,9 +316,9 @@ An empty candidate list is not an exception.
 
 ## Configuration
 
-This specification adds no configuration keys.
+This specification adds no configuration keys of its own.
 
-`title_languages` and `comicvine_api_key` are arguments. Their defaults remain those in [00-project-overview.md](00-project-overview.md): `["fr", "en"]` and `""`. The result limit of 10, the `User-Agent` `manga-tagger`, and the shell timeout of 15 seconds are not TOML keys.
+`title_languages`, `comicvine_api_key`, `nautiljon_base_url`, and `nautiljon_api_key` are arguments. Their defaults remain those in [00-project-overview.md](00-project-overview.md): `["fr", "en"]` and `""` for each string key. The result limit of 10, the `User-Agent` `manga-tagger`, and the shell timeout of 15 seconds are not TOML keys.
 
 `httpx` is the HTTP library. It is added to `pyproject.toml` when this specification is implemented.
 
@@ -304,29 +334,32 @@ Cover at least:
 - An AniList fixture with `english` and `native`, and `title_languages` `["fr", "en"]`, uses the English title and `LanguageISO` `en`. A fixture with only `native` and `countryOfOrigin` `JP` uses the native title and `LanguageISO` `ja`. A romaji-only fixture omits `LanguageISO`. A staff role `Story & Art` fills `Writer`, `Penciller`, and `CoverArtist`. A role `Partial coloring` fills none of those credit fields. A role `Artist` fills `Penciller` and `CoverArtist` and does not fill `Writer`. `Publisher` is absent. `Manga` is `YesAndRightToLeft`.
 - A Jikan fixture with title types `French` and `English` uses the French title and `LanguageISO` `fr`. `serializations[0].name` is `Publisher`. `genres` are joined in order and a theme is not included. `published.prop.from` of year `2001`, month `6`, day `null` sets `Year` `2001` and `Month` `6` and omits `Day`. An author type `Story & Art` fills `Writer`, `Penciller`, and `CoverArtist`. An author type `Partial` fills none of those credit fields.
 - A Comic Vine load sets `Manga` to `No`, omits `LanguageISO`, uses `description` over `deck`, and maps `writer, artist` to `Writer` and `Penciller` but not `CoverArtist`. A role `cover` sets `CoverArtist`. A blank `api_key` raises `ProviderUnavailableError`, the message says the Comic Vine API key is not set, and the transport sees no request. A JSON `status_code` other than `1` raises `ProviderResponseError`.
+- A Nautiljon search fixture yields a candidate whose `id` is the series slug from `url`, with `year` from `dateVo`, `credit` `""`, `count` from `issues`, and `cover` from the cover URL. Search sends `X-Api-Key`. A blank base URL or blank API key raises `ProviderUnavailableError` with the matching message and the transport sees no request.
+- A Nautiljon load with `title_languages` `["fr", "en"]` uses `title`, sets `LanguageISO` `fr`, `Manga` `YesAndRightToLeft`, `Publisher` from `editeurVf`, `Writer` from stripped `auteurs`, and both `Penciller` and `CoverArtist` from `extra.Dessinateur`. `AgeRating` comes from `ageConseille`. Filename stem `Berserk v01` includes `Number` `1`, requests the volume endpoint, and prefers the volume `description` for `Summary` and `releaseDateVf` for `Year`/`Month`/`Day`. Volume HTTP 404 keeps the series synopsis. Stem `Berserk` omits `Number` and does not request a volume.
 - `load` with filename stem `Claymore v02` includes `Number` `2` and does not include `Volume`. `load` with stem `Claymore` omits `Number`. `Title` equals `Series`.
 - Summary `<p>Hello&nbsp;there</p>` becomes `Hello there`.
 - Status 429 raises `ProviderRateLimitError`. A transport that raises `httpx.ConnectError` raises `ProviderTimeoutError`.
 - `load` whose `cancel` returns true raises `ProviderCancelledError` and the transport sees no request.
 - Provider name `other` raises `ProviderResponseError` and the transport sees no request.
 - `search` and `load` have no archive path argument. A test that calls them writes nothing in a temporary directory.
-- Search candidates include `cover` when the fixture has a usable image URL (MangaDex cover art file name, AniList `coverImage.large`, Jikan `images.jpg`, Comic Vine `image`), and `cover` is `""` when that URL is absent. MangaDex search requests `includes[]=cover_art`. AniList search requests `coverImage { large }`, `volumes`, `chapters`, and `description`. Comic Vine search `field_list` includes `image`, `count_of_issues`, `deck`, and `description`.
+- Search candidates include `cover` when the fixture has a usable image URL (MangaDex cover art file name, AniList `coverImage.large`, Jikan `images.jpg`, Comic Vine `image`, Nautiljon `cover`), and `cover` is `""` when that URL is absent. MangaDex search requests `includes[]=cover_art`. AniList search requests `coverImage { large }`, `volumes`, `chapters`, and `description`. Comic Vine search `field_list` includes `image`, `count_of_issues`, `deck`, and `description`.
 - Search candidates expose structured `year`, `credit`, `count`, and `summary` from the search payload when those values are present, and `""` when absent.
+- Remote cover downloads allow `uploads.mangadex.org`, `www.nautiljon.com`, and `nautiljon.com`.
 
 ## Acceptance criteria
 
-- The caller selects one of MangaDex, AniList, Jikan, or Comic Vine. Search returns at most 10 candidates. An empty query returns no candidates and sends no request.
+- The caller selects one of MangaDex, AniList, Jikan, Comic Vine, or Nautiljon. Search returns at most 10 candidates. An empty query returns no candidates and sends no request.
 - Each candidate has `id`, `title`, `year`, `credit`, `count`, `summary`, and `cover` as strings. `cover` is an absolute HTTPS URL or `""`. A missing cover does not drop the hit.
 - The query is the trimmed `Series` when that value is non-blank, without removing numbers from it. Otherwise it is the filename stem after release tags and one volume suffix. The locked stem table produces those queries and numbers.
 - `load` returns a form patch and does not write an archive. `Title` and `Series` are the same preferred series title. `Number` is present only when the filename stem has a volume marker. `Volume` is never present.
-- French, then English, then the original title, following `title_languages`. AniList has no French title slot, so `fr` is skipped there. Comic Vine uses its single name and omits `LanguageISO`.
-- MangaDex, AniList, and Jikan set `Manga` to `YesAndRightToLeft`. Comic Vine sets `Manga` to `No`.
-- A blank Comic Vine key fails before any request, and the message says the Comic Vine API key is not set. A timeout, a connection failure, or HTTP 429 raises the matching provider error. No call sleeps or retries.
+- French, then English, then the original title, following `title_languages`. AniList has no French title slot, so `fr` is skipped there. Comic Vine uses its single name and omits `LanguageISO`. Nautiljon maps `fr` to the site title and `ja` to `titreOriginal`.
+- MangaDex, AniList, Jikan, and Nautiljon set `Manga` to `YesAndRightToLeft`. Comic Vine sets `Manga` to `No`.
+- A blank Comic Vine key, or a blank Nautiljon base URL or API key, fails before any request with a message that names the missing setting. A timeout, a connection failure, or HTTP 429 raises the matching provider error. No call sleeps or retries.
 - `cancel` returning true before a request sends no request. A network result is not an archive write.
 
 ## Open questions
 
 All resolved. Recorded here so they are not re-opened.
 
-- **What does a match fill?** Series-level fields. `Title` is the same preferred series title. There is no per-volume or per-issue lookup. `Number` comes from the filename. `Volume` is not set.
+- **What does a match fill?** Series-level fields. `Title` is the same preferred series title. `Number` comes from the filename. `Volume` is not set. Nautiljon may also fetch one volume page when `Number` is a positive integer, only to prefer that volume's résumé and French release date.
 - **How many catalogs are searched at once?** One. The caller passes the provider id.

@@ -102,6 +102,7 @@ export const PROVIDERS = [
   { id: "anilist", label: "AniList" },
   { id: "jikan", label: "MyAnimeList" },
   { id: "comicvine", label: "Comic Vine" },
+  { id: "nautiljon", label: "Nautiljon" },
 ] as const;
 
 const FIELD_COLUMNS: Record<string, string> = {
