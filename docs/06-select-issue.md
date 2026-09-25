@@ -102,7 +102,7 @@ Preferred number for OK: form `Number` when non-blank and not mixed, else filena
 
 ## UI
 
-Matches footer actions, leading to trailing: quiet **Select Issue**, quiet **Cancel**, primary **OK**.
+Matches footer actions, leading to trailing: secondary **Select Issue**, secondary **Cancel**, primary **OK**.
 
 - **OK** / Enter: start Load for the highlighted series id without `issue_id` (number from form/stem).
 - **Select Issue** / double-click on a series row: start the Issues job for that id. While Issues is queued or running, Matches shows busy (Select Issue and OK disabled) or the client may show the Issues dialog in a loading state; either is acceptable if Cancel on Matches can still dismiss and cancel.

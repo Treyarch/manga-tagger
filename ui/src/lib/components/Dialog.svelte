@@ -67,11 +67,13 @@
     </div>
     <div class="mt-4 flex justify-end gap-2">
       {#if leadingLabel !== undefined && onLeading}
-        <Button variant="quiet" disabled={leadingDisabled} onclick={onLeading}
-          >{leadingLabel}</Button
+        <Button
+          variant="secondary"
+          disabled={leadingDisabled}
+          onclick={onLeading}>{leadingLabel}</Button
         >
       {/if}
-      <Button variant="quiet" onclick={onDismiss}>Cancel</Button>
+      <Button variant="secondary" onclick={onDismiss}>Cancel</Button>
       {#if confirmLabel !== undefined && onConfirm}
         <Button
           variant={confirmVariant}
