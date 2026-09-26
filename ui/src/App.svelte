@@ -218,7 +218,7 @@
 
   function toastFrom(job: Job) {
     const toast = jobToastMessage(job);
-    if (toast) pushToast(toast.message, toast.tone);
+    if (toast) pushToast(toast.message, toast.tone, toast.icon);
   }
 
   async function settle(job: Job) {

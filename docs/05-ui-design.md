@@ -202,13 +202,25 @@ Actions sit at the trailing edge by default: a `secondary` dismiss button labele
 
 ### Toast
 
-`ToastHost.svelte` plus `ui/src/lib/toast.ts`. The host is a fixed stack at the top-center of the window (`top-16 left-1/2 -translate-x-1/2`), clear of the 8px window inset and 48px header, `z-40` so it sits above dialogs. The host stays mounted even when empty so the first toast still runs its enter transition. Each toast is one short sentence, `rounded-lg`, `text-sm`, `max-w-sm`, and `px-4 py-3`. Success uses primary text. Failure uses `text-red-600` in light and `text-red-400` in dark. No badges, icons, or progress bars.
+`ToastHost.svelte` plus `ui/src/lib/toast.ts`. The host is a fixed stack at the top-center of the window (`top-16 left-1/2 -translate-x-1/2`), clear of the 8px window inset and 48px header, `z-40` so it sits above dialogs. The host stays mounted even when empty so the first toast still runs its enter transition. Each toast is a flex row: a leading 16px Lucide icon (`currentColor`, decorative, `aria-hidden`) and one short sentence. The row is `rounded-lg`, `text-sm`, `max-w-sm`, and `px-4 py-3`. Success uses primary text. Failure uses `text-red-600` in light and `text-red-400` in dark. No badges or progress bars.
+
+The icon follows the job that produced the toast (same glyphs as the chrome that started it). Failures always use Lucide `CircleAlert`. A direct `pushToast` with no job defaults to `Check` on success and `CircleAlert` on failure.
+
+| Context | Success icon | Failure icon |
+| --- | --- | --- |
+| Search | `ScanSearch` | `CircleAlert` |
+| Issues | `ListOrdered` | `CircleAlert` |
+| Load | `Check` | `CircleAlert` |
+| Save | `Save` | `CircleAlert` |
+| Rename | `Pencil` | `CircleAlert` |
+| Convert | `FileArchive` | `CircleAlert` |
+| Scan | `RefreshCw` | `CircleAlert` |
 
 Light mode uses a white fill, a `zinc-200` hairline, and `shadow-md` so the toast lifts off the pane. Dark mode does not reuse the pane fill: it uses a `zinc-800` fill, a `zinc-600` border, and `shadow-lg` with a dark black wash so the toast reads clearly against `zinc-900` panes and `zinc-950` chrome.
 
-Enter: fade in and fly downward about 24px over ~400ms with a slight overshoot (`backOut`). Exit: fade out and drift upward over ~220ms. Each toast removes itself after 5 seconds. A click dismisses it early. Several toasts stack downward with a small gap. The live region uses `role="status"` and `aria-live="polite"`. Toasts are not keyboard-focusable chrome and do not take a focus ring.
+Enter: fade in and fly downward about 24px over ~400ms with a slight overshoot (`backOut`). The leading icon pops once on mount (opacity 0→1 and scale 0.5→1 over ~400ms with a slight overshoot); it does not spin or pulse. Exit: fade out and drift upward over ~220ms. Each toast removes itself after 5 seconds. A click dismisses it early. Several toasts stack downward with a small gap. The live region uses `role="status"` and `aria-live="polite"`. Toasts are not keyboard-focusable chrome and do not take a focus ring.
 
-`toast.ts` owns the queue (`pushToast`, `dismissToast`) and the pure `jobToastMessage` helper that turns a finished job into that sentence. [04-application-shell.md](04-application-shell.md) decides when the client pushes a toast.
+`toast.ts` owns the queue (`pushToast`, `dismissToast`) and the pure `jobToastMessage` helper that turns a finished job into that sentence plus its `icon`. [04-application-shell.md](04-application-shell.md) decides when the client pushes a toast.
 
 ## Configuration
 
@@ -236,8 +248,8 @@ Cover at least:
 - Grouping by series puts blank-series volumes first with an empty `series` key, then named series in case-folded alphabetical order, preserving name order within each group.
 - Inspector field captions use the readable names from the shell form section, not camel-cased ComicInfo keys.
 - `dirtyFieldClass(true)` returns the amber dirty text and border utilities; `dirtyFieldClass(false)` returns `""`.
-- `jobToastMessage` returns null for `cancelled`, the scrape/load/save/rename/convert/scan sentences from the shell toast table for `succeeded` and `failed`, and uses entry counts without `error_message` for save, rename, and convert.
-- `pushToast` adds an item that `dismissToast` removes, and a timer removes it after 5 seconds.
+- `jobToastMessage` returns null for `cancelled`, the scrape/load/save/rename/convert/scan sentences and icons from the shell toast table for `succeeded` and `failed`, and uses entry counts without `error_message` for save, rename, and convert.
+- `pushToast` adds an item that `dismissToast` removes, defaults `icon` from tone when omitted, and a timer removes it after 5 seconds.
 - `candidatesOf` maps `id`, `title`, `year`, `credit`, `count`, `summary`, and `cover` from the search result, coercing missing fields to `""`.
 - `issuesOf` maps `id`, `number`, `title`, `date`, `cover`, and `summary` from the issues result, coercing missing fields to `""`.
 - `jobToastMessage` for Issues returns `No issues available.` on success with an empty list, null on success with hits, and the failure toast on failure.
@@ -257,7 +269,7 @@ The product brand (SVG logo and wordmark) is presentational chrome. It is covere
 - Icons are Lucide, `currentColor`, 16px in rows and menu items and 20px in the header. The view switch is `List` / `List view` and `LayoutGrid` / `Grid view`. Add folder is `FolderPlus`. Close is `X` at the trailing edge of the header. Icon buttons expose their accessible name as a native `title` so a short hover shows that label.
 - Buttons, text inputs, textareas, checkboxes, selects, menus, dialogs, and toasts are the local components in this document, styled with Tailwind utilities. The UI package does not depend on a third-party component kit.
 - Dialogs are centered over the window with a dimmed backdrop. Their panels use the same raised surface as toasts (white / `zinc-800` in dark, hairline, shadow) and fade in with a short upward overshoot. The title is bold with the opening control's Lucide icon ahead of it, and a Close `X` at the trailing edge of the title row. Settings, Rename, Convert, Matches, and Issues share that chrome. Settings uses the `lg` panel with a General / Archives / Scrapers tab rail. Matches and Issues use the `xl` panel width. Matches shows secondary Cancel and primary OK; when one volume is selected it also shows secondary Select Issue before Cancel; while searching it shows `Searching…` with a spinner, then a large cover beside a Series/Year/Issues/(Publisher or Author) table and a summary pane. Issues shows Loading issues… then Issue/Date/Title with the same cover and summary layout. Rename and Convert keep `md` width, secondary Cancel, and a confirm action.
-- Action toasts appear in a top-center stack below the header bar, fade in downward with a short overshoot (including the first toast), and disappear after 5 seconds or on click. In dark mode they use a raised `zinc-800` surface and a stronger shadow so they stand apart from the panes. They summarize scrape, load, save, rename, convert, and scan outcomes only—not in-progress search. Scrape match count, no matches, and provider errors are toast-only. Detailed per-file save/rename/convert errors and scan-root lines stay in the inspector.
+- Action toasts appear in a top-center stack below the header bar, fade in downward with a short overshoot (including the first toast), show a leading 16px Lucide icon that pops once on mount (job-matched on success, `CircleAlert` on failure), and disappear after 5 seconds or on click. In dark mode they use a raised `zinc-800` surface and a stronger shadow so they stand apart from the panes. They summarize scrape, load, save, rename, convert, and scan outcomes only—not in-progress search. Scrape match count, no matches, and provider errors are toast-only. Detailed per-file save/rename/convert errors and scan-root lines stay in the inspector.
 - Type is the default sans stack at `text-sm` for controls and rows, and `text-xs` for captions. The product wordmark alone uses the bundled Dela Gothic One face via `.font-brand`.
 - The header is three zones: leading brand (mini SVG + `Manga Tagger`), centered action cluster, trailing Settings / Close. The brand is readable in light and dark.
 - A keyboard focus ring is visible on the shared controls.

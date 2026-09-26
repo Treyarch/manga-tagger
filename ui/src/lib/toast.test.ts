@@ -49,12 +49,12 @@ describe("jobToastMessage", () => {
           },
         }),
       ),
-    ).toEqual({ message: "Found 1 matches.", tone: "ok" });
+    ).toEqual({ message: "Found 1 matches.", tone: "ok", icon: "scanSearch" });
     expect(
       jobToastMessage(
         job({ name: "Search", state: "succeeded", result: { candidates: [] } }),
       ),
-    ).toEqual({ message: "No matches.", tone: "ok" });
+    ).toEqual({ message: "No matches.", tone: "ok", icon: "scanSearch" });
     expect(
       jobToastMessage(
         job({
@@ -63,27 +63,29 @@ describe("jobToastMessage", () => {
           error_message: "rate limited",
         }),
       ),
-    ).toEqual({ message: "rate limited", tone: "error" });
+    ).toEqual({ message: "rate limited", tone: "error", icon: "alert" });
     expect(
       jobToastMessage(job({ name: "Search", state: "failed" })),
-    ).toEqual({ message: "Scrape failed.", tone: "error" });
+    ).toEqual({ message: "Scrape failed.", tone: "error", icon: "alert" });
   });
 
   it("summarizes load and scan", () => {
     expect(jobToastMessage(job({ name: "Load", state: "succeeded" }))).toEqual({
       message: "Metadata loaded.",
       tone: "ok",
+      icon: "check",
     });
     expect(jobToastMessage(job({ name: "Scan", state: "succeeded" }))).toEqual({
       message: "Library updated.",
       tone: "ok",
+      icon: "refreshCw",
     });
     expect(
       jobToastMessage(job({ name: "Load", state: "failed", error_message: "" })),
-    ).toEqual({ message: "Load failed.", tone: "error" });
+    ).toEqual({ message: "Load failed.", tone: "error", icon: "alert" });
     expect(
       jobToastMessage(job({ name: "Scan", state: "failed", error_message: "boom" })),
-    ).toEqual({ message: "boom", tone: "error" });
+    ).toEqual({ message: "boom", tone: "error", icon: "alert" });
   });
 
   it("summarizes issues", () => {
@@ -91,7 +93,11 @@ describe("jobToastMessage", () => {
       jobToastMessage(
         job({ name: "Issues", state: "succeeded", result: { issues: [] } }),
       ),
-    ).toEqual({ message: "No issues available.", tone: "ok" });
+    ).toEqual({
+      message: "No issues available.",
+      tone: "ok",
+      icon: "listOrdered",
+    });
     expect(
       jobToastMessage(
         job({
@@ -103,7 +109,7 @@ describe("jobToastMessage", () => {
     ).toBeNull();
     expect(
       jobToastMessage(job({ name: "Issues", state: "failed" })),
-    ).toEqual({ message: "Issues failed.", tone: "error" });
+    ).toEqual({ message: "Issues failed.", tone: "error", icon: "alert" });
   });
 
   it("counts save rename and convert entries", () => {
@@ -120,7 +126,19 @@ describe("jobToastMessage", () => {
           },
         }),
       ),
-    ).toEqual({ message: "Saved 2 volumes.", tone: "ok" });
+    ).toEqual({ message: "Saved 2 issues.", tone: "ok", icon: "save" });
+
+    expect(
+      jobToastMessage(
+        job({
+          name: "Save",
+          state: "succeeded",
+          result: {
+            entries: [{ path: "/a.cbz", output_path: "/a.cbz" }],
+          },
+        }),
+      ),
+    ).toEqual({ message: "Issue updated.", tone: "ok", icon: "save" });
 
     expect(
       jobToastMessage(
@@ -135,7 +153,7 @@ describe("jobToastMessage", () => {
           },
         }),
       ),
-    ).toEqual({ message: "Renamed 1 of 2.", tone: "ok" });
+    ).toEqual({ message: "Renamed 1 of 2.", tone: "ok", icon: "pencil" });
 
     expect(
       jobToastMessage(
@@ -151,17 +169,17 @@ describe("jobToastMessage", () => {
           },
         }),
       ),
-    ).toEqual({ message: "Converted 1 of 2.", tone: "ok" });
+    ).toEqual({ message: "Converted 1 of 2.", tone: "ok", icon: "fileArchive" });
 
     expect(
       jobToastMessage(
         job({ name: "Save", state: "succeeded", result: { entries: [] } }),
       ),
-    ).toEqual({ message: "Saved 0 volumes.", tone: "ok" });
+    ).toEqual({ message: "Saved 0 issues.", tone: "ok", icon: "save" });
 
     expect(
       jobToastMessage(job({ name: "Save", state: "failed" })),
-    ).toEqual({ message: "Save failed.", tone: "error" });
+    ).toEqual({ message: "Save failed.", tone: "error", icon: "alert" });
   });
 });
 
@@ -181,12 +199,23 @@ describe("toast queue", () => {
     const stop = subscribeToasts((items) => {
       seen.push(items.map((item) => item.id));
     });
-    const id = pushToast("Saved 1 volumes.");
+    const id = pushToast("Issue updated.");
     expect(listToasts()).toEqual([
-      { id, message: "Saved 1 volumes.", tone: "ok" },
+      { id, message: "Issue updated.", tone: "ok", icon: "check" },
     ]);
     expect(seen.at(-1)).toEqual([id]);
     stop();
+  });
+
+  it("defaults icon from tone and accepts an explicit icon", () => {
+    const okId = pushToast("Done.");
+    const errId = pushToast("Nope.", "error");
+    const saveId = pushToast("Issue updated.", "ok", "save");
+    expect(listToasts()).toEqual([
+      { id: okId, message: "Done.", tone: "ok", icon: "check" },
+      { id: errId, message: "Nope.", tone: "error", icon: "alert" },
+      { id: saveId, message: "Issue updated.", tone: "ok", icon: "save" },
+    ]);
   });
 
   it("dismisses on click helper and after five seconds", () => {
