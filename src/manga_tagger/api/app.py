@@ -17,6 +17,8 @@ from manga_tagger.api.models import (
     ConfigModel,
     ConfigPut,
     ConvertRequest,
+    FieldLocksRequest,
+    FieldLocksResponse,
     FolderDialogModel,
     IssuesRequest,
     JobModel,
@@ -39,10 +41,12 @@ from manga_tagger.archives.rename import plan_rename, rename_in_directory
 from manga_tagger.archives.save import convert_cbr, save_comic_info
 from manga_tagger.config import AppConfig, ConfigError, apply_put, save_config
 from manga_tagger.index import (
+    copy_locked_fields,
     forget_volume,
     list_volumes,
     refresh_volume,
     scan,
+    set_field_lock,
     thumbnail_for,
 )
 from manga_tagger.jobs import (
@@ -56,6 +60,7 @@ from manga_tagger.shell import (
     NoThumbnailError,
     ShellError,
     accept_root_paths,
+    apply_field_locks,
     default_client,
     ensure_inside,
     load_library,
@@ -69,7 +74,7 @@ from manga_tagger.shell import (
     run_save,
     run_scan,
     run_search,
-    thumbnail_bytes,
+    thumbnail_path,
     validate_save,
 )
 
@@ -91,6 +96,8 @@ class Services:
     thumbnail_for: Callable[..., object]
     refresh_volume: Callable[..., object]
     forget_volume: Callable[..., object]
+    copy_locked_fields: Callable[..., object]
+    set_field_lock: Callable[..., object]
     list_pages: Callable[..., object]
     read_page: Callable[..., object]
     save_comic_info: Callable[..., object]
@@ -128,6 +135,8 @@ def default_services() -> Services:
         thumbnail_for=thumbnail_for,
         refresh_volume=refresh_volume,
         forget_volume=forget_volume,
+        copy_locked_fields=copy_locked_fields,
+        set_field_lock=set_field_lock,
         list_pages=list_pages,
         read_page=read_page,
         save_comic_info=save_comic_info,
@@ -304,16 +313,23 @@ def _register_routes(app: FastAPI) -> None:
         return Response(content=payload, media_type=media)
 
     @app.get("/api/thumbnail")
-    def thumbnail(path: str) -> Response:
+    def thumbnail(path: str) -> FileResponse:
         state = _state(app)
-        payload = thumbnail_bytes(
+        found = thumbnail_path(
             path,
             state.config.library_roots,
             thumbnail_for=state.services.thumbnail_for,
             db_path=str(state.index_path),
             cache_dir=str(state.thumbnail_dir),
         )
-        return Response(content=payload, media_type="image/jpeg")
+        return FileResponse(
+            found,
+            media_type="image/jpeg",
+            headers={
+                "Cache-Control": "private, max-age=3600",
+                "ETag": f'"{found.stem}"',
+            },
+        )
 
     @app.get("/api/cover")
     def cover(url: str) -> Response:
@@ -469,12 +485,14 @@ def _register_routes(app: FastAPI) -> None:
                 volumes=volumes,
                 roots=list(config.library_roots),
                 keep_cbr_original=config.keep_cbr_original,
+                write_poster_on_save=config.write_poster_on_save,
                 db_path=str(state.index_path),
                 cache_dir=str(state.thumbnail_dir),
                 save_comic_info=state.services.save_comic_info,
                 write_poster=state.services.write_poster,
                 refresh_volume=state.services.refresh_volume,
                 forget_volume=state.services.forget_volume,
+                copy_locked_fields=state.services.copy_locked_fields,
                 parse_number=state.services.parse_number,
                 cancel=cancel,
                 progress=progress,
@@ -492,12 +510,14 @@ def _register_routes(app: FastAPI) -> None:
                 directory=body.directory,
                 template=body.template,
                 roots=list(state.config.library_roots),
+                write_poster_on_save=state.config.write_poster_on_save,
                 db_path=str(state.index_path),
                 cache_dir=str(state.thumbnail_dir),
                 rename_in_directory=state.services.rename_in_directory,
                 write_poster=state.services.write_poster,
                 refresh_volume=state.services.refresh_volume,
                 forget_volume=state.services.forget_volume,
+                copy_locked_fields=state.services.copy_locked_fields,
                 cancel=cancel,
                 progress=progress,
             )
@@ -545,11 +565,27 @@ def _register_routes(app: FastAPI) -> None:
                 convert_cbr=state.services.convert_cbr,
                 refresh_volume=state.services.refresh_volume,
                 forget_volume=state.services.forget_volume,
+                copy_locked_fields=state.services.copy_locked_fields,
                 cancel=cancel,
                 progress=progress,
             )
 
         return JobModel.from_job(state.runner.start("Convert", fn))
+
+    @app.post("/api/field-locks", response_model=FieldLocksResponse)
+    def post_field_locks(body: FieldLocksRequest) -> FieldLocksResponse:
+        state = _state(app)
+        rows = apply_field_locks(
+            paths=body.paths,
+            field=body.field,
+            locked=body.locked,
+            roots=state.config.library_roots,
+            db_path=str(state.index_path),
+            set_field_lock=state.services.set_field_lock,
+        )
+        return FieldLocksResponse(
+            volumes=[VolumeModel.from_row(row) for row in rows]
+        )
 
     @app.get("/api/jobs/current", response_model=JobModel | None)
     def current_job() -> JobModel | None:

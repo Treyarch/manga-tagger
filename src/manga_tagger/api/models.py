@@ -62,6 +62,7 @@ class VolumeModel(BaseModel):
     penciller: str
     inker: str
     cover_artist: str
+    locked_fields: str = "[]"
 
     @classmethod
     def from_row(cls, row: object) -> "VolumeModel":
@@ -76,11 +77,27 @@ class LibraryResponse(BaseModel):
     volumes: list[VolumeModel]
 
 
+class FieldLocksRequest(BaseModel):
+    """Body for ``POST /api/field-locks``."""
+
+    paths: list[str]
+    field: str
+    locked: bool
+
+
+class FieldLocksResponse(BaseModel):
+    """Updated volume rows after a field-lock change."""
+
+    volumes: list[VolumeModel]
+
+
 class ConfigModel(BaseModel):
-    """The eight known config keys."""
+    """The ten known config keys."""
 
     library_roots: list[str]
     keep_cbr_original: bool
+    write_poster_on_save: bool
+    auto_save_metadata_on_switch: bool
     comicvine_api_key: str
     nautiljon_base_url: str
     nautiljon_api_key: str
@@ -96,6 +113,8 @@ class ConfigPut(BaseModel):
 
     library_roots: Any = None
     keep_cbr_original: Any = None
+    write_poster_on_save: Any = None
+    auto_save_metadata_on_switch: Any = None
     comicvine_api_key: Any = None
     nautiljon_base_url: Any = None
     nautiljon_api_key: Any = None

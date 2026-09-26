@@ -1,5 +1,7 @@
 /** Client-side shelf, selection, form, and inspector rules from the shell spec. */
 
+import { pluralize } from "./pluralize";
+
 export const POLL_MS = 500;
 
 export const OFFERED_RENAME_TEMPLATE = "{Series} v{Number:02}";
@@ -182,11 +184,12 @@ export type Volume = {
   penciller: string;
   inker: string;
   cover_artist: string;
+  locked_fields?: string;
 };
 
 export type Place = { path: string; label: string };
 
-export type Field = { value: string; dirty: boolean; mixed?: boolean };
+export type Field = { value: string; dirty: boolean; locked: boolean; mixed?: boolean };
 
 export type InspectorForm = {
   mode: "one" | "many";
@@ -232,6 +235,11 @@ export type IssueCandidate = {
   cover: string;
   summary: string;
 };
+
+/** Same-origin img src for a shelf thumbnail. */
+export function thumbnailSrc(path: string): string {
+  return `/api/thumbnail?path=${encodeURIComponent(path)}`;
+}
 
 /** Same-origin img src for a candidate cover. Proxied hosts stay same-origin. */
 export function matchCoverSrc(cover: string): string {
@@ -408,6 +416,26 @@ function fieldText(row: Volume, name: string): string {
   return String(value);
 }
 
+/** Sorted unique locked ComicInfo names from a volume row. */
+export function parseLockedFields(row: Volume): string[] {
+  const raw = row.locked_fields ?? "[]";
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    const names = new Set<string>();
+    for (const item of parsed) {
+      if (typeof item === "string" && item) names.add(item);
+    }
+    return [...names].sort();
+  } catch {
+    return [];
+  }
+}
+
+function lockedNames(row: Volume): Set<string> {
+  return new Set(parseLockedFields(row));
+}
+
 /** Archive page count text when ComicInfo left PageCount blank. */
 export function pageCountFill(row: Volume): string | null {
   if (fieldText(row, "PageCount").trim() !== "") return null;
@@ -419,6 +447,7 @@ export function pageCountFill(row: Volume): string | null {
 export function formFromVolumes(rows: Volume[]): InspectorForm | null {
   if (rows.length === 0) return null;
   if (rows.length === 1) {
+    const locked = lockedNames(rows[0]);
     const values: Record<string, Field> = {};
     for (const name of FORM_FIELDS) {
       let value = fieldText(rows[0], name);
@@ -426,17 +455,29 @@ export function formFromVolumes(rows: Volume[]): InspectorForm | null {
         const filled = pageCountFill(rows[0]);
         if (filled !== null) value = filled;
       }
-      values[name] = { value, dirty: false };
+      values[name] = { value, dirty: false, locked: locked.has(name) };
     }
     return { mode: "one", values };
   }
+  const locks = rows.map((row) => lockedNames(row));
   const values: Record<string, Field> = {};
   for (const name of SHARED_FIELDS) {
     const texts = rows.map((row) => fieldText(row, name));
+    const fieldLocked = locks.every((locked) => locked.has(name));
     if (texts.every((text) => text === texts[0])) {
-      values[name] = { value: texts[0], mixed: false, dirty: false };
+      values[name] = {
+        value: texts[0],
+        mixed: false,
+        dirty: false,
+        locked: fieldLocked,
+      };
     } else {
-      values[name] = { value: "", mixed: true, dirty: false };
+      values[name] = {
+        value: "",
+        mixed: true,
+        dirty: false,
+        locked: fieldLocked,
+      };
     }
   }
   return { mode: "many", values };
@@ -448,6 +489,7 @@ export function editField(
   value: string,
 ): InspectorForm {
   const current = form.values[key];
+  if (current.locked) return form;
   if (current.value === value && !current.mixed) {
     return form;
   }
@@ -455,15 +497,47 @@ export function editField(
   for (const [name, field] of Object.entries(form.values)) {
     values[name] = { ...field };
   }
-  const updated: Field = { value, dirty: true };
+  const updated: Field = { value, dirty: true, locked: current.locked };
   if ("mixed" in form.values[key]) updated.mixed = false;
   values[key] = updated;
   return { mode: form.mode, values };
 }
 
+/** Set ``locked`` on one form field without clearing dirty or value. */
+export function setFieldLocked(
+  form: InspectorForm,
+  key: string,
+  locked: boolean,
+): InspectorForm {
+  const values: Record<string, Field> = {};
+  for (const [name, field] of Object.entries(form.values)) {
+    values[name] = { ...field };
+  }
+  values[key] = { ...values[key], locked };
+  return { mode: form.mode, values };
+}
+
+/**
+ * Whether every selected volume locks ``field`` (multi-select display rule).
+ */
+export function fieldLockedOnAll(rows: Volume[], field: string): boolean {
+  if (rows.length === 0) return false;
+  return rows.every((row) => lockedNames(row).has(field));
+}
+
 export function formIsDirty(form: InspectorForm | null): boolean {
   if (form === null) return false;
   return Object.values(form.values).some((field) => field.dirty);
+}
+
+export type SwitchGuard = "proceed" | "autosave" | "confirm";
+
+export function switchGuard(
+  form: InspectorForm | null,
+  autoSave: boolean,
+): SwitchGuard {
+  if (!formIsDirty(form)) return "proceed";
+  return autoSave ? "autosave" : "confirm";
 }
 
 export function savePatch(form: InspectorForm): Record<string, string> {
@@ -532,7 +606,7 @@ export function cbrCount(rows: Volume[]): number {
 }
 
 export function convertConfirmMessage(count: number): string {
-  return `Convert ${count} CBR files to CBZ and delete the originals?`;
+  return `Convert ${count} CBR ${pluralize(count, "file")} to CBZ and delete the originals?`;
 }
 
 export function isAbsolutePath(value: string): boolean {

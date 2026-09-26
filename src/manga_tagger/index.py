@@ -1,6 +1,7 @@
 """SQLite library index, recursive scan, and cover thumbnails."""
 
 import hashlib
+import json
 import os
 import sqlite3
 import tempfile
@@ -21,6 +22,7 @@ from manga_tagger.archives.read import list_pages, read_comic_info, read_page
 _THUMB_WIDTH = 256
 _THUMB_QUALITY = 80
 _ARCHIVE_SUFFIXES = {".cbz", ".cbr"}
+_EMPTY_LOCKED = "[]"
 
 _TEXT_COLUMNS: tuple[tuple[str, str], ...] = (
     ("Title", "title"),
@@ -81,7 +83,8 @@ CREATE TABLE volumes (
   writer TEXT NOT NULL,
   penciller TEXT NOT NULL,
   inker TEXT NOT NULL,
-  cover_artist TEXT NOT NULL
+  cover_artist TEXT NOT NULL,
+  locked_fields TEXT NOT NULL DEFAULT '[]'
 );
 """
 
@@ -91,7 +94,7 @@ class LibraryIndexError(Exception):
 
 
 class IndexVersionError(LibraryIndexError):
-    """``user_version`` is neither 0, 1, nor 2. The schema is left unchanged."""
+    """``user_version`` is not 0, 1, 2, or 3. The schema is left unchanged."""
 
 
 @dataclass(frozen=True)
@@ -131,6 +134,7 @@ class Volume:
     penciller: str
     inker: str
     cover_artist: str
+    locked_fields: str = _EMPTY_LOCKED
 
 
 @dataclass(frozen=True)
@@ -304,13 +308,124 @@ def forget_volume(
 
     Raises:
         LibraryIndexError: ``path`` is relative.
-        IndexVersionError: The schema version is not 1.
+        IndexVersionError: The schema version is not supported.
     """
     archive = _one_absolute(path)
     with _session(db_path) as connection:
         with connection:
             connection.execute("DELETE FROM volumes WHERE path = ?", (str(archive),))
     _delete_thumbnails(Path(cache_dir), archive)
+
+
+def parse_locked_fields(text: str | None) -> list[str]:
+    """Return sorted unique ComicInfo names from a ``locked_fields`` JSON string.
+
+    Non-strings and empty names are dropped. Invalid JSON becomes ``[]``.
+    """
+    if text is None or text == "":
+        return []
+    try:
+        raw = json.loads(text)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(raw, list):
+        return []
+    names = {item for item in raw if isinstance(item, str) and item}
+    return sorted(names)
+
+
+def encode_locked_fields(names: Sequence[str]) -> str:
+    """Encode lock names as sorted unique JSON array text."""
+    return json.dumps(sorted({name for name in names if name}), separators=(",", ":"))
+
+
+def set_field_lock(
+    db_path: os.PathLike[str] | str,
+    paths: Sequence[os.PathLike[str] | str],
+    field: str,
+    locked: bool,
+) -> list[Volume]:
+    """Add or remove ``field`` in each path's ``locked_fields``.
+
+    Paths with no row are skipped. Returns updated rows in request order.
+
+    Args:
+        db_path: SQLite database.
+        paths: Absolute archive paths.
+        field: ComicInfo element name to lock or unlock.
+        locked: When true, add ``field``; when false, remove it.
+
+    Raises:
+        LibraryIndexError: A path is relative.
+        IndexVersionError: The schema version is not supported.
+    """
+    updated: list[Volume] = []
+    with _session(db_path) as connection:
+        for raw in paths:
+            archive = _one_absolute(raw)
+            key = str(archive)
+            row = connection.execute(
+                "SELECT locked_fields FROM volumes WHERE path = ?", (key,)
+            ).fetchone()
+            if row is None:
+                continue
+            names = set(parse_locked_fields(row["locked_fields"]))
+            if locked:
+                names.add(field)
+            else:
+                names.discard(field)
+            encoded = encode_locked_fields(names)
+            with connection:
+                connection.execute(
+                    "UPDATE volumes SET locked_fields = ? WHERE path = ?",
+                    (encoded, key),
+                )
+            refreshed = connection.execute(
+                "SELECT * FROM volumes WHERE path = ?", (key,)
+            ).fetchone()
+            if refreshed is not None:
+                updated.append(_volume(refreshed))
+    return updated
+
+
+def copy_locked_fields(
+    db_path: os.PathLike[str] | str,
+    source: os.PathLike[str] | str,
+    dest: os.PathLike[str] | str,
+) -> None:
+    """Copy ``locked_fields`` from ``source`` onto ``dest`` when both rows exist.
+
+    Same resolved path is a no-op. A missing source or dest is a no-op.
+
+    Args:
+        db_path: SQLite database.
+        source: Absolute path of the old volume row.
+        dest: Absolute path of the new volume row.
+
+    Raises:
+        LibraryIndexError: A path is relative.
+        IndexVersionError: The schema version is not supported.
+    """
+    old = _one_absolute(source)
+    new = _one_absolute(dest)
+    if old == new:
+        return
+    with _session(db_path) as connection:
+        source_row = connection.execute(
+            "SELECT locked_fields FROM volumes WHERE path = ?", (str(old),)
+        ).fetchone()
+        if source_row is None:
+            return
+        dest_row = connection.execute(
+            "SELECT path FROM volumes WHERE path = ?", (str(new),)
+        ).fetchone()
+        if dest_row is None:
+            return
+        with connection:
+            connection.execute(
+                "UPDATE volumes SET locked_fields = ? WHERE path = ?",
+                (source_row["locked_fields"], str(new)),
+            )
 
 
 def thumbnail_for(
@@ -588,6 +703,7 @@ def _upsert_ok(
         "cover_index",
         "archive_page_count",
         *[column for _element, column in _TEXT_COLUMNS],
+        "locked_fields",
     ]
     values: list[object] = [
         str(archive),
@@ -602,6 +718,7 @@ def _upsert_ok(
         cover_index,
         page_count,
         *[texts[column] for _element, column in _TEXT_COLUMNS],
+        _existing_locked_fields(connection, archive),
     ]
     _replace(connection, columns, values)
 
@@ -626,6 +743,7 @@ def _upsert_failed(
         "cover_index",
         "archive_page_count",
         *[column for _element, column in _TEXT_COLUMNS],
+        "locked_fields",
     ]
     values: list[object] = [
         str(archive),
@@ -640,8 +758,24 @@ def _upsert_failed(
         None,
         None,
         *["" for _element, _column in _TEXT_COLUMNS],
+        _existing_locked_fields(connection, archive),
     ]
     _replace(connection, columns, values)
+
+
+def _existing_locked_fields(
+    connection: sqlite3.Connection, archive: Path
+) -> str:
+    """Return the stored lock JSON for ``archive``, or ``[]`` when new."""
+    row = connection.execute(
+        "SELECT locked_fields FROM volumes WHERE path = ?", (str(archive),)
+    ).fetchone()
+    if row is None:
+        return _EMPTY_LOCKED
+    text = row["locked_fields"]
+    if text is None or text == "":
+        return _EMPTY_LOCKED
+    return str(text)
 
 
 def _replace(
@@ -680,7 +814,7 @@ def _connect(db_path: os.PathLike[str] | str) -> sqlite3.Connection:
             version = int(readonly.execute("PRAGMA user_version").fetchone()[0])
         finally:
             readonly.close()
-        if version not in {0, 1, 2}:
+        if version not in {0, 1, 2, 3}:
             raise IndexVersionError(f"{path} has schema version {version}")
     try:
         connection = sqlite3.connect(path)
@@ -691,15 +825,26 @@ def _connect(db_path: os.PathLike[str] | str) -> sqlite3.Connection:
     version = int(connection.execute("PRAGMA user_version").fetchone()[0])
     if version == 0:
         connection.executescript(_SCHEMA)
-        connection.execute("PRAGMA user_version = 2")
+        connection.execute("PRAGMA user_version = 3")
         connection.commit()
     elif version == 1:
         connection.execute(
             "ALTER TABLE volumes ADD COLUMN count TEXT NOT NULL DEFAULT ''"
         )
-        connection.execute("PRAGMA user_version = 2")
+        connection.execute(
+            "ALTER TABLE volumes ADD COLUMN locked_fields "
+            "TEXT NOT NULL DEFAULT '[]'"
+        )
+        connection.execute("PRAGMA user_version = 3")
         connection.commit()
-    elif version != 2:
+    elif version == 2:
+        connection.execute(
+            "ALTER TABLE volumes ADD COLUMN locked_fields "
+            "TEXT NOT NULL DEFAULT '[]'"
+        )
+        connection.execute("PRAGMA user_version = 3")
+        connection.commit()
+    elif version != 3:
         connection.close()
         raise IndexVersionError(f"{path} has schema version {version}")
     return connection
@@ -707,6 +852,8 @@ def _connect(db_path: os.PathLike[str] | str) -> sqlite3.Connection:
 
 def _volume(row: sqlite3.Row) -> Volume:
     values = {key: row[key] for key in row.keys()}
+    if "locked_fields" not in values or values["locked_fields"] is None:
+        values["locked_fields"] = _EMPTY_LOCKED
     return Volume(**values)
 
 

@@ -9,7 +9,7 @@ import httpx
 
 from manga_tagger.archives.comicinfo import BATCH_FIELDS, OWNED_ELEMENTS
 from manga_tagger.archives.errors import BatchFieldError
-from manga_tagger.index import ScanResult
+from manga_tagger.index import ScanResult, parse_locked_fields
 from manga_tagger.jobs import Cancel, JobCancelled, Progress
 
 FORM_FIELDS: tuple[str, ...] = tuple(
@@ -269,11 +269,13 @@ def form_from_volumes(rows: Sequence[object]) -> dict[str, object] | None:
 
     Returns:
         ``mode`` ``one`` with every form field, or ``mode`` ``many`` with the
-        shared fields. ``dirty`` starts false. ``Pages`` is omitted.
+        shared fields. ``dirty`` starts false. ``Pages`` is omitted. ``locked``
+        comes from each row's ``locked_fields``.
     """
     if not rows:
         return None
     if len(rows) == 1:
+        locked = _locked_names(rows[0])
         values = {}
         for name in FORM_FIELDS:
             value = _field_text(rows[0], name)
@@ -281,32 +283,54 @@ def form_from_volumes(rows: Sequence[object]) -> dict[str, object] | None:
                 filled = _page_count_fill(rows[0])
                 if filled is not None:
                     value = filled
-            values[name] = {"value": value, "dirty": False}
+            values[name] = {
+                "value": value,
+                "dirty": False,
+                "locked": name in locked,
+            }
         return {"mode": "one", "values": values}
     values: dict[str, dict[str, object]] = {}
+    locks = [_locked_names(row) for row in rows]
     for name in SHARED_FIELDS:
         texts = [_field_text(row, name) for row in rows]
+        field_locked = all(name in locked for locked in locks)
         if all(text == texts[0] for text in texts):
-            values[name] = {"value": texts[0], "mixed": False, "dirty": False}
+            values[name] = {
+                "value": texts[0],
+                "mixed": False,
+                "dirty": False,
+                "locked": field_locked,
+            }
         else:
-            values[name] = {"value": "", "mixed": True, "dirty": False}
+            values[name] = {
+                "value": "",
+                "mixed": True,
+                "dirty": False,
+                "locked": field_locked,
+            }
     return {"mode": "many", "values": values}
 
 
 def edit_field(form: Mapping[str, object], key: str, value: str) -> dict[str, object]:
     """Set one field to ``value``, mark it dirty, and clear ``mixed``.
 
-    When ``value`` equals the current text and the field is not mixed, the form
-    is returned unchanged (values copied, dirty left as it was).
+    When the field is locked, or ``value`` equals the current text and the field
+    is not mixed, the form is returned unchanged (values copied).
     """
     values = {
         name: dict(field)  # type: ignore[arg-type]
         for name, field in form["values"].items()  # type: ignore[union-attr]
     }
     current = values[key]
+    if current.get("locked"):
+        return {"mode": form["mode"], "values": values}
     if current.get("value") == value and not current.get("mixed"):
         return {"mode": form["mode"], "values": values}
-    updated: dict[str, object] = {"value": value, "dirty": True}
+    updated: dict[str, object] = {
+        "value": value,
+        "dirty": True,
+        "locked": bool(current.get("locked")),
+    }
     if "mixed" in values[key]:
         updated["mixed"] = False
     values[key] = updated
@@ -324,10 +348,10 @@ def merge_load_patch(
         mode: ``one`` or ``many``.
 
     Returns:
-        A new form. Omitted keys keep their value and dirty flag. A patch value
-        that equals the current text on a non-mixed field leaves that field
-        unchanged. On ``many``, only shared fields change. ``Number`` and
-        ``Title`` are ignored there.
+        A new form. Omitted keys keep their value and dirty flag. A locked
+        field is left unchanged. A patch value that equals the current text on
+        a non-mixed field leaves that field unchanged. On ``many``, only shared
+        fields change. ``Number`` and ``Title`` are ignored there.
     """
     values = {
         name: dict(field)  # type: ignore[arg-type]
@@ -338,9 +362,15 @@ def merge_load_patch(
         if key not in allowed or key not in values:
             continue
         current = values[key]
+        if current.get("locked"):
+            continue
         if current.get("value") == value and not current.get("mixed"):
             continue
-        updated: dict[str, object] = {"value": value, "dirty": True}
+        updated: dict[str, object] = {
+            "value": value,
+            "dirty": True,
+            "locked": bool(current.get("locked")),
+        }
         if mode == "many":
             updated["mixed"] = False
         values[key] = updated
@@ -358,15 +388,15 @@ def load_library(
     return kept, places_from_volumes(kept)
 
 
-def thumbnail_bytes(
+def thumbnail_path(
     path: str,
     roots: Sequence[str],
     *,
     thumbnail_for: Callable[..., object],
     db_path: str,
     cache_dir: str,
-) -> bytes:
-    """Return the cached cover JPEG, building it through ``thumbnail_for``.
+) -> Path:
+    """Return the cached cover JPEG path, building it through ``thumbnail_for``.
 
     Raises:
         NoThumbnailError: ``thumbnail_for`` returns no path.
@@ -376,7 +406,30 @@ def thumbnail_bytes(
     found = thumbnail_for(db_path, cache_dir, path)
     if found is None:
         raise NoThumbnailError(f"{path} has no thumbnail")
-    return Path(str(found)).read_bytes()
+    return Path(str(found))
+
+
+def thumbnail_bytes(
+    path: str,
+    roots: Sequence[str],
+    *,
+    thumbnail_for: Callable[..., object],
+    db_path: str,
+    cache_dir: str,
+) -> bytes:
+    """Return the cached cover JPEG bytes, building it through ``thumbnail_for``.
+
+    Raises:
+        NoThumbnailError: ``thumbnail_for`` returns no path.
+        OutsideLibraryError: ``path`` is outside the library.
+    """
+    return thumbnail_path(
+        path,
+        roots,
+        thumbnail_for=thumbnail_for,
+        db_path=db_path,
+        cache_dir=cache_dir,
+    ).read_bytes()
 
 
 def media_type_for(name: str) -> str:
@@ -420,6 +473,28 @@ def ensure_inside(path: str, roots: Sequence[str]) -> str:
         if resolved == base or resolved.is_relative_to(base):
             return path
     raise OutsideLibraryError(f"{resolved} is outside the library")
+
+
+def apply_field_locks(
+    *,
+    paths: Sequence[str],
+    field: str,
+    locked: bool,
+    roots: Sequence[str],
+    db_path: str,
+    set_field_lock: Callable[..., list[object]],
+) -> list[object]:
+    """Validate paths and field, then update index locks. Writes no archive.
+
+    Raises:
+        ShellError: ``field`` is not a form field, or a path is relative.
+        OutsideLibraryError: A path is outside the library.
+    """
+    if field not in FORM_FIELDS:
+        raise ShellError(f"{field} is not a lockable field")
+    for path in paths:
+        ensure_inside(path, roots)
+    return list(set_field_lock(db_path, paths, field, locked))
 
 
 def validate_save(
@@ -649,12 +724,14 @@ def run_save(
     volumes: Sequence[object],
     roots: Sequence[str],
     keep_cbr_original: bool,
+    write_poster_on_save: bool,
     db_path: str,
     cache_dir: str,
     save_comic_info: Callable[..., Path],
     write_poster: Callable[[str], object],
     refresh_volume: Callable[..., object],
     forget_volume: Callable[..., object],
+    copy_locked_fields: Callable[..., object],
     parse_number: Callable[[str], str | None],
     cancel: Cancel,
     progress: Progress,
@@ -695,7 +772,8 @@ def run_save(
                 write_poster=write_poster,
                 refresh_volume=refresh_volume,
                 forget_volume=forget_volume,
-                with_poster=True,
+                copy_locked_fields=copy_locked_fields,
+                with_poster=write_poster_on_save,
             )
         )
         progress(index + 1, total)
@@ -719,16 +797,18 @@ def run_rename(
     directory: str,
     template: str,
     roots: Sequence[str],
+    write_poster_on_save: bool,
     db_path: str,
     cache_dir: str,
     rename_in_directory: Callable[[str, str], list[object]],
     write_poster: Callable[[str], object],
     refresh_volume: Callable[..., object],
     forget_volume: Callable[..., object],
+    copy_locked_fields: Callable[..., object],
     cancel: Cancel,
     progress: Progress,
 ) -> dict[str, object]:
-    """Rename every archive directly in the place, then write posters."""
+    """Rename every archive directly in the place, then write posters when enabled."""
     ensure_inside(directory, roots)
     if cancel():
         raise JobCancelled({"entries": []})
@@ -759,7 +839,8 @@ def run_rename(
                     write_poster=write_poster,
                     refresh_volume=refresh_volume,
                     forget_volume=forget_volume,
-                    with_poster=True,
+                    copy_locked_fields=copy_locked_fields,
+                    with_poster=write_poster_on_save,
                 )
             )
         progress(index + 1, total)
@@ -776,6 +857,7 @@ def run_convert(
     convert_cbr: Callable[..., Path],
     refresh_volume: Callable[..., object],
     forget_volume: Callable[..., object],
+    copy_locked_fields: Callable[..., object],
     cancel: Cancel,
     progress: Progress,
 ) -> dict[str, object]:
@@ -808,6 +890,7 @@ def run_convert(
                 write_poster=lambda _path: None,
                 refresh_volume=refresh_volume,
                 forget_volume=forget_volume,
+                copy_locked_fields=copy_locked_fields,
                 with_poster=False,
             )
         )
@@ -849,10 +932,13 @@ def _file_patch(
 ) -> tuple[dict[str, str], bool]:
     stem = _stem(volume, path)
     stored = "" if volume is None else str(getattr(volume, "number", "") or "")
+    locked = _locked_names(volume) if volume is not None else set()
     file_patch = dict(patch)
     if mode == "one":
         if "Number" in file_patch:
             write_number = True
+        elif "Number" in locked:
+            write_number = False
         else:
             parsed = parse_number(stem)
             if parsed is not None and parsed != stored:
@@ -863,11 +949,12 @@ def _file_patch(
     else:
         file_patch.pop("Number", None)
         file_patch.pop("Volume", None)
-        parsed = parse_number(stem)
-        if parsed is not None and parsed != stored:
-            file_patch["Number"] = parsed
+        if "Number" not in locked:
+            parsed = parse_number(stem)
+            if parsed is not None and parsed != stored:
+                file_patch["Number"] = parsed
         write_number = "Number" in file_patch
-    if "PageCount" not in file_patch:
+    if "PageCount" not in file_patch and "PageCount" not in locked:
         filled = _page_count_fill(volume)
         if filled is not None:
             file_patch["PageCount"] = filled
@@ -897,6 +984,7 @@ def _after_success(
     write_poster: Callable[[str], object],
     refresh_volume: Callable[..., object],
     forget_volume: Callable[..., object],
+    copy_locked_fields: Callable[..., object],
     with_poster: bool,
 ) -> dict[str, object]:
     output_path = str(output)
@@ -913,6 +1001,11 @@ def _after_success(
         entry.setdefault("error_type", type(exc).__name__)
         entry.setdefault("error_message", str(exc))
     if Path(output_path).resolve() != Path(path).resolve():
+        try:
+            copy_locked_fields(db_path, path, output_path)
+        except Exception as exc:
+            entry.setdefault("error_type", type(exc).__name__)
+            entry.setdefault("error_message", str(exc))
         try:
             forget_volume(db_path, cache_dir, path)
         except Exception as exc:
@@ -953,6 +1046,12 @@ def _field_text(row: object, name: str) -> str:
     if value is None:
         return ""
     return str(value)
+
+
+def _locked_names(row: object) -> set[str]:
+    """Return the set of locked ComicInfo names for an index row."""
+    raw = getattr(row, "locked_fields", "") or ""
+    return set(parse_locked_fields(str(raw)))
 
 
 def _parent_path(path: str) -> str:

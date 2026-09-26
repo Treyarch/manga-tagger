@@ -135,8 +135,8 @@ def test_form_and_merge() -> None:
     assert one is not None
     assert one["mode"] == "one"
     assert list(one["values"]) == list(FORM_FIELDS)
-    assert one["values"]["Number"] == {"value": "4", "dirty": False}
-    assert one["values"]["PageCount"] == {"value": "1", "dirty": False}
+    assert one["values"]["Number"] == {"value": "4", "dirty": False, "locked": False}
+    assert one["values"]["PageCount"] == {"value": "1", "dirty": False, "locked": False}
     assert "Pages" not in one["values"]
 
     blank_pages = form_from_volumes(
@@ -150,7 +150,11 @@ def test_form_and_merge() -> None:
         ]
     )
     assert blank_pages is not None
-    assert blank_pages["values"]["PageCount"] == {"value": "42", "dirty": False}
+    assert blank_pages["values"]["PageCount"] == {
+        "value": "42",
+        "dirty": False,
+        "locked": False,
+    }
 
     kept = form_from_volumes(
         [
@@ -162,16 +166,28 @@ def test_form_and_merge() -> None:
         ]
     )
     assert kept is not None
-    assert kept["values"]["PageCount"] == {"value": "10", "dirty": False}
+    assert kept["values"]["PageCount"] == {
+        "value": "10",
+        "dirty": False,
+        "locked": False,
+    }
 
     no_archive = form_from_volumes(
         [_volume("/books/a.cbz", page_count="", archive_page_count=None)]
     )
     assert no_archive is not None
-    assert no_archive["values"]["PageCount"] == {"value": "", "dirty": False}
+    assert no_archive["values"]["PageCount"] == {
+        "value": "",
+        "dirty": False,
+        "locked": False,
+    }
 
     edited = edit_field(one, "Number", "9")
-    assert edited["values"]["Number"] == {"value": "9", "dirty": True}
+    assert edited["values"]["Number"] == {
+        "value": "9",
+        "dirty": True,
+        "locked": False,
+    }
 
     shared = form_from_volumes(
         [
@@ -185,17 +201,27 @@ def test_form_and_merge() -> None:
     assert shared["mode"] == "many"
     assert list(shared["values"]) == list(SHARED_FIELDS)
     assert "Manga" in shared["values"]
-    assert shared["values"]["Series"] == {"value": "", "mixed": True, "dirty": False}
+    assert shared["values"]["Series"] == {
+        "value": "",
+        "mixed": True,
+        "dirty": False,
+        "locked": False,
+    }
     assert shared["values"]["Publisher"] == {
         "value": "Shueisha",
         "mixed": False,
         "dirty": False,
+        "locked": False,
     }
     assert all(field["dirty"] is False for field in shared["values"].values())
     assert form_from_volumes([]) is None
 
     merged = merge_load_patch(one, {"Number": "2", "Summary": "Hello"}, "one")
-    assert merged["values"]["Number"] == {"value": "2", "dirty": True}
+    assert merged["values"]["Number"] == {
+        "value": "2",
+        "dirty": True,
+        "locked": False,
+    }
     assert merged["values"]["Summary"]["dirty"] is True
     assert merged["values"]["Series"] == one["values"]["Series"]
     same = merge_load_patch(
@@ -203,7 +229,11 @@ def test_form_and_merge() -> None:
     )
     assert same["values"]["Number"] == one["values"]["Number"]
     assert same["values"]["Number"]["dirty"] is False
-    assert same["values"]["Series"] == {"value": "Monster", "dirty": True}
+    assert same["values"]["Series"] == {
+        "value": "Monster",
+        "dirty": True,
+        "locked": False,
+    }
     assert edit_field(one, "Number", one["values"]["Number"]["value"])["values"][
         "Number"
     ]["dirty"] is False
@@ -223,12 +253,63 @@ def test_form_and_merge() -> None:
         "value": "Claymore",
         "mixed": False,
         "dirty": True,
+        "locked": False,
     }
     assert many["values"]["Manga"]["dirty"] is True
     assert many["values"]["Publisher"]["dirty"] is False
     same_many = merge_load_patch(shared, {"Publisher": "Shueisha"}, "many")
     assert same_many["values"]["Publisher"] == shared["values"]["Publisher"]
     assert same_many["values"]["Publisher"]["dirty"] is False
+
+    locked_one = form_from_volumes(
+        [_volume("/books/a.cbz", series="Claymore", locked_fields='["Series"]')]
+    )
+    assert locked_one is not None
+    assert locked_one["values"]["Series"]["locked"] is True
+    skipped = merge_load_patch(locked_one, {"Series": "Monster"}, "one")
+    assert skipped["values"]["Series"] == locked_one["values"]["Series"]
+    assert edit_field(locked_one, "Series", "Monster")["values"]["Series"][
+        "value"
+    ] == "Claymore"
+
+    partial = form_from_volumes(
+        [
+            _volume("/books/a.cbz", series="A", locked_fields='["Series"]'),
+            _volume("/books/b.cbz", series="A", locked_fields="[]"),
+        ]
+    )
+    assert partial is not None
+    assert partial["values"]["Series"]["locked"] is False
+    both = form_from_volumes(
+        [
+            _volume("/books/a.cbz", series="A", locked_fields='["Series"]'),
+            _volume("/books/b.cbz", series="A", locked_fields='["Series"]'),
+        ]
+    )
+    assert both is not None
+    assert both["values"]["Series"]["locked"] is True
+
+
+def test_save_skips_auto_fills_when_locked(tmp_path: Path) -> None:
+    recorder = _Recorder()
+    run_save(
+        **_save_kwargs(
+            recorder,
+            paths=["/books/Claymore v02.cbz"],
+            patch={},
+            mode="one",
+            volumes=[
+                _volume(
+                    "/books/Claymore v02.cbz",
+                    number="",
+                    page_count="",
+                    archive_page_count=42,
+                    locked_fields='["Number","PageCount"]',
+                )
+            ],
+        )
+    )
+    assert recorder.saves == []
 
 
 def test_one_save_number_rules(tmp_path: Path) -> None:
@@ -484,6 +565,7 @@ def test_search_and_load_do_not_write() -> None:
         "value": "27",
         "mixed": False,
         "dirty": True,
+        "locked": False,
     }
     assert writes == ["progress", "progress"]
 
@@ -513,8 +595,16 @@ def test_run_load_applies_search_count_on_one() -> None:
         issue_id="99",
         count=" 75 ",
     )
-    assert loaded["form"]["values"]["Count"] == {"value": "75", "dirty": True}
-    assert loaded["form"]["values"]["Number"] == {"value": "1", "dirty": False}
+    assert loaded["form"]["values"]["Count"] == {
+        "value": "75",
+        "dirty": True,
+        "locked": False,
+    }
+    assert loaded["form"]["values"]["Number"] == {
+        "value": "1",
+        "dirty": False,
+        "locked": False,
+    }
 
 def test_list_issues_and_preferred_number() -> None:
     form = form_from_volumes([_volume("/books/a.cbz", series="A", number="3")])
@@ -650,20 +740,65 @@ def test_rename_preview_and_job(tmp_path: Path) -> None:
         directory="/books/Claymore",
         template=OFFERED_RENAME_TEMPLATE,
         roots=["/books"],
+        write_poster_on_save=True,
         db_path=str(tmp_path / "index.db"),
         cache_dir=str(tmp_path / "covers"),
         rename_in_directory=rename_in_directory,
         write_poster=recorder.write_poster,
         refresh_volume=recorder.refresh_volume,
         forget_volume=recorder.forget_volume,
+        copy_locked_fields=recorder.copy_locked_fields,
         cancel=lambda: False,
         progress=lambda _completed, _total: None,
     )
     assert recorder.renames == [("/books/Claymore", OFFERED_RENAME_TEMPLATE)]
     assert recorder.posters == [str(dest)]
     assert recorder.refreshed == [str(dest)]
+    assert recorder.lock_copies == [(str(source), str(dest))]
     assert recorder.forgot == [str(source)]
     assert result["entries"][0]["output_path"] == str(dest)
+
+    recorder = _Recorder()
+
+    def rename_again(directory: str, template: str):
+        recorder.renames.append((directory, template))
+        return [FileResult(path=source, output_path=dest)]
+
+    run_rename(
+        directory="/books/Claymore",
+        template=OFFERED_RENAME_TEMPLATE,
+        roots=["/books"],
+        write_poster_on_save=False,
+        db_path=str(tmp_path / "index.db"),
+        cache_dir=str(tmp_path / "covers"),
+        rename_in_directory=rename_again,
+        write_poster=recorder.write_poster,
+        refresh_volume=recorder.refresh_volume,
+        forget_volume=recorder.forget_volume,
+        copy_locked_fields=recorder.copy_locked_fields,
+        cancel=lambda: False,
+        progress=lambda _completed, _total: None,
+    )
+    assert recorder.renames == [("/books/Claymore", OFFERED_RENAME_TEMPLATE)]
+    assert recorder.posters == []
+    assert recorder.refreshed == [str(dest)]
+
+
+def test_save_skips_poster_when_disabled(tmp_path: Path) -> None:
+    recorder = _Recorder()
+    run_save(
+        **_save_kwargs(
+            recorder,
+            paths=["/books/Claymore.cbz"],
+            patch={"Number": "9"},
+            mode="one",
+            volumes=[_volume("/books/Claymore.cbz", number="1")],
+            write_poster_on_save=False,
+        )
+    )
+    assert recorder.saves == [("/books/Claymore.cbz", {"Number": "9"}, True)]
+    assert recorder.posters == []
+    assert recorder.refreshed == ["/books/Claymore.cbz"]
 
 
 def test_convert_skips_cbz_and_does_not_write_a_poster(tmp_path: Path) -> None:
@@ -682,6 +817,7 @@ def test_convert_skips_cbz_and_does_not_write_a_poster(tmp_path: Path) -> None:
         convert_cbr=convert_cbr,
         refresh_volume=recorder.refresh_volume,
         forget_volume=recorder.forget_volume,
+        copy_locked_fields=recorder.copy_locked_fields,
         cancel=lambda: False,
         progress=lambda _completed, _total: None,
     )
@@ -689,6 +825,7 @@ def test_convert_skips_cbz_and_does_not_write_a_poster(tmp_path: Path) -> None:
     assert recorder.converted == [("/books/old.cbr", False)]
     assert recorder.posters == []
     assert recorder.refreshed == ["/books/old.cbz"]
+    assert recorder.lock_copies == [("/books/old.cbr", "/books/old.cbz")]
     assert recorder.forgot == ["/books/old.cbr"]
 
 
@@ -753,6 +890,7 @@ def _volume(path: str, **overrides: object) -> Volume:
         "penciller": "",
         "inker": "",
         "cover_artist": "",
+        "locked_fields": "[]",
     }
     values.update(overrides)
     return Volume(**values)
@@ -764,6 +902,7 @@ class _Recorder:
         self.posters: list[str] = []
         self.refreshed: list[str] = []
         self.forgot: list[str] = []
+        self.lock_copies: list[tuple[str, str]] = []
         self.renames: list[tuple[str, str]] = []
         self.converted: list[tuple[str, bool]] = []
         self.seen_progress: list[tuple[int, int]] = []
@@ -784,6 +923,10 @@ class _Recorder:
         del db_path, cache_dir
         self.forgot.append(path)
 
+    def copy_locked_fields(self, db_path, source, dest) -> None:
+        del db_path
+        self.lock_copies.append((str(source), str(dest)))
+
 
 def _save_kwargs(recorder: _Recorder, **overrides: object) -> dict[str, object]:
     values: dict[str, object] = {
@@ -793,12 +936,14 @@ def _save_kwargs(recorder: _Recorder, **overrides: object) -> dict[str, object]:
         "volumes": [],
         "roots": ["/books"],
         "keep_cbr_original": False,
+        "write_poster_on_save": True,
         "db_path": "index.db",
         "cache_dir": "covers",
         "save_comic_info": recorder.save_comic_info,
         "write_poster": recorder.write_poster,
         "refresh_volume": recorder.refresh_volume,
         "forget_volume": recorder.forget_volume,
+        "copy_locked_fields": recorder.copy_locked_fields,
         "parse_number": parse_number,
         "cancel": lambda: False,
         "progress": lambda _completed, _total: None,

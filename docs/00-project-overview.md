@@ -51,13 +51,13 @@ Each archive is one tankōbon. The volume number is stored in ComicInfo `Number`
 
 The user can select one volume or several. Accepting a match loads the form and does not change any archive. Saving one volume writes the fields the user edited or a load set, and keeps every other XML element. An unchanged save does not rewrite the archive. Saving several volumes writes the shared series fields that are dirty: `Series`, `Publisher`, `LanguageISO`, `AgeRating`, `Genre`, `Manga`, `Writer`, `Penciller`, `Inker`, and `CoverArtist`. It also writes each file's `Number` from that file's filename when the name has a volume marker. It does not change `Volume`, `Title`, or any other element. A file whose patch is empty is not rewritten. One file failing during that save does not stop the other selected files, and files already written stay written.
 
-The user can rename the archives sitting directly in one opened series folder. The dialog shows each old name and new name before anything is renamed. The template offered is `{Series} v{Number:02}`, which turns `Number` `1` into `Claymore v01.cbz`. `Number` `1.5` stays `1.5`. The extension stays `.cbz` or `.cbr`. The file stays in that folder. A successful save or a successful rename writes a sibling `{stem}-poster.jpg`, the cover scaled to 600 pixels wide on a white background.
+The user can rename the archives sitting directly in one opened series folder. The dialog shows each old name and new name before anything is renamed. The template offered is `{Series} v{Number:02}`, which turns `Number` `1` into `Claymore v01.cbz`. `Number` `1.5` stays `1.5`. The extension stays `.cbz` or `.cbr`. The file stays in that folder. When `write_poster_on_save` is true, a successful save or a successful rename writes a sibling `{stem}-poster.jpg`, the cover scaled to 600 pixels wide on a white background. When it is false, save and rename do not extract a poster; rename still moves an existing sibling poster with the archive.
 
 Title text uses the first language the catalog actually has, in this order: French, then English, then the original title.
 
 A match from MangaDex, AniList, MyAnimeList, or Nautiljon sets reading direction to right to left (`Manga` = `YesAndRightToLeft`). A Comic Vine match sets it to left to right (`Manga` = `No`). The form shows that value. Save writes the value still on the form.
 
-Saving metadata for a `.cbr`, or an explicit convert action, produces a `.cbz` beside it. The original `.cbr` is removed only after the `.cbz` is complete and its `ComicInfo.xml` can be read back. `Foo.cbr` becomes `Foo.cbz` in the same directory. If `Foo.cbz` already exists, the convert fails for that file and leaves the `.cbr` untouched. The default is to delete the `.cbr` so one book stays one file. `keep_cbr_original` keeps it.
+Saving metadata for a `.cbr`, or an explicit convert action, produces a `.cbz` beside it. The original `.cbr` is removed only after the `.cbz` is complete and its `ComicInfo.xml` can be read back. `Foo.cbr` becomes `Foo.cbz` in the same directory. If `Foo.cbz` already exists, the convert fails for that file and leaves the `.cbr` untouched. The default is to keep the `.cbr` beside the new `.cbz`. When `keep_cbr_original` is false, the `.cbr` is deleted after a verified write.
 
 ## Out of scope
 
@@ -117,7 +117,9 @@ On Linux, unset XDG variables mean `~/.config`, `~/.local/share`, and `~/.cache`
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `library_roots` | list of absolute paths | `[]` | Folders scanned for `.cbz` and `.cbr` files. An empty list means an empty shelf. |
-| `keep_cbr_original` | boolean | `false` | When `false`, delete the `.cbr` after its `.cbz` has been written and read back. When `true`, keep the `.cbr` next to the new `.cbz`. |
+| `keep_cbr_original` | boolean | `true` | When `true`, keep the `.cbr` next to the new `.cbz`. When `false`, delete the `.cbr` after its `.cbz` has been written and read back. |
+| `write_poster_on_save` | boolean | `true` | When `true`, a successful save or rename writes `{stem}-poster.jpg` from the cover. When `false`, those jobs do not extract a poster. Rename still moves an existing sibling poster with the archive. |
+| `auto_save_metadata_on_switch` | boolean | `false` | When `true`, leaving a dirty metadata form by changing issue or place silently saves that form before navigating. When `false`, the app asks Save / Don't save / Cancel. Only fields already dirty from an edit or an accepted load are written; scrape alone still does not write an archive. |
 | `comicvine_api_key` | string | `""` | Comic Vine API key. Empty disables that provider. |
 | `nautiljon_base_url` | string | `""` | Absolute origin of the Nautiljon wrapper API. Empty disables that provider. |
 | `nautiljon_api_key` | string | `""` | Nautiljon wrapper API key (`X-Api-Key`). Empty disables that provider. |
@@ -147,6 +149,8 @@ Write these before the code they describe. Each one is a normal spec: YAML front
 | `03-metadata-providers.md` | MangaDex, AniList, Jikan, Comic Vine, Nautiljon, title language order, reading direction, accept-before-write |
 | `04-application-shell.md` | Single process, local FastAPI, pywebview, the one-screen layout, multi-volume selection |
 | `05-ui-design.md` | Nautilus-like light and dark theme, header bar, sidebar, list or cover grid, inspector, Lucide icons, local Tailwind components |
+| `06-select-issue.md` | Issue/volume picker after a series match, Comic Vine and Nautiljon |
+| `07-field-locks.md` | Per-volume field locks in the index that block scrape overwrite and manual edits |
 
 ## Testing
 
@@ -175,13 +179,13 @@ All resolved. Recorded here so they are not re-opened in feature specs.
 - **Which language?** Python 3.12. The library is a few hundred volumes, so the speed goal is avoiding full extracts and recompression, not a native rewrite.
 - **What must v1 do?** Edit ComicInfo, scrape the five catalogs, preview pages, apply shared series fields to every volume in the current selection, and rename archives in place from a filename template.
 - **How does a batch save work?** One shared form is reviewed, then a multi-volume save writes the dirty shared fields `Series`, `Count`, `Publisher`, `LanguageISO`, `AgeRating`, `Genre`, `Manga`, `Writer`, `Penciller`, `Inker`, and `CoverArtist` to each selected file. Each file also takes `Number` from its own filename when that name has a volume marker (and `Volume` mirrors that `Number`). A single selected volume writes the fields the user edited or a load set (including a scrape-filled `Count`). An unchanged save does not rewrite the archive. This is still a confirmed save, not an unattended auto-tag.
-- **How does rename work?** The dialog shows the planned names first. The template offered is `{Series} v{Number:02}`. Each archive directly in the opened folder gets a new filename from its own ComicInfo. `{Number}` is the `Number` element, not `Volume`. `:02` zero-pads an integer to at least two digits. A fractional number such as `1.5` is kept as written and is not padded. The file is not moved to another directory. A successful save or rename also writes `{stem}-poster.jpg` at 600 pixels wide.
+- **How does rename work?** The dialog shows the planned names first. The template offered is `{Series} v{Number:02}`. Each archive directly in the opened folder gets a new filename from its own ComicInfo. `{Number}` is the `Number` element, not `Volume`. `:02` zero-pads an integer to at least two digits. A fractional number such as `1.5` is kept as written and is not padded. The file is not moved to another directory. When `write_poster_on_save` is true, a successful save or rename also writes `{stem}-poster.jpg` at 600 pixels wide. An existing sibling poster still moves with the archive when that setting is false.
 - **What is one file?** One tankōbon. ComicInfo `Number` is the volume number (inspector caption `Issue`). `Volume` mirrors `Number` and is not shown in the inspector. ComicInfo `Count` holds the catalog's released volume or issue count when a scrape load provides it (inspector caption `Volumes`).
 - **Which catalogs?** MangaDex, AniList, MyAnimeList via Jikan, Comic Vine when an API key is set, and Nautiljon when the wrapper base URL and API key are set.
 - **Which title?** French, then English, then the original. The order is `title_languages`, default `["fr", "en"]`, with the original title as the fallback.
 - **Which reading direction?** Right to left for MangaDex, AniList, MyAnimeList, and Nautiljon. Left to right for Comic Vine. The form can change it before save.
 - **What happens when ComicInfo already exists?** The match loads the form. Disk changes only on save. A single-volume save writes the fields the user edited or a load set, plus `Number` from the filename when that field was not edited and the stored value differs (`Volume` mirrors that `Number`). A multi-volume save writes the dirty shared fields, including `Manga` and `Count`, and each file's `Number` from its filename. An unchanged save does not rewrite the archive.
-- **What happens to `.cbr`?** Convert to `.cbz` on save or explicit convert. Delete the `.cbr` after a verified write unless `keep_cbr_original` is true.
+- **What happens to `.cbr`?** Convert to `.cbz` on save or explicit convert. Keep the `.cbr` after a verified write unless `keep_cbr_original` is false.
 - **Which files are scanned?** `.cbz` and `.cbr` only, recursively inside each library root. Symlinks that leave the root are ignored.
 - **Where does the search text come from?** Existing `Series`, or the filename without its extension when `Series` is empty.
 - **How big is the library?** A few hundred volumes. The performance rules still forbid work that grows with the whole archive when only metadata or one page is needed.

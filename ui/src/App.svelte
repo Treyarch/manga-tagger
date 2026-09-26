@@ -37,6 +37,7 @@
     enabledProviderOptions,
     entriesOf,
     entryErrorLines,
+    fieldLockedOnAll,
     filenameStem,
     folderDropRequest,
     groupVolumesBySeries,
@@ -56,7 +57,9 @@
     selectionFromClick,
     selectionKey,
     seriesForSearch,
+    setFieldLocked,
     shouldRefetchLibrary,
+    switchGuard,
     volumesForShelf,
     type Candidate,
     type InspectorForm,
@@ -67,6 +70,10 @@
     type Volume,
   } from "./lib/library";
   import { applyDocumentClass, resolveDark } from "./lib/theme";
+
+  type PendingNavigation =
+    | { type: "place"; path: string }
+    | { type: "volume"; path: string; shift: boolean; toggle: boolean };
 
   let { initialConfig }: { initialConfig: Config } = $props();
 
@@ -88,6 +95,8 @@
   let settingsOpen = $state(false);
   let renameOpen = $state(false);
   let convertOpen = $state(false);
+  let unsavedOpen = $state(false);
+  let pendingNavigation = $state<PendingNavigation | null>(null);
   let renameTemplate = $state(OFFERED_RENAME_TEMPLATE);
   let renameLines = $state<string[]>([]);
   let renameError = $state("");
@@ -126,7 +135,8 @@
       isBusy(headerJob) &&
       headerJob.name !== "Search" &&
       headerJob.name !== "Issues" &&
-      headerJob.name !== "Load"
+      headerJob.name !== "Load" &&
+      headerJob.name !== "Save"
       ? headerJob
       : null,
   );
@@ -274,6 +284,14 @@
     }
     if (shouldRefetchLibrary(job)) await refreshLibrary(job);
     toastFrom(job);
+    if (job.name === "Save" && pendingNavigation !== null) {
+      if (job.state === "succeeded") {
+        const pending = pendingNavigation;
+        applyNavigation(pending);
+      } else {
+        pendingNavigation = null;
+      }
+    }
   }
 
   function watch(job: Job) {
@@ -306,31 +324,114 @@
   }
 
   function onPlace(path: string) {
-    selectedPlace = path === selectedPlace ? null : path;
-    selection = { paths: [], anchor: null };
-    candidates = [];
-    issues = [];
-    issuesSeries = null;
-    rebuildForm();
+    requestNavigation({ type: "place", path });
   }
 
   function onVolume(path: string, event: MouseEvent) {
-    const previous = selection.anchor;
-    selection = selectionFromClick(visiblePaths, selection, path, {
+    requestNavigation({
+      type: "volume",
+      path,
       shift: event.shiftKey,
       toggle: event.ctrlKey || event.metaKey,
     });
-    if (selection.anchor !== previous) {
+  }
+
+  function navigationBlocked(): boolean {
+    return unsavedOpen || pendingNavigation !== null || busy;
+  }
+
+  function requestNavigation(pending: PendingNavigation) {
+    if (navigationBlocked()) return;
+    const guard = switchGuard(form, config.auto_save_metadata_on_switch);
+    if (guard === "proceed") {
+      applyNavigation(pending);
+      return;
+    }
+    pendingNavigation = pending;
+    if (guard === "confirm") {
+      unsavedOpen = true;
+      return;
+    }
+    void saveForPendingNavigation();
+  }
+
+  function applyNavigation(pending: PendingNavigation) {
+    if (pending.type === "place") {
+      selectedPlace = pending.path === selectedPlace ? null : pending.path;
+      selection = { paths: [], anchor: null };
       candidates = [];
       issues = [];
       issuesSeries = null;
+    } else {
+      const previous = selection.anchor;
+      selection = selectionFromClick(visiblePaths, selection, pending.path, {
+        shift: pending.shift,
+        toggle: pending.toggle,
+      });
+      if (selection.anchor !== previous) {
+        candidates = [];
+        issues = [];
+        issuesSeries = null;
+      }
     }
+    pendingNavigation = null;
+    unsavedOpen = false;
     rebuildForm();
+  }
+
+  function dismissUnsaved() {
+    pendingNavigation = null;
+    unsavedOpen = false;
+  }
+
+  function discardUnsaved() {
+    const pending = pendingNavigation;
+    if (pending === null) {
+      dismissUnsaved();
+      return;
+    }
+    applyNavigation(pending);
+  }
+
+  async function saveForPendingNavigation() {
+    unsavedOpen = false;
+    if (form === null || selection.paths.length === 0) {
+      const pending = pendingNavigation;
+      if (pending !== null) applyNavigation(pending);
+      return;
+    }
+    inspectorLines = [];
+    try {
+      await startJob("/api/jobs/save", {
+        paths: selection.paths,
+        patch: savePatch(form),
+        mode: form.mode,
+      });
+    } catch {
+      pendingNavigation = null;
+    }
   }
 
   function onEdit(key: string, value: string) {
     if (form === null) return;
     form = editField(form, key, value);
+  }
+
+  async function onToggleLock(key: string, locked: boolean) {
+    if (form === null || selection.paths.length === 0 || formLocked) return;
+    try {
+      const result = await postJson<{ volumes: Volume[] }>("/api/field-locks", {
+        paths: selection.paths,
+        field: key,
+        locked,
+      });
+      const byPath = new Map(result.volumes.map((row) => [row.path, row]));
+      volumes = volumes.map((row) => byPath.get(row.path) ?? row);
+      const selected = rowsFor(selection.paths);
+      form = setFieldLocked(form, key, fieldLockedOnAll(selected, key));
+    } catch {
+      /* keep current form; toast comes from shared error handling if any */
+    }
   }
 
   async function scrape() {
@@ -773,6 +874,7 @@
         {formLocked}
         lines={inspectorLines}
         {onEdit}
+        {onToggleLock}
       />
     </aside>
   </div>
@@ -852,6 +954,24 @@
       <FileArchive size={20} />
     {/snippet}
     <p class="text-sm">{convertConfirmMessage(selectedCbr)}</p>
+  </Dialog>
+{/if}
+{#if unsavedOpen}
+  <Dialog
+    title="Unsaved metadata"
+    leadingLabel="Don't save"
+    confirmLabel="Save"
+    onLeading={discardUnsaved}
+    onDismiss={dismissUnsaved}
+    onConfirm={() => void saveForPendingNavigation()}
+  >
+    {#snippet icon()}
+      <Save size={20} />
+    {/snippet}
+    <p class="text-sm">
+      Metadata changes have not been written to the archive(s) yet. Save before
+      switching, or discard them?
+    </p>
   </Dialog>
 {/if}
 <ToastHost />

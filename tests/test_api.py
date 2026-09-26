@@ -104,6 +104,24 @@ def test_thumbnail_miss_is_404(tmp_path: Path) -> None:
     assert response.json()["error_type"] == "NoThumbnailError"
 
 
+def test_thumbnail_hit_is_cacheable_jpeg(tmp_path: Path) -> None:
+    jpeg = tmp_path / "covers" / "abc-1-2.jpg"
+    jpeg.parent.mkdir(parents=True)
+    jpeg.write_bytes(b"\xff\xd8\xff\xd9")
+
+    def thumbnail_for(*_args, **_kwargs):
+        return jpeg
+
+    app = _app(tmp_path, thumbnail_for=thumbnail_for, roots=["/books"])
+    with TestClient(app) as client:
+        response = client.get("/api/thumbnail", params={"path": "/books/a.cbz"})
+    assert response.status_code == 200
+    assert response.content == b"\xff\xd8\xff\xd9"
+    assert response.headers["content-type"].startswith("image/jpeg")
+    assert response.headers["cache-control"] == "private, max-age=3600"
+    assert response.headers["etag"] == '"abc-1-2"'
+
+
 def test_cover_rejects_hosts_outside_the_allow_list(tmp_path: Path) -> None:
     app = _app(tmp_path, roots=["/books"])
     with TestClient(app) as client:
@@ -408,6 +426,7 @@ def test_load_job_passes_issue_id(tmp_path: Path) -> None:
     assert loaded.json()["result"]["form"]["values"]["Count"] == {
         "value": "27",
         "dirty": True,
+        "locked": False,
     }
 
 
@@ -544,6 +563,45 @@ def test_unknown_job_is_404(tmp_path: Path) -> None:
         assert client.get("/api/jobs/current").json() is None
 
 
+def test_field_locks_endpoint(tmp_path: Path) -> None:
+    from manga_tagger.index import list_volumes, scan
+
+    library = tmp_path / "books"
+    archive = library / "a.cbz"
+    archive.parent.mkdir()
+    with __import__("zipfile").ZipFile(archive, "w") as zf:
+        zf.writestr(
+            "ComicInfo.xml",
+            b'<?xml version="1.0"?><ComicInfo><Series>Claymore</Series></ComicInfo>',
+        )
+        zf.writestr("0.jpg", b"page")
+    root = str(library.resolve())
+    scan(tmp_path / "index.db", tmp_path / "covers", [library])
+    path = str(archive.resolve())
+    app = _app(tmp_path, roots=[root])
+    with TestClient(app) as client:
+        bad = client.post(
+            "/api/field-locks",
+            json={"paths": [path], "field": "Volume", "locked": True},
+        )
+        assert bad.status_code == 400
+        assert bad.json()["error_type"] == "ShellError"
+        ok = client.post(
+            "/api/field-locks",
+            json={"paths": [path], "field": "Series", "locked": True},
+        )
+        assert ok.status_code == 200
+        body = ok.json()
+        assert body["volumes"][0]["locked_fields"] == '["Series"]'
+        assert list_volumes(tmp_path / "index.db")[0].locked_fields == '["Series"]'
+        outside = client.post(
+            "/api/field-locks",
+            json={"paths": ["/etc/passwd"], "field": "Series", "locked": True},
+        )
+        assert outside.status_code == 400
+        assert outside.json()["error_type"] == "OutsideLibraryError"
+
+
 def _app(
     tmp_path: Path, *, roots: list[str], hold: bool = False, ui_dir=None, **services
 ):
@@ -610,6 +668,7 @@ def _volume(path: str, **overrides: object) -> Volume:
         "penciller": "",
         "inker": "",
         "cover_artist": "",
+        "locked_fields": "[]",
     }
     values.update(overrides)
     return Volume(**values)

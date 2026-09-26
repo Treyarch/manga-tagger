@@ -22,6 +22,7 @@ import {
   mangaChoices,
   mangaLabel,
   matchCoverSrc,
+  thumbnailSrc,
   parseRootLines,
   placeAfterLibrary,
   preferredIssueNumber,
@@ -37,6 +38,7 @@ import {
   selectionAfterFilter,
   selectionFromClick,
   seriesForSearch,
+  switchGuard,
   volumesForShelf,
   volumesInPlace,
   type Volume,
@@ -76,6 +78,7 @@ function volume(path: string, extra: Partial<Volume> = {}): Volume {
     penciller: "",
     inker: "",
     cover_artist: "",
+    locked_fields: "[]",
     ...extra,
   };
 }
@@ -118,6 +121,12 @@ describe("shelf and selection", () => {
       "a2.cbz",
       "a1.cbz",
     ]);
+  });
+
+  it("builds a thumbnail URL from the archive path", () => {
+    expect(thumbnailSrc("/books/Claymore/a.cbz")).toBe(
+      "/api/thumbnail?path=" + encodeURIComponent("/books/Claymore/a.cbz"),
+    );
   });
 
   it("proxies MangaDex covers through /api/cover", () => {
@@ -165,13 +174,22 @@ describe("form", () => {
   it("builds one volume and a shared form", () => {
     const one = formFromVolumes([volume("/books/a.cbz", { number: "4" })]);
     expect(one?.mode).toBe("one");
-    expect(one?.values.Number).toEqual({ value: "4", dirty: false });
+    expect(one?.values.Number).toEqual({
+      value: "4",
+      dirty: false,
+      locked: false,
+    });
     expect(one?.values.Pages).toBeUndefined();
     const edited = editField(one!, "Number", "9");
-    expect(edited.values.Number).toEqual({ value: "9", dirty: true });
+    expect(edited.values.Number).toEqual({
+      value: "9",
+      dirty: true,
+      locked: false,
+    });
     expect(editField(one!, "Number", "4").values.Number).toEqual({
       value: "4",
       dirty: false,
+      locked: false,
     });
     expect(savePatch(edited)).toEqual({ Number: "9" });
 
@@ -182,11 +200,17 @@ describe("form", () => {
     expect(Object.keys(many?.values ?? [])).toContain("Manga");
     expect(Object.keys(many?.values ?? [])).toContain("AgeRating");
     expect(Object.keys(many!.values)).toEqual([...SHARED_FIELDS]);
-    expect(many?.values.Series).toEqual({ value: "", mixed: true, dirty: false });
+    expect(many?.values.Series).toEqual({
+      value: "",
+      mixed: true,
+      dirty: false,
+      locked: false,
+    });
     expect(many?.values.Publisher).toEqual({
       value: "Shueisha",
       mixed: false,
       dirty: false,
+      locked: false,
     });
     expect(Object.values(many!.values).every((field) => field.dirty === false)).toBe(
       true,
@@ -195,6 +219,38 @@ describe("form", () => {
     expect(savePatch(changed)).toEqual({ Publisher: "" });
     expect(savePatch(changed).Series).toBeUndefined();
     expect(savePatch(changed).Number).toBeUndefined();
+  });
+
+  it("marks fields locked from the index and blocks edits", () => {
+    const one = formFromVolumes([
+      volume("/books/a.cbz", {
+        series: "Claymore",
+        locked_fields: '["Series"]',
+      }),
+    ]);
+    expect(one?.values.Series.locked).toBe(true);
+    expect(editField(one!, "Series", "Monster").values.Series.value).toBe("Claymore");
+    const mixed = formFromVolumes([
+      volume("/books/a.cbz", { series: "A", locked_fields: '["Series"]' }),
+      volume("/books/b.cbz", { series: "A", locked_fields: "[]" }),
+    ]);
+    expect(mixed?.values.Series.locked).toBe(false);
+    const both = formFromVolumes([
+      volume("/books/a.cbz", { series: "A", locked_fields: '["Series"]' }),
+      volume("/books/b.cbz", { series: "A", locked_fields: '["Series"]' }),
+    ]);
+    expect(both?.values.Series.locked).toBe(true);
+  });
+
+  it("guards volume and place switches for dirty forms", () => {
+    expect(switchGuard(null, false)).toBe("proceed");
+    expect(switchGuard(null, true)).toBe("proceed");
+    const clean = formFromVolumes([volume("/books/a.cbz", { number: "4" })]);
+    expect(switchGuard(clean, false)).toBe("proceed");
+    expect(switchGuard(clean, true)).toBe("proceed");
+    const dirty = editField(clean!, "Number", "9");
+    expect(switchGuard(dirty, false)).toBe("confirm");
+    expect(switchGuard(dirty, true)).toBe("autosave");
   });
 
   it("maps ComicInfo keys to readable field captions", () => {
@@ -237,17 +293,29 @@ describe("form", () => {
     const filled = formFromVolumes([
       volume("/books/a.cbz", { page_count: "", archive_page_count: 42 }),
     ])!;
-    expect(filled.values.PageCount).toEqual({ value: "42", dirty: false });
+    expect(filled.values.PageCount).toEqual({
+      value: "42",
+      dirty: false,
+      locked: false,
+    });
 
     const kept = formFromVolumes([
       volume("/books/a.cbz", { page_count: "10", archive_page_count: 42 }),
     ])!;
-    expect(kept.values.PageCount).toEqual({ value: "10", dirty: false });
+    expect(kept.values.PageCount).toEqual({
+      value: "10",
+      dirty: false,
+      locked: false,
+    });
 
     const missing = formFromVolumes([
       volume("/books/a.cbz", { page_count: "", archive_page_count: null }),
     ])!;
-    expect(missing.values.PageCount).toEqual({ value: "", dirty: false });
+    expect(missing.values.PageCount).toEqual({
+      value: "",
+      dirty: false,
+      locked: false,
+    });
   });
 
   it("uses series for scrape only when it is set and not mixed", () => {
@@ -277,6 +345,9 @@ describe("jobs and dialogs", () => {
     expect(entryErrorLines([{ path: "/books/a.cbz", error_message: "nope" }])).toEqual([
       "a.cbz: nope",
     ]);
+    expect(convertConfirmMessage(1)).toBe(
+      "Convert 1 CBR file to CBZ and delete the originals?",
+    );
     expect(convertConfirmMessage(2)).toBe(
       "Convert 2 CBR files to CBZ and delete the originals?",
     );

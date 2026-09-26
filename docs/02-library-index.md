@@ -29,10 +29,11 @@ One row is one resolved archive path. The row stores file facts, scan status, an
 | `cover_index` | Reading-order cover index. NULL when `status` is `failed` |
 | `archive_page_count` | Number of page images. NULL when `status` is `failed` |
 | ComicInfo columns | One text column per owned element except `Pages`. A missing element is `""` |
+| `locked_fields` | JSON array text of locked ComicInfo element names from the shell `FORM_FIELDS` list. Default `[]`. App-owned; not ComicInfo. See [07-field-locks.md](07-field-locks.md) |
 
 The ComicInfo columns are `title`, `series`, `number`, `volume`, `count`, `publisher`, `page_count`, `language_iso`, `age_rating`, `manga`, `genre`, `summary`, `web`, `community_rating`, `notes`, `year`, `month`, `day`, `writer`, `penciller`, `inker`, and `cover_artist`. `page_count` is the `PageCount` element text. `archive_page_count` is the number of page images. They are stored as read and are not required to match.
 
-`list_volumes` returns these fields, including failed rows. The form can use the row without opening the archive.
+`list_volumes` returns these fields, including failed rows and `locked_fields`. The form can use the row without opening the archive.
 
 ## Database
 
@@ -40,9 +41,10 @@ Each public call opens its own connection, ensures the schema, does its work, an
 
 A missing parent directory and a missing database file are created. `PRAGMA user_version` is the schema version.
 
-- Version 0 gets the table below, then `user_version` is set to 2.
-- Version 1 gains a `count` column via `ALTER TABLE`, then `user_version` is set to 2.
-- Version 2 is opened unchanged.
+- Version 0 gets the table below (including `locked_fields`), then `user_version` is set to 3.
+- Version 1 gains a `count` column via `ALTER TABLE`, then continues migration.
+- Version 2 gains `locked_fields TEXT NOT NULL DEFAULT '[]'` via `ALTER TABLE`, then `user_version` is set to 3.
+- Version 3 is opened unchanged.
 - Any other version raises `IndexVersionError` and does not modify the file.
 
 ```sql
@@ -79,9 +81,12 @@ CREATE TABLE volumes (
   writer TEXT NOT NULL,
   penciller TEXT NOT NULL,
   inker TEXT NOT NULL,
-  cover_artist TEXT NOT NULL
+  cover_artist TEXT NOT NULL,
+  locked_fields TEXT NOT NULL DEFAULT '[]'
 );
 ```
+
+An `INSERT OR REPLACE` for an existing path copies that path's previous `locked_fields` into the new row. A new path stores `[]`.
 
 There is no pagination. A library of a few hundred volumes is returned in one list.
 
@@ -153,7 +158,11 @@ A path that is missing, is not a `.cbz` or `.cbr`, or sits outside every root lo
 
 `forget_volume(db_path, cache_dir, path)` deletes the row for that resolved path and deletes its thumbnail files. A path that is not indexed is a success.
 
-A save, a rename, or a convert calls `refresh_volume` on the output path and `forget_volume` on a path that is gone. This module does not watch the filesystem. Neither call builds a thumbnail.
+`set_field_lock(db_path, paths, field, locked)` updates `locked_fields` for each resolved path that has a row: when `locked` is true, add `field` to the JSON list; when false, remove it. Names are stored sorted and unique. Paths with no row are skipped. Returns the updated rows in request order. Field-name validation is the caller's job (see [07-field-locks.md](07-field-locks.md)).
+
+`copy_locked_fields(db_path, source, dest)` copies `locked_fields` from `source` onto `dest` when both rows exist and the paths differ after resolve. Used after rename or convert refresh. A missing source or dest is a no-op.
+
+A save, a rename, or a convert calls `refresh_volume` on the output path, copies locks from the old path when the path changed, then `forget_volume` on a path that is gone. This module does not watch the filesystem. Neither call builds a thumbnail.
 
 ## Thumbnail cache
 
@@ -172,7 +181,7 @@ The JPEG is written to a temporary file in `cache_dir` and renamed into place. T
 | Exception | When |
 | --- | --- |
 | `LibraryIndexError` | The database cannot be opened or written, a path that must be absolute is relative, or thumbnail encoding fails. A failed encode removes its temporary file and leaves an older thumbnail in place |
-| `IndexVersionError` | `user_version` is neither 0, 1, nor 2. The schema is not rewritten and existing rows stay |
+| `IndexVersionError` | `user_version` is neither 0, 1, 2, nor 3. The schema is not rewritten and existing rows stay |
 
 `IndexVersionError` is a subclass of `LibraryIndexError`. The base name is not the builtin `IndexError`.
 
@@ -203,7 +212,8 @@ Cover at least:
 - `refresh_volume` updates one file after its ComicInfo changes and does not walk a sibling. `forget_volume` removes the row and the thumbnail. A missing path returns no row.
 - `thumbnail_for` reads only the cover page, writes a JPEG 256 pixels wide, and leaves the archive bytes unchanged. It does not write `{stem}-poster.jpg`. A cover narrower than 256 pixels is not enlarged. A cover with an alpha channel encodes on white. The test may decode that JPEG. A second call for the same size and mtime does not open the archive. A `failed` row returns no path. `list_volumes` creates no thumbnail.
 - When `unar` is absent, a `.cbr` row is `failed` with `error_type` `MissingUnarError` and a message that names `unar`, and a `.cbz` row is `ok`.
-- `user_version` 3 raises `IndexVersionError`. The version stays 3 and a sentinel row is still present.
+- `user_version` 4 raises `IndexVersionError`. The version stays 4 and a sentinel row is still present.
+- Version 2 migrates to 3 with `locked_fields` default `[]`. An upsert of an existing path preserves `locked_fields`. `set_field_lock` adds and removes a name. `copy_locked_fields` moves the list to a new path.
 
 ## Acceptance criteria
 
@@ -215,4 +225,4 @@ Cover at least:
 - A finished scan drops files that disappeared and drops roots that are no longer in the list, including a finished scan of an empty root list. A root that is not an existing directory keeps its rows. A root whose directory cannot be listed is not pruned.
 - `refresh_volume` updates one archive. `forget_volume` drops one path and its thumbnail. The module does not watch the filesystem and does not start a thread.
 - A thumbnail is built when asked, from the cover page only, as a 256-pixel-wide JPEG at quality 80 on a white matte when the cover has an alpha channel, by rename inside the cache directory. The sibling poster is left alone. A scan does not build thumbnails.
-- A database whose `user_version` is neither 0, 1, nor 2 is refused. The schema is not rewritten and existing rows stay. Version 1 is migrated to 2 by adding `count`.
+- A database whose `user_version` is neither 0, 1, 2, nor 3 is refused. The schema is not rewritten and existing rows stay. Version 1 is migrated through to 3 (adding `count` then `locked_fields`). Version 2 is migrated to 3 by adding `locked_fields`. Upsert preserves `locked_fields` for an existing path.
