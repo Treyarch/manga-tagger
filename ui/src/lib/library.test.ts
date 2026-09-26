@@ -25,6 +25,7 @@ import {
   parseRootLines,
   placeAfterLibrary,
   preferredIssueNumber,
+  preferredIssueId,
   renamePlanLines,
   requestsPage,
   savePatch,
@@ -422,5 +423,18 @@ describe("jobs and dialogs", () => {
       "3",
     );
     expect(preferredIssueNumber(null)).toBe("");
+  });
+
+  it("picks the preferred issue id by normalized number", () => {
+    const issues = [
+      { id: "a", number: "1" },
+      { id: "b", number: "02" },
+      { id: "c", number: "10.5" },
+    ];
+    expect(preferredIssueId(issues, "2")).toBe("b");
+    expect(preferredIssueId(issues, "10.5")).toBe("c");
+    expect(preferredIssueId(issues, "99")).toBe("a");
+    expect(preferredIssueId(issues, "")).toBe("a");
+    expect(preferredIssueId([], "2")).toBeNull();
   });
 });

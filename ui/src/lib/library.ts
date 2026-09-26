@@ -692,6 +692,32 @@ export function preferredIssueNumber(form: InspectorForm | null): string {
   return field.value.trim();
 }
 
+/** Strip leading zeros on the integer part; keep a fractional suffix. */
+export function normalizeIssueNumber(value: string): string {
+  const text = value.trim();
+  if (text.includes(".")) {
+    const [whole, frac] = text.split(".", 2);
+    return `${whole.replace(/^0+(?=\d)/, "") || "0"}.${frac}`;
+  }
+  return text.replace(/^0+(?=\d)/, "") || "0";
+}
+
+/** Id of the preferred-number issue, else the first issue, else null. */
+export function preferredIssueId(
+  issues: Pick<IssueCandidate, "id" | "number">[],
+  preferredNumber: string,
+): string | null {
+  if (issues.length === 0) return null;
+  const preferred = preferredNumber.trim();
+  const match =
+    preferred !== ""
+      ? issues.find(
+          (item) => normalizeIssueNumber(item.number) === normalizeIssueNumber(preferred),
+        )
+      : undefined;
+  return (match ?? issues[0]).id;
+}
+
 export function entriesOf(result: unknown): WorkEntry[] {
   if (result === null || typeof result !== "object" || !("entries" in result)) {
     return [];

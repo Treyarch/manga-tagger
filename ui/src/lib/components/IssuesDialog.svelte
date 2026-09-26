@@ -1,8 +1,9 @@
 <script lang="ts">
+  import { tick } from "svelte";
   import { Book, ListOrdered, LoaderCircle } from "lucide-svelte";
   import Dialog from "./Dialog.svelte";
   import type { Candidate, IssueCandidate } from "../library";
-  import { matchCoverSrc } from "../library";
+  import { matchCoverSrc, preferredIssueId } from "../library";
 
   let {
     series,
@@ -24,6 +25,7 @@
 
   let selectedId = $state("");
   let failedCovers = $state(new Set<string>());
+  let listEl: HTMLDivElement | undefined = $state();
 
   const title = $derived(
     series.year.trim() !== ""
@@ -45,22 +47,19 @@
       return;
     }
     if (issues.some((item) => item.id === selectedId)) return;
-    const preferred = preferredNumber.trim();
-    const match =
-      preferred !== ""
-        ? issues.find((item) => normalizeNumber(item.number) === normalizeNumber(preferred))
-        : undefined;
-    selectedId = (match ?? issues[0]).id;
+    selectedId = preferredIssueId(issues, preferredNumber) ?? "";
   });
 
-  function normalizeNumber(value: string): string {
-    const text = value.trim();
-    if (text.includes(".")) {
-      const [whole, frac] = text.split(".", 2);
-      return `${whole.replace(/^0+(?=\d)/, "") || "0"}.${frac}`;
-    }
-    return text.replace(/^0+(?=\d)/, "") || "0";
-  }
+  $effect(() => {
+    const id = selectedId;
+    if (!id || loading) return;
+    void tick().then(() => {
+      const row = listEl?.querySelector(`[data-issue-id="${CSS.escape(id)}"]`);
+      if (row instanceof HTMLElement) {
+        row.scrollIntoView({ block: "nearest", inline: "nearest" });
+      }
+    });
+  });
 
   function coverFailed(url: string): boolean {
     return failedCovers.has(url);
@@ -141,6 +140,7 @@
       </div>
       <div class="flex min-h-0 min-w-0 flex-col gap-3">
         <div
+          bind:this={listEl}
           class="max-h-64 overflow-auto rounded-sm border border-zinc-200 dark:border-zinc-600"
           role="listbox"
           aria-label="Issues"
@@ -160,6 +160,7 @@
             <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
               {#each issues as issue (issue.id)}
                 <tr
+                  data-issue-id={issue.id}
                   role="option"
                   aria-selected={selected?.id === issue.id}
                   class="cursor-pointer {selected?.id === issue.id

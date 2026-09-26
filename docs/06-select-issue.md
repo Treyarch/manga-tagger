@@ -111,7 +111,7 @@ When the form mode is `many` (several volumes selected), Matches omits **Select 
 
 Dismiss Matches clears candidates and issues and cancels a running Search or Issues job started from that flow.
 
-Issues dialog (`IssuesDialog.svelte`), `xl` size, title `{Series} ({Year}) - Select Issue` using the highlighted candidate's title and year (omit ` (Year)` when year is blank). Lucide `ListOrdered` (or `ScanSearch`) as the title icon. Body: loading spinner `Loading issues…`, or the same two-column layout as Matches with table columns **Issue** / **Date** / **Title**, cover left, summary below the table. Preselect the row whose `number` matches the preferred number (form or stem); if none, the first row. OK / double-click / Enter starts Load with that `issue_id` and the parent series candidate's `count`. Cancel closes Issues only and returns to Matches with candidates kept.
+Issues dialog (`IssuesDialog.svelte`), `xl` size, title `{Series} ({Year}) - Select Issue` using the highlighted candidate's title and year (omit ` (Year)` when year is blank). Lucide `ListOrdered` (or `ScanSearch`) as the title icon. Body: loading spinner `Loading issues…`, or the same two-column layout as Matches with table columns **Issue** / **Date** / **Title**, cover left, summary below the table. Preselect the row whose `number` matches the preferred number (form or stem); if none, the first row. Scroll the issues table so that highlighted row is visible when the list first loads and when arrow keys move the highlight. OK / double-click / Enter starts Load with that `issue_id` and the parent series candidate's `count`. Cancel closes Issues only and returns to Matches with candidates kept.
 
 Cover proxy rules for issue covers match Matches (MangaDex and Nautiljon hosts through `/api/cover`; Comic Vine uses the direct URL). When an issue row has a blank `cover`, the Issues dialog shows the series candidate cover instead.
 
@@ -132,6 +132,7 @@ Hermetic MockTransport tests. Cover at least:
 - MangaDex, AniList, and Jikan `list_issues` return `[]` with no HTTP.
 - Issues job returns `{ "issues": [...] }`; empty list is success.
 - Load job passes `issue_id` and `mode` through; preferred number from non-blank form `Number`.
+- `preferredIssueId` picks the matching preferred-number issue (leading-zero-normalized) or the first row.
 
 ## Acceptance criteria
 
@@ -141,3 +142,4 @@ Hermetic MockTransport tests. Cover at least:
 - MangaDex, AniList, and Jikan return an empty issue list; the client toasts `No issues available.`
 - A successful issue or number load merges a form patch and does not write an archive. `Number` comes from the chosen issue/volume when that path ran.
 - Cancel checks run before each new HTTP request. Multi-volume save still ignores patch `Number` per the shell shared-field rules.
+- When Issues lists arrive, the preferred-number row (else the first) is highlighted and scrolled into view in the issues table.
