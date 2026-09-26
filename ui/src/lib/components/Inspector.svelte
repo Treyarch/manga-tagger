@@ -18,15 +18,25 @@
     form,
     formLocked,
     lines,
+    coverRevision = "",
+    coverActions = false,
+    coverActionsDisabled = true,
     onEdit,
     onToggleLock,
+    onReplaceCover,
+    onInsertCover,
   }: {
     anchor: Volume | null;
     form: InspectorForm | null;
     formLocked: boolean;
     lines: string[];
+    coverRevision?: string;
+    coverActions?: boolean;
+    coverActionsDisabled?: boolean;
     onEdit: (key: string, value: string) => void;
     onToggleLock: (key: string, locked: boolean) => void;
+    onReplaceCover?: () => void;
+    onInsertCover?: () => void;
   } = $props();
 
   const fields = $derived(
@@ -43,8 +53,14 @@
     </ul>
   {/if}
   {#if anchor}
-    {#key anchor.path}
-      <PagePreview {anchor} />
+    {#key `${anchor.path}:${coverRevision}`}
+      <PagePreview
+        {anchor}
+        {coverActions}
+        {coverActionsDisabled}
+        {onReplaceCover}
+        {onInsertCover}
+      />
     {/key}
   {/if}
   {#if form}

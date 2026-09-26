@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, type Component } from "svelte";
+  import { onMount } from "svelte";
   import { fly } from "svelte/transition";
   import { backOut, cubicIn } from "svelte/easing";
   import {
@@ -21,7 +21,7 @@
 
   let items = $state<ToastItem[]>([]);
 
-  const icons: Record<ToastIcon, Component<{ size?: number; class?: string }>> = {
+  const icons: Record<ToastIcon, typeof Check> = {
     check: Check,
     save: Save,
     pencil: Pencil,

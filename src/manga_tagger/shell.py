@@ -898,6 +898,86 @@ def run_convert(
     return {"entries": entries}
 
 
+def run_cover(
+    *,
+    path: str,
+    action: str,
+    web: str,
+    number: str,
+    roots: Sequence[str],
+    keep_cbr_original: bool,
+    write_poster_on_save: bool,
+    api_key: str,
+    nautiljon_base_url: str,
+    nautiljon_api_key: str,
+    enabled_providers: Sequence[str],
+    db_path: str,
+    cache_dir: str,
+    resolve_cover_from_web: Callable[..., object],
+    remote_cover_bytes: Callable[..., tuple[bytes, str]],
+    replace_cover_page: Callable[..., Path],
+    insert_cover_page: Callable[..., Path],
+    write_poster: Callable[[str], object],
+    refresh_volume: Callable[..., object],
+    forget_volume: Callable[..., object],
+    copy_locked_fields: Callable[..., object],
+    client_factory: Callable[[], httpx.Client],
+    cancel: Cancel,
+    progress: Progress,
+) -> dict[str, object]:
+    """Download a catalog cover and replace or insert it as page 0."""
+    ensure_inside(path, roots)
+    if action not in {"replace", "insert"}:
+        raise ShellError(f"unknown cover action {action!r}")
+    progress(0, 1)
+    if cancel():
+        raise JobCancelled({"entries": []})
+    client = client_factory()
+    try:
+        cover = resolve_cover_from_web(
+            web,
+            client=client,
+            number=number,
+            api_key=api_key,
+            nautiljon_base_url=nautiljon_base_url,
+            nautiljon_api_key=nautiljon_api_key,
+            enabled_providers=list(enabled_providers),
+            cancel=cancel,
+        )
+        if cancel():
+            raise JobCancelled({"entries": []})
+        payload, _media = remote_cover_bytes(cover.url, client=client)
+    finally:
+        client.close()
+    if cancel():
+        raise JobCancelled({"entries": []})
+    writer = replace_cover_page if action == "replace" else insert_cover_page
+    try:
+        output = writer(
+            path,
+            payload,
+            cover.filename,
+            keep_cbr_original=keep_cbr_original,
+        )
+    except Exception as exc:
+        progress(1, 1)
+        return {"entries": [_error_entry(path, exc)]}
+    entry = _after_success(
+        path,
+        output,
+        db_path=db_path,
+        cache_dir=cache_dir,
+        roots=roots,
+        write_poster=write_poster,
+        refresh_volume=refresh_volume,
+        forget_volume=forget_volume,
+        copy_locked_fields=copy_locked_fields,
+        with_poster=write_poster_on_save,
+    )
+    progress(1, 1)
+    return {"entries": [entry]}
+
+
 def run_scan(
     *,
     db_path: str,

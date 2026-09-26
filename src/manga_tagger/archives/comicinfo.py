@@ -182,6 +182,28 @@ class ComicInfo:
                 applied["Volume"] = number
         return applied
 
+    def update_cover_pages(self, *, removed_index: int | None) -> None:
+        """Insert page zero, remapping retained XML without losing extensions."""
+        namespace = etree.QName(self._root).namespace
+        prefix = f"{{{namespace}}}" if namespace else ""
+        pages = _child(self._root, "Pages")
+        if pages is None:
+            pages = etree.SubElement(self._root, f"{prefix}Pages")
+        for page in list(pages):
+            if not isinstance(page.tag, str) or etree.QName(page).localname != "Page":
+                continue
+            image = page.get("Image", "")
+            if image.isascii() and image.isdigit():
+                index = int(image)
+                if index == removed_index:
+                    pages.remove(page)
+                    continue
+                if removed_index is None or index < removed_index:
+                    page.set("Image", str(index + 1))
+            if page.get("Type") == "FrontCover":
+                del page.attrib["Type"]
+        pages.insert(0, etree.Element(f"{prefix}Page", Image="0", Type="FrontCover"))
+
     def to_bytes(self) -> bytes:
         """Serialize the tree, including elements this model does not edit."""
         return etree.tostring(self._root, xml_declaration=True, encoding="UTF-8")

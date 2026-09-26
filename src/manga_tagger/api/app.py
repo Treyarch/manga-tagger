@@ -17,6 +17,7 @@ from manga_tagger.api.models import (
     ConfigModel,
     ConfigPut,
     ConvertRequest,
+    CoverRequest,
     FieldLocksRequest,
     FieldLocksResponse,
     FolderDialogModel,
@@ -35,6 +36,7 @@ from manga_tagger.api.models import (
     VolumeModel,
 )
 from manga_tagger.archives.errors import ArchiveError
+from manga_tagger.archives.pages import insert_cover_page, replace_cover_page
 from manga_tagger.archives.poster import write_poster
 from manga_tagger.archives.read import list_pages, read_page
 from manga_tagger.archives.rename import plan_rename, rename_in_directory
@@ -54,7 +56,14 @@ from manga_tagger.jobs import (
     JobNotFoundError,
     JobRunner,
 )
-from manga_tagger.providers import build_query, list_issues, load, parse_number, search
+from manga_tagger.providers import (
+    build_query,
+    list_issues,
+    load,
+    parse_number,
+    resolve_cover_from_web,
+    search,
+)
 from manga_tagger.providers.remote_cover import RemoteCoverError, remote_cover_bytes
 from manga_tagger.shell import (
     NoThumbnailError,
@@ -68,6 +77,7 @@ from manga_tagger.shell import (
     preview_rename,
     read_page_bytes,
     run_convert,
+    run_cover,
     run_list_issues,
     run_load,
     run_rename,
@@ -105,6 +115,10 @@ class Services:
     plan_rename: Callable[..., object]
     rename_in_directory: Callable[..., object]
     convert_cbr: Callable[..., object]
+    replace_cover_page: Callable[..., object]
+    insert_cover_page: Callable[..., object]
+    resolve_cover_from_web: Callable[..., object]
+    remote_cover_bytes: Callable[..., object]
     search: Callable[..., object]
     list_issues: Callable[..., object]
     load: Callable[..., object]
@@ -144,6 +158,10 @@ def default_services() -> Services:
         plan_rename=plan_rename,
         rename_in_directory=rename_in_directory,
         convert_cbr=convert_cbr,
+        replace_cover_page=replace_cover_page,
+        insert_cover_page=insert_cover_page,
+        resolve_cover_from_web=resolve_cover_from_web,
+        remote_cover_bytes=remote_cover_bytes,
         search=search,
         list_issues=list_issues,
         load=load,
@@ -572,6 +590,42 @@ def _register_routes(app: FastAPI) -> None:
 
         return JobModel.from_job(state.runner.start("Convert", fn))
 
+    @app.post("/api/jobs/cover", response_model=JobModel)
+    def post_cover(body: CoverRequest) -> JobModel:
+        state = _state(app)
+        ensure_inside(body.path, state.config.library_roots)
+
+        def fn(cancel, progress):
+            config = state.config
+            return run_cover(
+                path=body.path,
+                action=body.action,
+                web=body.web,
+                number=body.number,
+                roots=list(config.library_roots),
+                keep_cbr_original=config.keep_cbr_original,
+                write_poster_on_save=config.write_poster_on_save,
+                api_key=config.comicvine_api_key,
+                nautiljon_base_url=config.nautiljon_base_url,
+                nautiljon_api_key=config.nautiljon_api_key,
+                enabled_providers=list(config.enabled_providers),
+                db_path=str(state.index_path),
+                cache_dir=str(state.thumbnail_dir),
+                resolve_cover_from_web=state.services.resolve_cover_from_web,
+                remote_cover_bytes=state.services.remote_cover_bytes,
+                replace_cover_page=state.services.replace_cover_page,
+                insert_cover_page=state.services.insert_cover_page,
+                write_poster=state.services.write_poster,
+                refresh_volume=state.services.refresh_volume,
+                forget_volume=state.services.forget_volume,
+                copy_locked_fields=state.services.copy_locked_fields,
+                client_factory=state.services.client_factory,
+                cancel=cancel,
+                progress=progress,
+            )
+
+        return JobModel.from_job(state.runner.start("Cover", fn))
+
     @app.post("/api/field-locks", response_model=FieldLocksResponse)
     def post_field_locks(body: FieldLocksRequest) -> FieldLocksResponse:
         state = _state(app)
@@ -583,9 +637,7 @@ def _register_routes(app: FastAPI) -> None:
             db_path=str(state.index_path),
             set_field_lock=state.services.set_field_lock,
         )
-        return FieldLocksResponse(
-            volumes=[VolumeModel.from_row(row) for row in rows]
-        )
+        return FieldLocksResponse(volumes=[VolumeModel.from_row(row) for row in rows])
 
     @app.get("/api/jobs/current", response_model=JobModel | None)
     def current_job() -> JobModel | None:

@@ -173,7 +173,7 @@ def _stub_cbr(
             payload = json.dumps({"lsarContents": contents}).encode()
             return subprocess.CompletedProcess(args, 0, payload, b"")
         output = Path(args[args.index("-output-directory") + 1])
-        if "-no-directory" in args:
+        if len(args) > args.index("-output-directory") + 3:
             member = args[-1]
             target = output / Path(member).name
             target.write_bytes(files[member])
@@ -704,9 +704,8 @@ def test_convert_and_cbr_save_with_stubbed_unar(
     with _ORIGINAL_ZIP(output) as zip_file:
         assert zip_file.read("page.jpg") == b"img"
     unar = next(call for call in calls if call[0] == "unar")
-    assert unar[:3] == ["unar", "-quiet", "-output-directory"]
-    assert "-no-directory" not in unar
-    assert not Path(unar[3]).exists()
+    assert unar[:4] == ["unar", "-quiet", "-no-directory", "-output-directory"]
+    assert not Path(unar[4]).exists()
 
     kept = tmp_path / "Bar.cbr"
     kept.write_bytes(b"keep-me")
@@ -786,11 +785,32 @@ def test_empty_archive_and_bad_zip(tmp_path: Path) -> None:
 
 
 @needs_unar
-def test_convert_with_unar_on_path(tmp_path: Path) -> None:
+@pytest.mark.parametrize("keep_original", [True, False])
+@pytest.mark.parametrize("patch", [None, {"Series": "Updated"}])
+def test_convert_with_unar_on_path(
+    tmp_path: Path, keep_original: bool, patch: dict[str, str] | None
+) -> None:
     source = tmp_path / "Foo.cbr"
     _simple_cbz(source, Series="Claymore", Number="1")
+    with _ORIGINAL_ZIP(source, "a") as archive:
+        archive.writestr("pages/nested.jpg", b"nested-image")
+    original = source.read_bytes()
     # The bytes are a zip with a .cbr name. unar detects the format.
-    output = convert_cbr(source, keep_cbr_original=False)
+    if patch is None:
+        output = convert_cbr(source, keep_cbr_original=keep_original)
+    else:
+        output = save_comic_info(
+            source, patch, write_number=False, keep_cbr_original=keep_original
+        )
     assert output == tmp_path / "Foo.cbz"
-    assert not source.exists()
-    assert _field(output, "Series") == "Claymore"
+    assert source.exists() is keep_original
+    if keep_original:
+        assert source.read_bytes() == original
+    assert _field(output, "Series") == ("Claymore" if patch is None else "Updated")
+    assert _field(output, "Number") == "1"
+    with _ORIGINAL_ZIP(output) as archive:
+        assert set(archive.namelist()) == {
+            "ComicInfo.xml", "page.jpg", "pages/", "pages/nested.jpg"
+        }
+        assert archive.read("pages/nested.jpg") == b"nested-image"
+    assert not list(tmp_path.glob(".manga-tagger-*"))

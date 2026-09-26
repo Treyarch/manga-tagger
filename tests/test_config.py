@@ -18,7 +18,9 @@ def test_missing_config_returns_defaults(tmp_path: Path) -> None:
     path = tmp_path / "config.toml"
     config = load_config(path)
     assert config.library_roots == []
-    assert config.keep_cbr_original is False
+    assert config.keep_cbr_original is True
+    assert config.write_poster_on_save is True
+    assert config.auto_save_metadata_on_switch is False
     assert config.comicvine_api_key == ""
     assert config.nautiljon_base_url == ""
     assert config.nautiljon_api_key == ""
@@ -38,6 +40,8 @@ def test_missing_config_returns_defaults(tmp_path: Path) -> None:
     assert set(saved) == {
         "library_roots",
         "keep_cbr_original",
+        "write_poster_on_save",
+        "auto_save_metadata_on_switch",
         "comicvine_api_key",
         "nautiljon_base_url",
         "nautiljon_api_key",
@@ -52,13 +56,17 @@ def test_relative_root_is_dropped_and_file_is_unchanged(tmp_path: Path) -> None:
     path.write_text(
         'library_roots = ["relative", "/abs", "/abs"]\n'
         'keep_cbr_original = "no"\n'
+        'write_poster_on_save = "no"\n'
+        'auto_save_metadata_on_switch = "yes"\n'
         "theme = 1\n",
         encoding="utf-8",
     )
     before = path.read_bytes()
     config = load_config(path)
     assert config.library_roots == [str(Path("/abs").resolve())]
-    assert config.keep_cbr_original is False
+    assert config.keep_cbr_original is True
+    assert config.write_poster_on_save is True
+    assert config.auto_save_metadata_on_switch is False
     assert config.theme == "system"
     assert path.read_bytes() == before
 
@@ -102,6 +110,10 @@ def test_put_rejects_wrong_json_types(tmp_path: Path) -> None:
     with pytest.raises(ConfigError):
         apply_put(config, {"keep_cbr_original": "yes"})
     with pytest.raises(ConfigError):
+        apply_put(config, {"write_poster_on_save": "yes"})
+    with pytest.raises(ConfigError):
+        apply_put(config, {"auto_save_metadata_on_switch": "yes"})
+    with pytest.raises(ConfigError):
         apply_put(config, {"comicvine_api_key": 5})
     with pytest.raises(ConfigError):
         apply_put(config, {"nautiljon_base_url": 5})
@@ -111,6 +123,17 @@ def test_put_rejects_wrong_json_types(tmp_path: Path) -> None:
         apply_put(config, {"title_languages": "fr"})
     with pytest.raises(ConfigError):
         apply_put(config, {"enabled_providers": "mangadex"})
+    off = apply_put(
+        config,
+        {
+            "keep_cbr_original": False,
+            "write_poster_on_save": False,
+            "auto_save_metadata_on_switch": True,
+        },
+    )
+    assert off.keep_cbr_original is False
+    assert off.write_poster_on_save is False
+    assert off.auto_save_metadata_on_switch is True
 
 
 def test_enabled_providers_load_fallbacks(tmp_path: Path) -> None:

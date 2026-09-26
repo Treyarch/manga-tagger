@@ -5,6 +5,12 @@ import {
   FORM_FIELDS,
   SHARED_FIELDS,
   candidatesOf,
+  cbrCount,
+  coverProviderFromWeb,
+  canFetchCoverFromWeb,
+  coverPageIndex,
+  preserveDirtyFields,
+  shouldRefetchLibrary,
   clampProvider,
   convertConfirmMessage,
   editField,
@@ -50,7 +56,7 @@ function volume(path: string, extra: Partial<Volume> = {}): Volume {
     path,
     root: path.slice(0, path.lastIndexOf("/")),
     name,
-    extension: name.slice(name.lastIndexOf(".")),
+    extension: name.slice(name.lastIndexOf(".") + 1).toLowerCase(),
     status: "ok",
     error_type: "",
     error_message: "",
@@ -332,6 +338,18 @@ describe("form", () => {
 });
 
 describe("jobs and dialogs", () => {
+  it("counts selected CBRs using the library API's dotless extensions", () => {
+    expect(cbrCount([volume("/books/a.cbr")])).toBe(1);
+    expect(cbrCount([
+      volume("/books/a.cbr"),
+      volume("/books/b.CBR"),
+      volume("/books/c.cbz"),
+    ])).toBe(2);
+    expect(cbrCount([])).toBe(0);
+    expect(cbrCount([volume("/books/a.cbz")])).toBe(0);
+    expect(cbrCount([volume("/books/a.cbr", { extension: "CBR" })])).toBe(1);
+  });
+
   it("labels progress, plans renames, and confirms convert", () => {
     expect(POLL_MS).toBe(500);
     expect(jobLabel({ name: "Save", completed: 3, total: 40 })).toBe("Save 3/40");
@@ -507,5 +525,57 @@ describe("jobs and dialogs", () => {
     expect(preferredIssueId(issues, "99")).toBe("a");
     expect(preferredIssueId(issues, "")).toBe("a");
     expect(preferredIssueId([], "2")).toBeNull();
+  });
+});
+
+describe("provider cover actions", () => {
+  const config = { enabled_providers: ["mangadex", "anilist", "jikan", "comicvine", "nautiljon"], comicvine_api_key: "", nautiljon_base_url: "", nautiljon_api_key: "" };
+
+  it.each([
+    ["https://mangadex.org/title/11111111-2222-3333-4444-555555555555/name", "mangadex"],
+    ["https://anilist.co/manga/12/name", "anilist"],
+    ["https://myanimelist.net/manga/12/name", "jikan"],
+    ["https://comicvine.gamespot.com/name/4050-12/", "comicvine"],
+    ["https://comicvine.gamespot.com/name/4000-12/", "comicvine"],
+    ["https://www.nautiljon.com/mangas/name.html", "nautiljon"],
+    ["https://www.nautiljon.com/mangas/name/volume-3,42.html", "nautiljon"],
+    ["https://www.nautiljon.com/mangas/volumes/name,03.html", "nautiljon"],
+  ])("parses %s", (url, provider) => {
+    expect(coverProviderFromWeb(url)).toBe(provider);
+  });
+
+  it.each(["", "bad", "http://anilist.co/manga/1", "https://anilist.co.evil/manga/1", "https://anilist.co/manga/1junk", "https://anilist.co/wrong/manga/1", "https://name@anilist.co/manga/1", "https://nautiljon.com/volume-1,42.html", "https://mangadex.org/title/------------------------------------"])("rejects %s", (url) => {
+    expect(canFetchCoverFromWeb(url, config)).toBe(false);
+  });
+
+  it("requires enabled and configured providers", () => {
+    expect(canFetchCoverFromWeb("https://anilist.co/manga/1", config)).toBe(true);
+    expect(canFetchCoverFromWeb("https://anilist.co/manga/1", { ...config, enabled_providers: [] })).toBe(false);
+    expect(canFetchCoverFromWeb("https://comicvine.gamespot.com/name/4050-12/", config)).toBe(false);
+    expect(canFetchCoverFromWeb("https://comicvine.gamespot.com/name/4050-12/", { ...config, comicvine_api_key: "key" })).toBe(true);
+    expect(canFetchCoverFromWeb("https://nautiljon.com/mangas/name.html", config)).toBe(false);
+    expect(canFetchCoverFromWeb("https://nautiljon.com/mangas/name.html", { ...config, nautiljon_base_url: "https://wrapper.test", nautiljon_api_key: "key" })).toBe(true);
+  });
+
+  it("refreshes computed values without losing unsaved metadata", () => {
+    const row = volume("/books/a.cbz", { archive_page_count: 2, web: "https://anilist.co/manga/1" });
+    let draft = formFromVolumes([row])!;
+    draft = editField(draft, "Web", "https://anilist.co/manga/2");
+    draft = editField(draft, "Number", "3");
+    const fresh = formFromVolumes([{ ...row, path: "/books/a-converted.cbz", archive_page_count: 3, page_count: "3" }])!;
+    const merged = preserveDirtyFields(fresh, draft)!;
+    expect(merged.values.Web).toEqual(draft.values.Web);
+    expect(merged.values.Number).toEqual(draft.values.Number);
+    expect(merged.values.PageCount.value).toBe("3");
+    expect(merged.values.PageCount.dirty).toBe(false);
+    expect(fresh.values.Web.value).toBe(row.web);
+  });
+
+  it("refetches on terminal Cover jobs and chooses the preview cover", () => {
+    for (const state of ["succeeded", "failed", "cancelled"]) {
+      expect(shouldRefetchLibrary({ id: "1", name: "Cover", state, error_type: "", error_message: "", result: null, completed: 1, total: 1 })).toBe(true);
+    }
+    expect(coverPageIndex(volume("/a.cbz", { cover_index: 2, archive_page_count: 3 }))).toBe(2);
+    expect(coverPageIndex(volume("/a.cbz", { cover_index: null, archive_page_count: 3 }))).toBe(0);
   });
 });

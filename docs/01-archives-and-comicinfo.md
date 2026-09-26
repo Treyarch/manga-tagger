@@ -9,7 +9,7 @@ This specification owns partial reads, page preview bytes, ComicInfo edit, `Numb
 
 The core lives in `src/manga_tagger/` and imports without FastAPI and without pywebview. Callers pass the `keep_cbr_original` boolean in. This module does not read the TOML config file.
 
-Scraping, the SQLite index, and the window are out of scope. A later specification decides which fields a form shows. This document defines the archive operations that form calls.
+Scraping, the SQLite index, and the window are out of scope. A later specification decides which fields a form shows. This document defines the archive operations that form calls. Replacing or inserting a cover page image from a catalog download is owned by [08-cover-from-provider.md](08-cover-from-provider.md); that document reuses this module's atomic zip write, page listing, cover index, and CBR convert rules.
 
 ## Reference archive
 
@@ -92,7 +92,7 @@ A CBR list runs `lsar -json` on the archive and does not extract it. `lsarConten
 
 A CBR single-member read creates a temporary directory in the same directory as the archive, so the extract stays on that filesystem. The directory's name does not end in `.cbz` or `.cbr`. The command is `unar -quiet -no-directory -output-directory <temp> <archive> <member>`, where `<member>` is that `XADFileName`. The call reads the extracted file, then deletes the temporary directory. On failure the temporary directory is still deleted and the archive is unchanged.
 
-A full extract, used by convert and by saving metadata on a `.cbr`, uses the same temporary-directory rule and `unar -quiet -output-directory <temp> <archive>` with no member argument, so internal paths are kept. The new `.cbz` is built from that directory. The temporary directory is deleted after the `.cbz` has been renamed into place, or on failure.
+A full extract, used by convert and by saving metadata on a `.cbr`, uses the same temporary-directory rule and `unar -quiet -no-directory -output-directory <temp> <archive>` with no member argument. Internal paths are kept, but unar must not add a containing folder: root `ComicInfo.xml` must remain at the archive root. The new `.cbz` is built from that directory. The temporary directory is deleted after the `.cbz` has been renamed into place, or on failure.
 
 `unar` and `lsar` both come from The Unarchiver and must be on `PATH`. If either is missing, every CBR read or convert raises `MissingUnarError`. The message names `unar`. CBZ operations do not need either tool.
 
@@ -191,13 +191,15 @@ All of these are subclasses of `ArchiveError`. None of them modify the source ar
 
 This specification adds no configuration keys.
 
-Convert and CBR save take `keep_cbr_original` from the caller. The project default is `false`, as defined in [00-project-overview.md](00-project-overview.md): delete the `.cbr` after the `.cbz` has been written and read back. `true` keeps the `.cbr` next to the new `.cbz`.
+Convert and CBR save take `keep_cbr_original` from the caller. The project default is `true`, as defined in [00-project-overview.md](00-project-overview.md): keep the `.cbr` next to the new `.cbz`. `false` deletes the `.cbr` after the `.cbz` has been written and read back.
 
 The rename action takes the template from the caller. The template it offers is `{Series} v{Number:02}`. That string is not a TOML key.
 
-Poster width is 600 pixels, JPEG quality is 85, and the matte is white. None of these is a TOML key. Pillow is the library that scales the cover.
+`write_poster` itself adds no config key. The application shell decides whether to call it after a successful save or rename, using `write_poster_on_save` from [00-project-overview.md](00-project-overview.md). Poster width is 600 pixels, JPEG quality is 85, and the matte is white. None of these is a TOML key. Pillow is the library that scales the cover.
 
 ## Testing
+
+- Conversion with the installed `unar` preserves the original member paths, including root `ComicInfo.xml` and nested pages, without adding an archive-name folder. Both keeping and deleting the original are covered, along with metadata saves on a CBR.
 
 Tests are hermetic. They do not use the network, do not sleep, and do not read the developer’s config, index, or library. They do not open `src/Claymore/`. Archive fixtures are small files created under `tests/fixtures/` or in a temporary directory during the test. Tests that need `unar` or `lsar` skip when that executable is not on `PATH`. Every other test passes without them.
 

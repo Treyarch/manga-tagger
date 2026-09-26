@@ -7,6 +7,7 @@ import {
   type Job,
   type WorkEntry,
 } from "./library";
+import { pluralize } from "./pluralize";
 
 export const TOAST_MS = 5000;
 
@@ -129,14 +130,18 @@ function entryOk(entry: WorkEntry): boolean {
 
 function batchToast(
   verb: string,
-  unit: string,
+  singular: string,
   counted: WorkEntry[],
   icon: ToastIcon,
 ): JobToast {
   const total = counted.length;
   const ok = counted.filter(entryOk).length;
   if (ok === total) {
-    return { message: `${verb} ${ok} ${unit}.`, tone: "ok", icon };
+    return {
+      message: `${verb} ${ok} ${pluralize(ok, singular)}.`,
+      tone: "ok",
+      icon,
+    };
   }
   return { message: `${verb} ${ok} of ${total}.`, tone: "ok", icon };
 }
@@ -155,7 +160,8 @@ export function jobToastMessage(job: Job): JobToast | null {
     if (job.state === "failed") return failedToast("Scrape failed.", job);
     const n = candidatesOf(job.result).length;
     return {
-      message: n === 0 ? "No matches." : `Found ${n} matches.`,
+      message:
+        n === 0 ? "No matches." : `Found ${n} ${pluralize(n, "match", "matches")}.`,
       tone: "ok",
       icon: jobIcon(job, "ok"),
     };
@@ -203,23 +209,33 @@ export function jobToastMessage(job: Job): JobToast | null {
         icon: jobIcon(job, "ok"),
       };
     }
-    return batchToast("Saved", "issues", counted, jobIcon(job, "ok"));
+    return batchToast("Saved", "issue", counted, jobIcon(job, "ok"));
   }
 
   if (job.name === "Rename") {
     if (job.state === "failed") return failedToast("Rename failed.", job);
     return batchToast(
       "Renamed",
-      "files",
+      "file",
       entriesOf(job.result),
       jobIcon(job, "ok"),
     );
   }
 
+  if (job.name === "Cover") {
+    if (job.state === "failed") return failedToast("Cover failed.", job);
+    const entries = entriesOf(job.result);
+    const failed = entries.find((entry) => !entryOk(entry));
+    if (failed || entries.length !== 1 || !entries[0].output_path) {
+      return { message: failed?.error_message || "Cover failed.", tone: "error", icon: "alert" };
+    }
+    return { message: "Cover updated.", tone: "ok", icon: "check" };
+  }
+
   if (job.name === "Convert") {
     if (job.state === "failed") return failedToast("Convert failed.", job);
     const counted = entriesOf(job.result).filter((entry) => !entry.skipped);
-    return batchToast("Converted", "files", counted, jobIcon(job, "ok"));
+    return batchToast("Converted", "file", counted, jobIcon(job, "ok"));
   }
 
   return null;

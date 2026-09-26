@@ -47,6 +47,8 @@
   let nautiljonBaseUrl = $state(untrack(() => config.nautiljon_base_url));
   let nautiljonApiKey = $state(untrack(() => config.nautiljon_api_key));
   let keepOriginal = $state(untrack(() => config.keep_cbr_original));
+  let writePosterOnSave = $state(untrack(() => config.write_poster_on_save));
+  let autoSaveOnSwitch = $state(untrack(() => config.auto_save_metadata_on_switch));
   let languages = $state(untrack(() => config.title_languages.join(", ")));
   let theme = $state(
     untrack(() =>
@@ -79,6 +81,8 @@
         nautiljon_base_url: nautiljonBaseUrl,
         nautiljon_api_key: nautiljonApiKey,
         keep_cbr_original: keepOriginal,
+        write_poster_on_save: writePosterOnSave,
+        auto_save_metadata_on_switch: autoSaveOnSwitch,
         title_languages: parseLanguages(languages),
         enabled_providers: scrapers
           .filter((item) => item.enabled)
@@ -140,13 +144,34 @@
           </label>
         </div>
       {:else if tab === "archives"}
-        <div class="flex flex-col gap-2">
-          <Checkbox label="Keep the original CBR" bind:checked={keepOriginal} />
-          <p class="text-xs text-zinc-500 dark:text-zinc-400">
-            Convert writes a sibling CBZ. When this is off (the default), the original
-            CBR is deleted after a successful convert so each book stays one file.
-            When on, the CBR is kept beside the new CBZ.
-          </p>
+        <div class="flex flex-col gap-4">
+          <div class="flex flex-col gap-2">
+            <Checkbox label="Keep the original CBR" bind:checked={keepOriginal} />
+            <p class="text-xs text-zinc-500 dark:text-zinc-400">
+              Convert writes a sibling CBZ. When this is on (the default), the original
+              CBR is kept beside the new CBZ. When off, the CBR is deleted after a
+              successful convert so each book stays one file.
+            </p>
+          </div>
+          <div class="flex flex-col gap-2">
+            <Checkbox label="Write poster on save" bind:checked={writePosterOnSave} />
+            <p class="text-xs text-zinc-500 dark:text-zinc-400">
+              When on (the default), a successful save or rename writes a sibling
+              poster JPEG from the cover. When off, those jobs do not extract a
+              poster; rename still moves an existing poster with the archive.
+            </p>
+          </div>
+          <div class="flex flex-col gap-2">
+            <Checkbox
+              label="Auto-save metadata on switch"
+              bind:checked={autoSaveOnSwitch}
+            />
+            <p class="text-xs text-zinc-500 dark:text-zinc-400">
+              When off (the default), changing issue or place with unsaved metadata
+              asks Save / Don't save / Cancel. When on, the app saves that form then
+              switches.
+            </p>
+          </div>
         </div>
       {:else}
         <ul class="flex flex-col gap-3">

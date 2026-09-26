@@ -55,7 +55,7 @@ If the UI was not built, the window shows `UI build is missing.` while `/api` st
 2. Wait for the library scan to finish (header shows progress; cancel is available).
 3. Select one or more volumes, scrape a catalog, review the form, then **Save**.
 
-Nothing is written into an archive until you save. Accepting a scrape match only fills the form.
+Accepting a scrape match only fills the form; **Save** writes metadata. To fix a wrong or missing cover, select one volume and use **Replace cover** or **Insert cover** over the cover preview. These actions immediately download the full-size cover from the catalog linked in the Web field and update the archive. Unsaved metadata edits stay in the form.
 
 Optional providers:
 
@@ -79,7 +79,9 @@ Linux honors `$XDG_CONFIG_HOME`, `$XDG_DATA_HOME`, and `$XDG_CACHE_HOME` when se
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `library_roots` | `[]` | Absolute folders scanned recursively for `.cbz` / `.cbr` |
-| `keep_cbr_original` | `false` | Keep the `.cbr` after a successful convert to `.cbz` |
+| `keep_cbr_original` | `true` | Keep the `.cbr` after a successful convert to `.cbz` |
+| `write_poster_on_save` | `true` | Write `{stem}-poster.jpg` after a successful save, rename, or cover update |
+| `auto_save_metadata_on_switch` | `false` | When leaving a dirty form, save silently (`true`) or ask first (`false`) |
 | `comicvine_api_key` | `""` | Empty disables Comic Vine |
 | `nautiljon_base_url` | `""` | Absolute origin of the Nautiljon wrapper; empty disables it |
 | `nautiljon_api_key` | `""` | Wrapper `X-Api-Key`; empty disables Nautiljon |
@@ -130,5 +132,6 @@ This project is **spec-driven**. Feature behavior lives in [docs/](docs/README.m
 - [Metadata providers](docs/03-metadata-providers.md)
 - [Application shell](docs/04-application-shell.md)
 - [UI design](docs/05-ui-design.md)
+- [Cover from provider](docs/08-cover-from-provider.md)
 
 Read those before changing scope or behavior.

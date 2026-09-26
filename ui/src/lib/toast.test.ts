@@ -49,7 +49,37 @@ describe("jobToastMessage", () => {
           },
         }),
       ),
-    ).toEqual({ message: "Found 1 matches.", tone: "ok", icon: "scanSearch" });
+    ).toEqual({ message: "Found 1 match.", tone: "ok", icon: "scanSearch" });
+    expect(
+      jobToastMessage(
+        job({
+          name: "Search",
+          state: "succeeded",
+          result: {
+            candidates: [
+              {
+                id: "a",
+                title: "A",
+                year: "",
+                credit: "",
+                count: "",
+                summary: "",
+                cover: "",
+              },
+              {
+                id: "b",
+                title: "B",
+                year: "",
+                credit: "",
+                count: "",
+                summary: "",
+                cover: "",
+              },
+            ],
+          },
+        }),
+      ),
+    ).toEqual({ message: "Found 2 matches.", tone: "ok", icon: "scanSearch" });
     expect(
       jobToastMessage(
         job({ name: "Search", state: "succeeded", result: { candidates: [] } }),
@@ -146,6 +176,18 @@ describe("jobToastMessage", () => {
           name: "Rename",
           state: "succeeded",
           result: {
+            entries: [{ path: "/a.cbz", output_path: "/A.cbz" }],
+          },
+        }),
+      ),
+    ).toEqual({ message: "Renamed 1 file.", tone: "ok", icon: "pencil" });
+
+    expect(
+      jobToastMessage(
+        job({
+          name: "Rename",
+          state: "succeeded",
+          result: {
             entries: [
               { path: "/a.cbz", output_path: "/A.cbz" },
               { path: "/b.cbz", error_message: "conflict" },
@@ -154,6 +196,25 @@ describe("jobToastMessage", () => {
         }),
       ),
     ).toEqual({ message: "Renamed 1 of 2.", tone: "ok", icon: "pencil" });
+
+    expect(
+      jobToastMessage(
+        job({
+          name: "Convert",
+          state: "succeeded",
+          result: {
+            entries: [
+              { path: "/a.cbz", skipped: true },
+              { path: "/b.cbr", output_path: "/b.cbz" },
+            ],
+          },
+        }),
+      ),
+    ).toEqual({
+      message: "Converted 1 file.",
+      tone: "ok",
+      icon: "fileArchive",
+    });
 
     expect(
       jobToastMessage(
@@ -228,5 +289,17 @@ describe("toast queue", () => {
     expect(listToasts()).toHaveLength(1);
     vi.advanceTimersByTime(1);
     expect(listToasts().find((item) => item.id === later)).toBeUndefined();
+  });
+});
+
+describe("Cover job toast", () => {
+  it("reports only a successful write as updated", () => {
+    expect(jobToastMessage(job({ name: "Cover", state: "succeeded", result: { entries: [{ path: "/a.cbz", output_path: "/a.cbz" }] } }))).toEqual({ message: "Cover updated.", tone: "ok", icon: "check" });
+    expect(jobToastMessage(job({ name: "Cover", state: "succeeded", result: { entries: [{ path: "/a.cbz", error_type: "ArchiveError", error_message: "Bad image" }] } }))).toEqual({ message: "Bad image", tone: "error", icon: "alert" });
+    expect(jobToastMessage(job({ name: "Cover", state: "succeeded", result: { entries: [{ path: "/a.cbz", output_path: "/a.cbz", error_type: "PosterError", error_message: "Poster failed" }] } }))?.tone).toBe("error");
+    expect(jobToastMessage(job({ name: "Cover", state: "succeeded", result: { entries: [] } }))?.tone).toBe("error");
+    expect(jobToastMessage(job({ name: "Cover", state: "failed", error_message: "Download failed" }))?.message).toBe("Download failed");
+    expect(jobToastMessage(job({ name: "Cover", state: "failed" }))?.message).toBe("Cover failed.");
+    expect(jobToastMessage(job({ name: "Cover", state: "cancelled" }))).toBeNull();
   });
 });

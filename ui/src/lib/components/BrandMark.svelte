@@ -1,3 +1,6 @@
+<script lang="ts">
+</script>
+
 <!--
   Product brand for the header leading edge.
   Font: Dela Gothic One (OFL) — see ../assets/fonts/OFL.txt

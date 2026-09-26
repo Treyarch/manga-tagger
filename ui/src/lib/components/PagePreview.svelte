@@ -3,14 +3,27 @@
   import { ChevronLeft, ChevronRight } from "lucide-svelte";
   import Button from "./Button.svelte";
   import {
+    coverPageIndex,
     initialPageIndex,
     requestsPage,
     type Volume,
   } from "../library";
 
-  let { anchor }: { anchor: Volume } = $props();
+  let {
+    anchor,
+    coverActions = false,
+    coverActionsDisabled = true,
+    onReplaceCover,
+    onInsertCover,
+  }: {
+    anchor: Volume;
+    coverActions?: boolean;
+    coverActionsDisabled?: boolean;
+    onReplaceCover?: () => void;
+    onInsertCover?: () => void;
+  } = $props();
 
-  // Mount-time seed only; Inspector remounts this via {#key anchor.path}.
+  // Inspector remounts after a path change or a completed cover write.
   let pageIndex = $state(
     untrack(() =>
       initialPageIndex(anchor.cover_index, anchor.archive_page_count),
@@ -20,6 +33,10 @@
 
   const showPage = $derived(pageIndex !== null && requestsPage(anchor));
   const pageCount = $derived(anchor.archive_page_count ?? 0);
+  const showingCover = $derived(
+    pageIndex !== null && pageIndex === coverPageIndex(anchor),
+  );
+  const showCoverActions = $derived(coverActions && showingCover);
 
   function goTo(index: number) {
     if (index < 0 || index >= pageCount) return;
@@ -63,9 +80,31 @@
 
 {#if showPage}
   <div class="flex flex-col gap-2">
-    <div class="flex h-80 w-full items-center justify-center">
+    <div class="relative flex h-80 w-full items-center justify-center">
       {#if pageUrl}
         <img src={pageUrl} alt="" class="max-h-full max-w-full object-contain" />
+      {/if}
+      {#if showCoverActions}
+        <div
+          class="absolute inset-x-0 bottom-0 flex justify-center gap-2 bg-gradient-to-t from-zinc-950/60 to-transparent p-2"
+        >
+          <Button
+            variant="secondary"
+            label="Replace cover"
+            disabled={coverActionsDisabled}
+            onclick={() => onReplaceCover?.()}
+          >
+            Replace cover
+          </Button>
+          <Button
+            variant="secondary"
+            label="Insert cover"
+            disabled={coverActionsDisabled}
+            onclick={() => onInsertCover?.()}
+          >
+            Insert cover
+          </Button>
+        </div>
       {/if}
     </div>
     <div class="flex justify-between">

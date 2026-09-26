@@ -149,8 +149,23 @@ def _candidate(item: object, languages: Sequence[str]) -> Candidate | None:
     )
 
 
-def _cover_url(manga_id: str, relationships: list[object]) -> str:
-    chosen: str | None = None
+def choose_cover_filename(
+    relationships: list[object], *, number: str = ""
+) -> str | None:
+    """Return a MangaDex cover art ``fileName``, preferring a volume match.
+
+    Args:
+        relationships: Manga ``relationships`` list that may include ``cover_art``.
+        number: Preferred volume number text. When blank, prefers a cover whose
+            ``volume`` is null or blank, else the first usable cover.
+
+    Returns:
+        The ``fileName`` string, or ``None`` when no cover art is usable.
+    """
+    preferred = number.strip()
+    volume_match: str | None = None
+    blank_volume: str | None = None
+    first: str | None = None
     for item in relationships:
         if not isinstance(item, dict) or item.get("type") != "cover_art":
             continue
@@ -160,13 +175,37 @@ def _cover_url(manga_id: str, relationships: list[object]) -> str:
         filename = nonblank(attributes.get("fileName"))
         if filename is None:
             continue
-        url = f"https://uploads.mangadex.org/covers/{manga_id}/{filename}.256.jpg"
+        if first is None:
+            first = filename
         volume = attributes.get("volume")
-        if volume is None or nonblank(volume) is None:
-            return url
-        if chosen is None:
-            chosen = url
-    return chosen or ""
+        volume_text = nonblank(volume) if volume is not None else None
+        if volume_text is None:
+            if blank_volume is None:
+                blank_volume = filename
+            continue
+        if preferred and _volume_matches(volume_text, preferred):
+            volume_match = filename
+            break
+    if volume_match is not None:
+        return volume_match
+    if preferred:
+        return blank_volume or first
+    return blank_volume or first
+
+
+def _volume_matches(cover_volume: str, number: str) -> bool:
+    if cover_volume == number:
+        return True
+    if cover_volume.isdigit() and number.isdigit():
+        return int(cover_volume) == int(number)
+    return False
+
+
+def _cover_url(manga_id: str, relationships: list[object]) -> str:
+    filename = choose_cover_filename(relationships)
+    if filename is None:
+        return ""
+    return f"https://uploads.mangadex.org/covers/{manga_id}/{filename}.256.jpg"
 
 
 def _choose_title(

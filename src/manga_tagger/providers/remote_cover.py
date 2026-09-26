@@ -7,7 +7,16 @@ import httpx
 from manga_tagger.providers.constants import USER_AGENT
 
 ALLOWED_COVER_HOSTS = frozenset(
-    {"uploads.mangadex.org", "www.nautiljon.com", "nautiljon.com"}
+    {
+        "uploads.mangadex.org",
+        "www.nautiljon.com",
+        "nautiljon.com",
+        "s4.anilist.co",
+        "cdn.myanimelist.net",
+        "comicvine.gamespot.com",
+        "www.comicvine.gamespot.com",
+        "static.comicvine.com",
+    }
 )
 
 
@@ -37,16 +46,28 @@ def remote_cover_bytes(
     _require_allowed(url)
     own_client = client is None
     if own_client:
-        client = httpx.Client(timeout=15.0, follow_redirects=True)
+        client = httpx.Client(timeout=15.0)
     assert client is not None
     try:
         try:
-            response = client.get(url, headers={"User-Agent": USER_AGENT})
+            for _ in range(6):
+                _require_allowed(url)
+                response = client.get(
+                    url, headers={"User-Agent": USER_AGENT}, follow_redirects=False
+                )
+                if not response.is_redirect:
+                    break
+                location = response.headers.get("location")
+                if not location:
+                    raise RemoteCoverError("cover redirect was missing a location")
+                url = str(response.url.join(location))
+            else:
+                raise RemoteCoverError("too many cover redirects")
         except httpx.TransportError as exc:
             raise RemoteCoverError("cover download failed") from exc
         final = str(response.url)
         _require_allowed(final)
-        if response.status_code >= 400:
+        if not response.is_success:
             raise RemoteCoverError(f"cover HTTP {response.status_code}")
         media = (response.headers.get("content-type") or "").split(";")[0].strip()
         if not media.startswith("image/"):

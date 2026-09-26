@@ -31,6 +31,7 @@
     POLL_MS,
     cbrCount,
     candidatesOf,
+    canFetchCoverFromWeb,
     clampProvider,
     convertConfirmMessage,
     editField,
@@ -49,7 +50,9 @@
     jobLabel,
     placeAfterLibrary,
     preferredIssueNumber,
+    preserveDirtyFields,
     renamePlanLines,
+    requestsPage,
     savePatch,
     scanRootLines,
     selectionAfterEntries,
@@ -106,6 +109,8 @@
   let newestLoadId = $state<string | null>(null);
   let loadSelectionKey = $state("");
   let planToken = 0;
+  let coverStarting = $state(false);
+  let coverRevisions = $state<Record<string, string>>({});
   const settled = new Set<string>();
 
   const shelf = $derived(volumesForShelf(volumes, selectedPlace));
@@ -136,18 +141,32 @@
       headerJob.name !== "Search" &&
       headerJob.name !== "Issues" &&
       headerJob.name !== "Load" &&
-      headerJob.name !== "Save"
+      headerJob.name !== "Save" &&
+      headerJob.name !== "Convert"
       ? headerJob
       : null,
   );
   const formLocked = $derived(
     headerJob !== null &&
       isBusy(headerJob) &&
-      (headerJob.name === "Load" || headerJob.name === "Save"),
+      (headerJob.name === "Load" || headerJob.name === "Save" || headerJob.name === "Cover"),
   );
   const selectedCbr = $derived(cbrCount(selectedRows));
   const providerOptions = $derived(
     enabledProviderOptions(config.enabled_providers),
+  );
+  const formWeb = $derived(
+    form?.mode === "one" ? (form.values.Web?.value ?? "") : "",
+  );
+  const formNumber = $derived(
+    form?.mode === "one" ? (form.values.Number?.value ?? "") : "",
+  );
+  const coverActions = $derived(form?.mode === "one" && anchor !== null);
+  const coverActionsDisabled = $derived(
+    busy || coverStarting ||
+      anchor === null ||
+      !canFetchCoverFromWeb(formWeb, config) ||
+      !requestsPage(anchor),
   );
 
   $effect(() => {
@@ -199,7 +218,7 @@
     selectedPlace = nextPlace;
     if (placeChanged || job.name === "Rename") {
       selection = { paths: [], anchor: null };
-    } else if (job.name === "Save" || job.name === "Convert") {
+    } else if (job.name === "Save" || job.name === "Convert" || job.name === "Cover") {
       selection = selectionAfterEntries(
         selection,
         entriesOf(job.result),
@@ -208,7 +227,12 @@
     } else {
       selection = selectionAfterFilter(visiblePathsAfter(), selection);
     }
-    if (!(job.name === "Scan" && formIsDirty(form))) rebuildForm();
+    if (job.name === "Cover") {
+      form = preserveDirtyFields(formFromVolumes(rowsFor(selection.paths)), form);
+      for (const entry of entriesOf(job.result)) {
+        if (entry.output_path) coverRevisions[entry.output_path] = job.id;
+      }
+    } else if (!(job.name === "Scan" && formIsDirty(form))) rebuildForm();
     if (job.name === "Scan") {
       const result = (job.result ?? {}) as {
         skipped?: string[];
@@ -546,6 +570,21 @@
     });
   }
 
+  async function runCover(action: "replace" | "insert") {
+    if (!coverActions || coverActionsDisabled || anchor === null) return;
+    coverStarting = true;
+    inspectorLines = [];
+    try {
+      await startJob("/api/jobs/cover", {
+        path: anchor.path, action, web: formWeb, number: formNumber,
+      });
+    } catch (exc) {
+      pushToast(exc instanceof Error ? exc.message : "Cover failed.", "error");
+    } finally {
+      coverStarting = false;
+    }
+  }
+
   async function runConvert() {
     convertOpen = false;
     if (selection.paths.length === 0) return;
@@ -811,7 +850,7 @@
                     </span>
                   {/if}
                   <span class="flex size-4 shrink-0 items-center justify-center overflow-hidden">
-                    <Thumb path={row.path} failed={row.status === "failed"} fallback />
+                    <Thumb revision={coverRevisions[row.path] ?? ""} path={row.path} failed={row.status === "failed"} fallback />
                   </span>
                   <span class="min-w-0 flex-1 truncate text-sm">{row.name}</span>
                 </button>
@@ -846,7 +885,7 @@
                           : ''}"
                       >
                         {#if row.status !== "failed"}
-                          <Thumb path={row.path} failed={false} />
+                          <Thumb revision={coverRevisions[row.path] ?? ""} path={row.path} failed={false} />
                         {/if}
                       </span>
                       <span
@@ -873,8 +912,13 @@
         {form}
         {formLocked}
         lines={inspectorLines}
+        coverRevision={anchor ? coverRevisions[anchor.path] ?? "" : ""}
+        {coverActions}
+        {coverActionsDisabled}
         {onEdit}
         {onToggleLock}
+        onReplaceCover={() => void runCover("replace")}
+        onInsertCover={() => void runCover("insert")}
       />
     </aside>
   </div>

@@ -13,6 +13,8 @@ export class ApiError extends Error {
 export type Config = {
   library_roots: string[];
   keep_cbr_original: boolean;
+  write_poster_on_save: boolean;
+  auto_save_metadata_on_switch: boolean;
   comicvine_api_key: string;
   nautiljon_base_url: string;
   nautiljon_api_key: string;

@@ -1,6 +1,6 @@
 """Pydantic models for the local API. Not the ComicInfo or index types."""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -184,6 +184,15 @@ class ConvertRequest(BaseModel):
     """Body for ``POST /api/jobs/convert``."""
 
     paths: list[str]
+
+
+class CoverRequest(BaseModel):
+    """Body for ``POST /api/jobs/cover``."""
+
+    path: str
+    action: Literal["replace", "insert"]
+    web: str
+    number: str = ""
 
 
 class FolderDialogModel(BaseModel):

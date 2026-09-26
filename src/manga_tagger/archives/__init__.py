@@ -18,6 +18,7 @@ from manga_tagger.archives.errors import (
     RenameTemplateError,
     UnreadableArchiveError,
 )
+from manga_tagger.archives.pages import insert_cover_page, replace_cover_page
 from manga_tagger.archives.poster import write_poster
 from manga_tagger.archives.read import (
     cover_index,
@@ -51,11 +52,13 @@ __all__ = [
     "UnreadableArchiveError",
     "convert_cbr",
     "cover_index",
+    "insert_cover_page",
     "list_pages",
     "plan_rename",
     "read_comic_info",
     "read_page",
     "rename_in_directory",
+    "replace_cover_page",
     "resolve_cover_index",
     "save_comic_info",
     "save_many",

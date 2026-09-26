@@ -10,6 +10,8 @@ import tomli_w
 _KNOWN_KEYS = (
     "library_roots",
     "keep_cbr_original",
+    "write_poster_on_save",
+    "auto_save_metadata_on_switch",
     "comicvine_api_key",
     "nautiljon_base_url",
     "nautiljon_api_key",
@@ -38,11 +40,13 @@ class AppPaths:
 
 @dataclass
 class AppConfig:
-    """The eight known keys plus unknown keys from the last successful load."""
+    """The ten known keys plus unknown keys from the last successful load."""
 
     path: Path
     library_roots: list[str] = field(default_factory=list)
-    keep_cbr_original: bool = False
+    keep_cbr_original: bool = True
+    write_poster_on_save: bool = True
+    auto_save_metadata_on_switch: bool = False
     comicvine_api_key: str = ""
     nautiljon_base_url: str = ""
     nautiljon_api_key: str = ""
@@ -54,10 +58,12 @@ class AppConfig:
     extra: dict[str, object] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, object]:
-        """Return the eight known keys."""
+        """Return the ten known keys."""
         return {
             "library_roots": list(self.library_roots),
             "keep_cbr_original": self.keep_cbr_original,
+            "write_poster_on_save": self.write_poster_on_save,
+            "auto_save_metadata_on_switch": self.auto_save_metadata_on_switch,
             "comicvine_api_key": self.comicvine_api_key,
             "nautiljon_base_url": self.nautiljon_base_url,
             "nautiljon_api_key": self.nautiljon_api_key,
@@ -135,6 +141,16 @@ def load_config(path: Path) -> AppConfig:
         keep_cbr_original=(
             data["keep_cbr_original"]
             if isinstance(data.get("keep_cbr_original"), bool)
+            else True
+        ),
+        write_poster_on_save=(
+            data["write_poster_on_save"]
+            if isinstance(data.get("write_poster_on_save"), bool)
+            else True
+        ),
+        auto_save_metadata_on_switch=(
+            data["auto_save_metadata_on_switch"]
+            if isinstance(data.get("auto_save_metadata_on_switch"), bool)
             else False
         ),
         comicvine_api_key=(
@@ -200,6 +216,8 @@ def apply_put(config: AppConfig, updates: Mapping[str, object]) -> AppConfig:
         path=config.path,
         library_roots=list(current["library_roots"]),  # type: ignore[arg-type]
         keep_cbr_original=bool(current["keep_cbr_original"]),
+        write_poster_on_save=bool(current["write_poster_on_save"]),
+        auto_save_metadata_on_switch=bool(current["auto_save_metadata_on_switch"]),
         comicvine_api_key=str(current["comicvine_api_key"]),
         nautiljon_base_url=str(current["nautiljon_base_url"]),
         nautiljon_api_key=str(current["nautiljon_api_key"]),
@@ -218,6 +236,14 @@ def _put_value(key: str, value: object) -> object:
     if key == "keep_cbr_original":
         if not isinstance(value, bool):
             raise ConfigError("keep_cbr_original must be a boolean")
+        return value
+    if key == "write_poster_on_save":
+        if not isinstance(value, bool):
+            raise ConfigError("write_poster_on_save must be a boolean")
+        return value
+    if key == "auto_save_metadata_on_switch":
+        if not isinstance(value, bool):
+            raise ConfigError("auto_save_metadata_on_switch must be a boolean")
         return value
     if key == "comicvine_api_key":
         if not isinstance(value, str):

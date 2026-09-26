@@ -1,5 +1,6 @@
 /** Client-side shelf, selection, form, and inspector rules from the shell spec. */
 
+import type { Config } from "./api";
 import { pluralize } from "./pluralize";
 
 export const POLL_MS = 500;
@@ -150,7 +151,7 @@ const FIELD_COLUMNS: Record<string, string> = {
   CoverArtist: "cover_artist",
 };
 
-const LIBRARY_JOBS = new Set(["Scan", "Save", "Rename", "Convert"]);
+const LIBRARY_JOBS = new Set(["Scan", "Save", "Rename", "Convert", "Cover"]);
 
 export type Volume = {
   path: string;
@@ -258,6 +259,57 @@ export function matchCoverSrc(cover: string): string {
     return trimmed;
   }
   return trimmed;
+}
+
+/** Reading-order index shown as the cover in the inspector preview. */
+export function coverPageIndex(volume: Volume): number {
+  const count = volume.archive_page_count ?? 0;
+  if (count <= 0) return 0;
+  const cover = volume.cover_index;
+  if (cover === null || cover < 0 || cover >= count) return 0;
+  return cover;
+}
+
+/** Parse the same catalog URL shapes accepted by the cover service. */
+export function coverProviderFromWeb(web: string): string | null {
+  try {
+    const url = new URL(web.trim());
+    if (url.protocol !== "https:" || url.username || url.password) return null;
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    const path = url.pathname;
+    if (host === "mangadex.org" && /^\/title\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}(?:\/|$)/i.test(path)) return "mangadex";
+    if (host === "anilist.co" && /^\/manga\/[0-9]+(?:\/|$)/.test(path)) return "anilist";
+    if (host === "myanimelist.net" && /^\/manga\/[0-9]+(?:\/|$)/.test(path)) return "jikan";
+    if (host === "comicvine.gamespot.com" && /\/40(?:50|00)-[0-9]+(?:\/|$)/.test(path)) return "comicvine";
+    if (host === "nautiljon.com" && (
+      /^\/mangas\/[^/]+\.html$/i.test(path) ||
+      /^\/mangas\/[^/]+\/volume-[0-9]+,[0-9]+\.html$/i.test(path) ||
+      /^\/mangas\/volumes\/[^/,]+,[0-9]+\.html$/i.test(path)
+    )) return "nautiljon";
+  } catch { /* Invalid URLs disable the controls. */ }
+  return null;
+}
+
+export function canFetchCoverFromWeb(web: string, config?: Pick<Config,
+  "enabled_providers" | "comicvine_api_key" | "nautiljon_base_url" | "nautiljon_api_key"
+>): boolean {
+  const provider = coverProviderFromWeb(web);
+  if (provider === null) return false;
+  if (!config) return true;
+  if (!config.enabled_providers.includes(provider)) return false;
+  if (provider === "comicvine") return config.comicvine_api_key.trim() !== "";
+  if (provider === "nautiljon") return config.nautiljon_base_url.trim() !== "" && config.nautiljon_api_key.trim() !== "";
+  return true;
+}
+
+/** Refresh computed fields after a cover write while retaining the user's draft. */
+export function preserveDirtyFields(fresh: InspectorForm | null, draft: InspectorForm | null): InspectorForm | null {
+  if (!fresh || !draft || fresh.mode !== draft.mode) return fresh;
+  const values = { ...fresh.values };
+  for (const [key, field] of Object.entries(draft.values)) {
+    if (field.dirty && values[key]) values[key] = { ...values[key], value: field.value, dirty: true };
+  }
+  return { ...fresh, values };
 }
 
 export function casefold(value: string): string {
@@ -602,7 +654,7 @@ export function shouldRefetchLibrary(job: Job): boolean {
 }
 
 export function cbrCount(rows: Volume[]): number {
-  return rows.filter((row) => row.extension.toLowerCase() === ".cbr").length;
+  return rows.filter((row) => row.extension.toLowerCase() === "cbr").length;
 }
 
 export function convertConfirmMessage(count: number): string {

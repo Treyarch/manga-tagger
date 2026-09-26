@@ -137,7 +137,7 @@ def extract_cbr(path: Path) -> Path:
     temp = Path(tempfile.mkdtemp(prefix=".manga-tagger-", dir=path.parent))
     try:
         result = run_command(
-            ["unar", "-quiet", "-output-directory", str(temp), str(path)]
+            ["unar", "-quiet", "-no-directory", "-output-directory", str(temp), str(path)]
         )
     except Exception:
         shutil.rmtree(temp, ignore_errors=True)

@@ -18,7 +18,7 @@ A session feels fast when cheap work stays cheap:
 - Choosing a volume shows its cover and `ComicInfo.xml` without extracting the archive.
 - Saving tags copies the page images through and replaces the XML. It does not recompress the book.
 - A scrape, a save, or a rescan never freezes the window. The user can cancel a scrape.
-- Nothing is written into an archive until the user saves. Accepting a match only loads the form.
+- Metadata is written when the user saves. Accepting a match only loads the form. Explicit Replace cover / Insert cover actions write the image immediately, as defined in [08-cover-from-provider.md](08-cover-from-provider.md).
 
 Later specifications turn these into concrete behavior. They must not trade them away for a simpler implementation.
 
@@ -118,7 +118,7 @@ On Linux, unset XDG variables mean `~/.config`, `~/.local/share`, and `~/.cache`
 | --- | --- | --- | --- |
 | `library_roots` | list of absolute paths | `[]` | Folders scanned for `.cbz` and `.cbr` files. An empty list means an empty shelf. |
 | `keep_cbr_original` | boolean | `true` | When `true`, keep the `.cbr` next to the new `.cbz`. When `false`, delete the `.cbr` after its `.cbz` has been written and read back. |
-| `write_poster_on_save` | boolean | `true` | When `true`, a successful save or rename writes `{stem}-poster.jpg` from the cover. When `false`, those jobs do not extract a poster. Rename still moves an existing sibling poster with the archive. |
+| `write_poster_on_save` | boolean | `true` | When `true`, a successful save, rename, or cover update writes `{stem}-poster.jpg` from the cover. When `false`, those jobs do not extract a poster. Rename still moves an existing sibling poster with the archive. |
 | `auto_save_metadata_on_switch` | boolean | `false` | When `true`, leaving a dirty metadata form by changing issue or place silently saves that form before navigating. When `false`, the app asks Save / Don't save / Cancel. Only fields already dirty from an edit or an accepted load are written; scrape alone still does not write an archive. |
 | `comicvine_api_key` | string | `""` | Comic Vine API key. Empty disables that provider. |
 | `nautiljon_base_url` | string | `""` | Absolute origin of the Nautiljon wrapper API. Empty disables that provider. |
@@ -151,6 +151,7 @@ Write these before the code they describe. Each one is a normal spec: YAML front
 | `05-ui-design.md` | Nautilus-like light and dark theme, header bar, sidebar, list or cover grid, inspector, Lucide icons, local Tailwind components |
 | `06-select-issue.md` | Issue/volume picker after a series match, Comic Vine and Nautiljon |
 | `07-field-locks.md` | Per-volume field locks in the index that block scrape overwrite and manual edits |
+| `08-cover-from-provider.md` | Replace or insert the archive cover page from a full-size catalog cover resolved via ComicInfo `Web` |
 
 ## Testing
 
