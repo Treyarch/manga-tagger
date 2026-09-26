@@ -1,4 +1,4 @@
-/** Top-right action toast queue and job summary wording. */
+/** Top-center action toast queue and job summary wording. */
 
 import {
   candidatesOf,
