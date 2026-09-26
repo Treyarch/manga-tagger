@@ -29,8 +29,8 @@
 
   const title = $derived(
     series.year.trim() !== ""
-      ? `${series.title} (${series.year}) - Select Issue`
-      : `${series.title} - Select Issue`,
+      ? `${series.title} (${series.year}) - Select matching issue`
+      : `${series.title} - Select matching issue`,
   );
   const selected = $derived(
     issues.find((item) => item.id === selectedId) ?? issues[0] ?? null,
