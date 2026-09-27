@@ -54,6 +54,7 @@
     isBusy,
     issuesOf,
     placeAfterLibrary,
+    placeFromClick,
     preferredIssueNumber,
     preserveDirtyFields,
     renamePlanLines,
@@ -91,7 +92,7 @@
   } from "./lib/shortcuts";
 
   type PendingNavigation =
-    | { type: "place"; path: string }
+    | { type: "place"; path: string | null }
     | { type: "volume"; path: string; shift: boolean; toggle: boolean };
 
   let {
@@ -380,7 +381,7 @@
     return job;
   }
 
-  function onPlace(path: string) {
+  function onPlace(path: string | null) {
     requestNavigation({ type: "place", path });
   }
 
@@ -414,7 +415,7 @@
 
   function applyNavigation(pending: PendingNavigation) {
     if (pending.type === "place") {
-      selectedPlace = pending.path === selectedPlace ? null : pending.path;
+      selectedPlace = placeFromClick(selectedPlace, pending.path);
       selection = { paths: [], anchor: null };
       candidates = [];
       issues = [];
@@ -861,7 +862,7 @@
   >
     <nav
       id="places"
-      class="w-60 shrink-0 overflow-y-auto {dragDepth > 0
+      class="relative w-60 shrink-0 overflow-y-auto {dragDepth > 0
         ? 'bg-app-selection'
         : 'bg-app-window'}"
       ondragenter={(event) => {
@@ -879,24 +880,36 @@
         dragDepth = 0;
       }}
     >
-      <div class="flex h-9 items-center gap-1 px-2">
+      <button
+        type="button"
+        aria-label="Show whole library"
+        aria-disabled={selectedPlace === null}
+        tabindex={selectedPlace === null ? -1 : 0}
+        class="absolute inset-0 size-full cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-app-accent"
+        onclick={() => {
+          if (selectedPlace !== null) onPlace(null);
+        }}
+      ></button>
+      <div class="pointer-events-none relative z-10 flex h-9 items-center gap-1 px-2">
         <span class="min-w-0 flex-1 truncate text-xs text-app-muted"
           >My library</span
         >
-        <Button icon label="Add folder" onclick={() => void addFolder()}>
-          <FolderPlus size={16} />
-        </Button>
+        <span class="pointer-events-auto">
+          <Button icon label="Add folder" onclick={() => void addFolder()}>
+            <FolderPlus size={16} />
+          </Button>
+        </span>
       </div>
       {#if folderError}
-        <p class="px-2 pb-1 text-xs text-app-text">{folderError}</p>
+        <p class="pointer-events-none relative z-10 px-2 pb-1 text-xs text-app-text">{folderError}</p>
       {/if}
       {#if places.length === 0}
-        <p class="px-2 text-xs text-app-muted">Drop a folder here.</p>
+        <p class="pointer-events-none relative z-10 px-2 text-xs text-app-muted">Drop a folder here.</p>
       {/if}
       {#each places as place (place.path)}
         <button
           type="button"
-          class="flex h-9 w-full items-center gap-2 px-2 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent {selectedPlace ===
+          class="relative z-10 flex h-9 w-full items-center gap-2 px-2 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent {selectedPlace ===
           place.path
             ? 'bg-app-selection'
             : ''}"

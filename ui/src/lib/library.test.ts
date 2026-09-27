@@ -30,6 +30,7 @@ import {
   thumbnailSrc,
   parseRootLines,
   placeAfterLibrary,
+  placeFromClick,
   preferredIssueNumber,
   preferredIssueId,
   renamePlanLines,
@@ -106,6 +107,16 @@ describe("shelf and selection", () => {
     expect(volumesForShelf(rows, "/books/Claymore").map((row) => row.name)).toEqual([
       "a.cbz",
     ]);
+  });
+
+  it("selects, toggles, and clears a place from sidebar clicks", () => {
+    expect(placeFromClick(null, "/books/Claymore")).toBe("/books/Claymore");
+    expect(placeFromClick("/books/Claymore", "/books/Other")).toBe(
+      "/books/Other",
+    );
+    expect(placeFromClick("/books/Claymore", "/books/Claymore")).toBeNull();
+    expect(placeFromClick("/books/Claymore", null)).toBeNull();
+    expect(placeFromClick(null, null)).toBeNull();
   });
 
   it("groups blank series first, then named series alphabetically", () => {

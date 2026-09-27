@@ -623,6 +623,15 @@ export function placeAfterLibrary(
   return null;
 }
 
+/** Select, toggle, or clear a place from a sidebar click. */
+export function placeFromClick(
+  current: string | null,
+  clicked: string | null,
+): string | null {
+  if (clicked === null || clicked === current) return null;
+  return clicked;
+}
+
 export function initialPageIndex(
   coverIndex: number | null,
   pageCount: number | null,
