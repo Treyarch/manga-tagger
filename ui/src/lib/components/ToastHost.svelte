@@ -41,7 +41,7 @@
 
 <!-- Host stays mounted so the first toast gets its enter transition. -->
 <div
-  class="pointer-events-none fixed top-16 left-1/2 z-40 flex w-full max-w-sm -translate-x-1/2 flex-col gap-2"
+  class="pointer-events-none fixed top-16 left-1/2 z-40 flex w-[calc(100%-2rem)] max-w-[375px] -translate-x-1/2 flex-col items-center gap-2"
   role="status"
   aria-live="polite"
   aria-relevant="additions text"
@@ -50,7 +50,7 @@
     {@const Icon = icons[item.icon]}
     <button
       type="button"
-      class="pointer-events-auto flex w-full items-start gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left text-sm shadow-md dark:border-zinc-600 dark:bg-zinc-800 dark:shadow-lg dark:shadow-black/50 {item.tone ===
+      class="pointer-events-auto flex w-fit max-w-full items-start gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left text-sm shadow-md dark:border-zinc-600 dark:bg-zinc-800 dark:shadow-lg dark:shadow-black/50 {item.tone ===
       'error'
         ? 'text-red-600 dark:text-red-400'
         : 'text-zinc-900 dark:text-zinc-100'}"
@@ -67,7 +67,7 @@
       >
         <Icon size={16} />
       </span>
-      <span class="min-w-0 flex-1">{item.message}</span>
+      <span class="min-w-0 break-words">{item.message}</span>
     </button>
   {/each}
 </div>
