@@ -798,7 +798,9 @@
             : ''}"
           onclick={() => onPlace(place.path)}
         >
-          <Folder size={16} />
+          <span class="flex size-4 shrink-0 items-center justify-center" aria-hidden="true">
+            <Folder size={16} />
+          </span>
           <span class="truncate">{place.label}</span>
         </button>
       {/each}
