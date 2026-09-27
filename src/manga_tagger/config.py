@@ -18,6 +18,7 @@ _KNOWN_KEYS = (
     "title_languages",
     "enabled_providers",
     "theme",
+    "animate_interface",
 )
 _THEMES = frozenset({"system", "light", "dark"})
 _DEFAULT_LANGUAGES = ["fr", "en"]
@@ -40,7 +41,7 @@ class AppPaths:
 
 @dataclass
 class AppConfig:
-    """The ten known keys plus unknown keys from the last successful load."""
+    """The known keys plus unknown keys from the last successful load."""
 
     path: Path
     library_roots: list[str] = field(default_factory=list)
@@ -54,11 +55,12 @@ class AppConfig:
     enabled_providers: list[str] = field(
         default_factory=lambda: list(_DEFAULT_PROVIDERS)
     )
+    animate_interface: bool = False
     theme: str = "system"
     extra: dict[str, object] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, object]:
-        """Return the ten known keys."""
+        """Return the known keys."""
         return {
             "library_roots": list(self.library_roots),
             "keep_cbr_original": self.keep_cbr_original,
@@ -70,6 +72,7 @@ class AppConfig:
             "title_languages": list(self.title_languages),
             "enabled_providers": list(self.enabled_providers),
             "theme": self.theme,
+            "animate_interface": self.animate_interface,
         }
 
 
@@ -170,6 +173,11 @@ def load_config(path: Path) -> AppConfig:
         ),
         title_languages=_clean_languages(languages, fallback=True),
         enabled_providers=_clean_providers(providers, fallback=True),
+        animate_interface=(
+            data["animate_interface"]
+            if isinstance(data.get("animate_interface"), bool)
+            else False
+        ),
         theme=_load_theme(data.get("theme", "system")),
         extra=extra,
     )
@@ -224,6 +232,7 @@ def apply_put(config: AppConfig, updates: Mapping[str, object]) -> AppConfig:
         title_languages=list(current["title_languages"]),  # type: ignore[arg-type]
         enabled_providers=list(current["enabled_providers"]),  # type: ignore[arg-type]
         theme=str(current["theme"]),
+        animate_interface=bool(current["animate_interface"]),
         extra=dict(config.extra),
     )
 
@@ -233,6 +242,10 @@ def _put_value(key: str, value: object) -> object:
         if not isinstance(value, list):
             raise ConfigError("library_roots must be a list")
         return _clean_roots(value)
+    if key == "animate_interface":
+        if not isinstance(value, bool):
+            raise ConfigError("animate_interface must be a boolean")
+        return value
     if key == "keep_cbr_original":
         if not isinstance(value, bool):
             raise ConfigError("keep_cbr_original must be a boolean")

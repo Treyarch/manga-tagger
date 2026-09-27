@@ -92,7 +92,7 @@ class FieldLocksResponse(BaseModel):
 
 
 class ConfigModel(BaseModel):
-    """The ten known config keys."""
+    """The known config keys."""
 
     library_roots: list[str]
     keep_cbr_original: bool
@@ -104,6 +104,7 @@ class ConfigModel(BaseModel):
     title_languages: list[str]
     enabled_providers: list[str]
     theme: str
+    animate_interface: bool
 
 
 class ConfigPut(BaseModel):
@@ -121,6 +122,7 @@ class ConfigPut(BaseModel):
     title_languages: Any = None
     enabled_providers: Any = None
     theme: Any = None
+    animate_interface: Any = None
 
 
 class SearchRequest(BaseModel):

@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { untrack } from "svelte";
+  import { onDestroy, untrack } from "svelte";
   import { Settings } from "lucide-svelte";
+  import MotionPanel from "./MotionPanel.svelte";
+  import { motion } from "../motion";
   import Checkbox from "./Checkbox.svelte";
   import Dialog from "./Dialog.svelte";
   import Select from "./Select.svelte";
@@ -42,6 +44,25 @@
   } = $props();
 
   let tab = $state<TabId>("general");
+  let direction = $state(12);
+  let animateInterface = $state(untrack(() => config.animate_interface));
+  let finished = false;
+  onDestroy(() => {
+    if (!finished) motion.clearPreview();
+  });
+
+  function dismiss() {
+    finished = true;
+    motion.clearPreview();
+    onClose();
+  }
+
+  function switchTab(next: TabId) {
+    const nextIndex = TABS.findIndex((item) => item.id === next);
+    const previousIndex = TABS.findIndex((item) => item.id === tab);
+    direction = nextIndex >= previousIndex ? 12 : -12;
+    tab = next;
+  }
   let roots = $state(untrack(() => config.library_roots.join("\n")));
   let apiKey = $state(untrack(() => config.comicvine_api_key));
   let nautiljonBaseUrl = $state(untrack(() => config.nautiljon_base_url));
@@ -88,7 +109,11 @@
           .filter((item) => item.enabled)
           .map((item) => item.id),
         theme,
+        animate_interface: animateInterface,
       });
+      finished = true;
+      motion.setSaved(next.animate_interface);
+      motion.clearPreview();
       onSaved(next);
     } catch (exc) {
       error = exc instanceof Error ? exc.message : "Could not save settings.";
@@ -100,7 +125,7 @@
   title="Settings"
   size="lg"
   confirmLabel="Save"
-  onDismiss={onClose}
+  onDismiss={dismiss}
   onConfirm={save}
 >
   {#snippet icon()}
@@ -116,113 +141,127 @@
             ? 'bg-blue-600/10 text-zinc-900 dark:bg-blue-500/15 dark:text-zinc-100'
             : 'text-zinc-900 hover:bg-blue-600/10 dark:text-zinc-100 dark:hover:bg-blue-500/15'}"
           aria-current={tab === item.id ? "page" : undefined}
-          onclick={() => (tab = item.id)}
+          onclick={() => switchTab(item.id)}
         >
           {item.label}
         </button>
       {/each}
     </nav>
     <div class="min-w-0 flex-1">
-      {#if tab === "general"}
-        <div class="flex flex-col gap-3">
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-zinc-500 dark:text-zinc-400">Theme</span>
-            <Select
-              label="Theme"
-              value={theme}
-              options={THEME_OPTIONS}
-              onValue={(value) => (theme = value)}
-            />
-          </label>
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-zinc-500 dark:text-zinc-400">Library roots</span>
-            <Textarea value={roots} rows={4} onValue={(value) => (roots = value)} />
-          </label>
-          <label class="flex flex-col gap-1">
-            <span class="text-xs text-zinc-500 dark:text-zinc-400">Title languages</span>
-            <TextInput value={languages} onValue={(value) => (languages = value)} />
-          </label>
-        </div>
-      {:else if tab === "archives"}
-        <div class="flex flex-col gap-4">
-          <div class="flex flex-col gap-2">
-            <Checkbox label="Keep the original CBR" bind:checked={keepOriginal} />
-            <p class="text-xs text-zinc-500 dark:text-zinc-400">
-              Convert writes a sibling CBZ. When this is on (the default), the original
-              CBR is kept beside the new CBZ. When off, the CBR is deleted after a
-              successful convert so each book stays one file.
-            </p>
+      <MotionPanel identity={tab} y={direction}>
+        {#if tab === "general"}
+          <div class="flex flex-col gap-3">
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-zinc-500 dark:text-zinc-400">Theme</span>
+              <Select
+                label="Theme"
+                value={theme}
+                options={THEME_OPTIONS}
+                onValue={(value) => (theme = value)}
+              />
+            </label>
+            <div class="flex flex-col gap-1">
+              <Checkbox
+                label="Animate interface"
+                bind:checked={() => animateInterface, (value) => {
+                  animateInterface = value;
+                  motion.preview(value);
+                }}
+              />
+              <p class="text-xs text-zinc-500 dark:text-zinc-400">
+                Smooth panel transitions and resizing. Respects reduced motion settings.
+              </p>
+            </div>
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-zinc-500 dark:text-zinc-400">Library roots</span>
+              <Textarea value={roots} rows={4} onValue={(value) => (roots = value)} />
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-zinc-500 dark:text-zinc-400">Title languages</span>
+              <TextInput value={languages} onValue={(value) => (languages = value)} />
+            </label>
           </div>
-          <div class="flex flex-col gap-2">
-            <Checkbox label="Write poster on save" bind:checked={writePosterOnSave} />
-            <p class="text-xs text-zinc-500 dark:text-zinc-400">
-              When on (the default), a successful save or rename writes a sibling
-              poster JPEG from the cover. When off, those jobs do not extract a
-              poster; rename still moves an existing poster with the archive.
-            </p>
+        {:else if tab === "archives"}
+          <div class="flex flex-col gap-4">
+            <div class="flex flex-col gap-2">
+              <Checkbox label="Keep the original CBR" bind:checked={keepOriginal} />
+              <p class="text-xs text-zinc-500 dark:text-zinc-400">
+                Convert writes a sibling CBZ. When this is on (the default), the original
+                CBR is kept beside the new CBZ. When off, the CBR is deleted after a
+                successful convert so each book stays one file.
+              </p>
+            </div>
+            <div class="flex flex-col gap-2">
+              <Checkbox label="Write poster on save" bind:checked={writePosterOnSave} />
+              <p class="text-xs text-zinc-500 dark:text-zinc-400">
+                When on (the default), a successful save or rename writes a sibling
+                poster JPEG from the cover. When off, those jobs do not extract a
+                poster; rename still moves an existing poster with the archive.
+              </p>
+            </div>
+            <div class="flex flex-col gap-2">
+              <Checkbox
+                label="Auto-save metadata on switch"
+                bind:checked={autoSaveOnSwitch}
+              />
+              <p class="text-xs text-zinc-500 dark:text-zinc-400">
+                When off (the default), changing issue or place with unsaved metadata
+                asks Save / Don't save / Cancel. When on, the app saves that form then
+                switches.
+              </p>
+            </div>
           </div>
-          <div class="flex flex-col gap-2">
-            <Checkbox
-              label="Auto-save metadata on switch"
-              bind:checked={autoSaveOnSwitch}
-            />
-            <p class="text-xs text-zinc-500 dark:text-zinc-400">
-              When off (the default), changing issue or place with unsaved metadata
-              asks Save / Don't save / Cancel. When on, the app saves that form then
-              switches.
-            </p>
-          </div>
-        </div>
-      {:else}
-        <ul class="flex flex-col gap-3">
-          {#each scrapers as item (item.id)}
-            <li
-              class="flex flex-col gap-2 rounded-md border border-zinc-200 p-3 dark:border-zinc-700"
-            >
-              <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                  <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                    {item.label}
-                  </p>
-                  <p class="text-xs text-zinc-500 dark:text-zinc-400">{item.note}</p>
+        {:else}
+          <ul class="flex flex-col gap-3">
+            {#each scrapers as item (item.id)}
+              <li
+                class="flex flex-col gap-2 rounded-md border border-zinc-200 p-3 dark:border-zinc-700"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                      {item.label}
+                    </p>
+                    <p class="text-xs text-zinc-500 dark:text-zinc-400">{item.note}</p>
+                  </div>
+                  <Checkbox
+                    label="Enable {item.label}"
+                    hideLabel
+                    bind:checked={item.enabled}
+                  />
                 </div>
-                <Checkbox
-                  label="Enable {item.label}"
-                  hideLabel
-                  bind:checked={item.enabled}
-                />
-              </div>
-              {#if item.id === "comicvine"}
-                <label class="flex flex-col gap-1">
-                  <span class="text-xs text-zinc-500 dark:text-zinc-400"
-                    >Comic Vine API key</span
-                  >
-                  <TextInput value={apiKey} onValue={(value) => (apiKey = value)} />
-                </label>
-              {:else if item.id === "nautiljon"}
-                <label class="flex flex-col gap-1">
-                  <span class="text-xs text-zinc-500 dark:text-zinc-400"
-                    >Nautiljon base URL</span
-                  >
-                  <TextInput
-                    value={nautiljonBaseUrl}
-                    onValue={(value) => (nautiljonBaseUrl = value)}
-                  />
-                </label>
-                <label class="flex flex-col gap-1">
-                  <span class="text-xs text-zinc-500 dark:text-zinc-400"
-                    >Nautiljon API key</span
-                  >
-                  <TextInput
-                    value={nautiljonApiKey}
-                    onValue={(value) => (nautiljonApiKey = value)}
-                  />
-                </label>
-              {/if}
-            </li>
-          {/each}
-        </ul>
-      {/if}
+                {#if item.id === "comicvine"}
+                  <label class="flex flex-col gap-1">
+                    <span class="text-xs text-zinc-500 dark:text-zinc-400"
+                      >Comic Vine API key</span
+                    >
+                    <TextInput value={apiKey} onValue={(value) => (apiKey = value)} />
+                  </label>
+                {:else if item.id === "nautiljon"}
+                  <label class="flex flex-col gap-1">
+                    <span class="text-xs text-zinc-500 dark:text-zinc-400"
+                      >Nautiljon base URL</span
+                    >
+                    <TextInput
+                      value={nautiljonBaseUrl}
+                      onValue={(value) => (nautiljonBaseUrl = value)}
+                    />
+                  </label>
+                  <label class="flex flex-col gap-1">
+                    <span class="text-xs text-zinc-500 dark:text-zinc-400"
+                      >Nautiljon API key</span
+                    >
+                    <TextInput
+                      value={nautiljonApiKey}
+                      onValue={(value) => (nautiljonApiKey = value)}
+                    />
+                  </label>
+                {/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      </MotionPanel>
       {#if error}
         <p class="mt-3 text-sm text-zinc-900 dark:text-zinc-100">{error}</p>
       {/if}

@@ -21,6 +21,7 @@ export type Config = {
   title_languages: string[];
   enabled_providers: string[];
   theme: string;
+  animate_interface: boolean;
 };
 
 async function parse<T>(response: Response): Promise<T> {

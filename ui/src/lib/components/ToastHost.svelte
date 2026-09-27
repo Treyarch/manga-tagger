@@ -1,7 +1,9 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { fly } from "svelte/transition";
-  import { backOut, cubicIn } from "svelte/easing";
+  import { flip } from "svelte/animate";
+  import {
+    motion, panelTransition, settleMotion, MOTION_DURATION, easeInOut,
+  } from "../motion";
   import {
     Check,
     CircleAlert,
@@ -52,32 +54,20 @@
       'error'
         ? 'text-red-600 dark:text-red-400'
         : 'text-zinc-900 dark:text-zinc-100'}"
-      in:fly={{ y: -24, duration: 400, easing: backOut, opacity: 0 }}
-      out:fly={{ y: -12, duration: 220, easing: cubicIn, opacity: 0 }}
+      use:settleMotion
+      transition:panelTransition={{ y: -16, enabled: $motion }}
+      animate:flip={{ duration: $motion ? MOTION_DURATION : 0, easing: easeInOut }}
       onclick={() => dismissToast(item.id)}
     >
-      <span class="toast-icon mt-0.5 shrink-0" aria-hidden="true">
+      <span
+        class="inline-flex mt-0.5 shrink-0"
+        aria-hidden="true"
+        use:settleMotion
+        in:panelTransition|global={{ y: 0, enabled: $motion }}
+      >
         <Icon size={16} />
       </span>
       <span class="min-w-0 flex-1">{item.message}</span>
     </button>
   {/each}
 </div>
-
-<style>
-  .toast-icon {
-    display: inline-flex;
-    animation: toast-icon-pop 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
-  }
-
-  @keyframes toast-icon-pop {
-    from {
-      opacity: 0;
-      transform: scale(0.5);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-</style>

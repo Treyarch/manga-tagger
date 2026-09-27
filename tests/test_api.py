@@ -758,3 +758,19 @@ def test_rename_rejects_invalid_selection_before_work(
         )
         assert response.status_code == 400
         assert client.get("/api/jobs/current").json() is None
+
+
+def test_interface_motion_config_api(tmp_path: Path) -> None:
+    app = _app(tmp_path, roots=[])
+    with TestClient(app) as client:
+        assert client.get("/api/config").json()["animate_interface"] is False
+        for value in (True, False, True):
+            response = client.put("/api/config", json={"animate_interface": value})
+            assert response.status_code == 200
+            assert response.json()["animate_interface"] is value
+        assert client.put("/api/config", json={"theme": "dark"}).json()["animate_interface"] is True
+        for invalid in (None, 1, "true", [], {}):
+            assert client.put("/api/config", json={"animate_interface": invalid}).status_code == 400
+            assert client.get("/api/config").json()["animate_interface"] is True
+        assert load_config(app.state.box.config.path).animate_interface is True
+        assert client.get("/api/jobs/current").json() is None

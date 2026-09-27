@@ -32,6 +32,7 @@ def test_missing_config_returns_defaults(tmp_path: Path) -> None:
         "comicvine",
         "nautiljon",
     ]
+    assert config.animate_interface is False
     assert config.theme == "system"
     assert config.extra == {}
     assert not path.exists()
@@ -48,6 +49,7 @@ def test_missing_config_returns_defaults(tmp_path: Path) -> None:
         "title_languages",
         "enabled_providers",
         "theme",
+        "animate_interface",
     }
 
 
@@ -67,6 +69,7 @@ def test_relative_root_is_dropped_and_file_is_unchanged(tmp_path: Path) -> None:
     assert config.keep_cbr_original is True
     assert config.write_poster_on_save is True
     assert config.auto_save_metadata_on_switch is False
+    assert config.animate_interface is False
     assert config.theme == "system"
     assert path.read_bytes() == before
 
@@ -199,3 +202,31 @@ def test_app_paths(tmp_path: Path) -> None:
     assert custom.thumbnails == local / "manga-tagger" / "covers"
     blank = app_paths("linux", {"XDG_CONFIG_HOME": "  "}, home)
     assert blank.config == linux.config
+
+
+@pytest.mark.parametrize("value", [True, False])
+def test_motion_config_round_trip_and_partial_updates(tmp_path: Path, value: bool) -> None:
+    path = tmp_path / "config.toml"
+    path.write_text('custom = "preserved"\n', encoding="utf-8")
+    config = apply_put(load_config(path), {"animate_interface": value})
+    config = apply_put(config, {"theme": "dark"})
+    save_config(path, config)
+    loaded = load_config(path)
+    assert loaded.animate_interface is value
+    assert loaded.to_dict()["animate_interface"] is value
+    assert loaded.extra == {"custom": "preserved"}
+
+
+@pytest.mark.parametrize("literal", ['"true"', '1', '[]', '{}'])
+def test_motion_invalid_stored_type_defaults_off(tmp_path: Path, literal: str) -> None:
+    path = tmp_path / "config.toml"
+    path.write_text(f"animate_interface = {literal}\n", encoding="utf-8")
+    assert load_config(path).animate_interface is False
+
+
+@pytest.mark.parametrize("value", [None, 0, 1, "true", [], {}])
+def test_motion_put_rejects_non_booleans(tmp_path: Path, value: object) -> None:
+    config = load_config(tmp_path / "config.toml")
+    with pytest.raises(ConfigError, match="animate_interface must be a boolean"):
+        apply_put(config, {"animate_interface": value})
+    assert config.animate_interface is False

@@ -165,7 +165,7 @@ Archive, page, thumbnail, save, rename, and convert paths must be absolute. A re
 | `GET /api/page?path=&index=` | One page. `index` is a non-negative integer. A missing or negative index is `ShellError` |
 | `GET /api/thumbnail?path=` | The cached cover JPEG, building it on demand through `thumbnail_for`. `Cache-Control: private, max-age=3600`. `ETag` is the JPEG filename stem |
 | `GET /api/cover?url=` | Bytes of one allow-listed remote catalog cover. Only `https` URLs whose host is `uploads.mangadex.org`, `www.nautiljon.com`, or `nautiljon.com` are accepted. Used by Matches so the WebView loads a same-origin image |
-| `GET /api/config` | The ten known keys |
+| `GET /api/config` | The known keys |
 | `PUT /api/config` | A partial object of those keys. Returns the full config. Roots in the body enqueue a scan after a successful write |
 | `POST /api/dialogs/folder` | Calls the injected `pick_folder`. Returns `{ "path" }` or `{ "path": null }` when the dialog is cancelled. No picker is HTTP 503 |
 | `POST /api/window/close` | Calls the injected `destroy_window`. Returns an empty 204. No closer is HTTP 503 |
@@ -281,7 +281,7 @@ The first sidebar row is Add folder. It calls `POST /api/dialogs/folder`. A canc
 
 Dropping a folder on the sidebar does not call into Python from the client. `window.py` reads the native drop on `#places` and dispatches a `folders-dropped` window event whose `detail.paths` are absolute paths. The client posts those paths to `POST /api/library/roots`.
 
-Settings is a dialog with General, Archives, and Scrapers tabs. It edits `theme`, library roots (one absolute path per line), `title_languages` as comma-separated codes in order, `keep_cbr_original` as a checkbox labeled `Keep the original CBR` on Archives, `write_poster_on_save` as a checkbox labeled `Write poster on save` on Archives, `auto_save_metadata_on_switch` as a checkbox labeled `Auto-save metadata on switch` on Archives, the Comic Vine key, the Nautiljon base URL, the Nautiljon API key, and `enabled_providers`. Dismiss writes nothing. Save drops blank root lines. If a non-blank root line is not absolute, the dialog does not send the request and shows `Paths must be absolute.` A successful save calls `PUT /api/config`.
+Settings is a dialog with General, Archives, and Scrapers tabs. It edits `theme`, `animate_interface` (General, with live preview and rollback on dismissal), library roots (one absolute path per line), `title_languages` as comma-separated codes in order, `keep_cbr_original` as a checkbox labeled `Keep the original CBR` on Archives, `write_poster_on_save` as a checkbox labeled `Write poster on save` on Archives, `auto_save_metadata_on_switch` as a checkbox labeled `Auto-save metadata on switch` on Archives, the Comic Vine key, the Nautiljon base URL, the Nautiljon API key, and `enabled_providers`. Dismiss writes nothing. Save drops blank root lines. If a non-blank root line is not absolute, the dialog does not send the request and shows `Paths must be absolute.` A successful save calls `PUT /api/config`.
 
 Per-file save, rename, and convert errors, and scan-root lines, are listed at the top of the inspector, above the form. Search and load status (match count, no matches, provider errors) is toast-only and is not repeated in the inspector. Scrape opens the Matches dialog (searching, then rows when any); match rows are not listed in the inspector. The toast for every finished job is the short summary in the jobs client section.
 
@@ -304,7 +304,7 @@ Per-file save, rename, and convert errors, and scan-root lines, are listed at th
 
 This specification adds no configuration keys.
 
-It is the only reader and writer of `library_roots`, `keep_cbr_original`, `write_poster_on_save`, `auto_save_metadata_on_switch`, `comicvine_api_key`, `nautiljon_base_url`, `nautiljon_api_key`, and `title_languages` from [00-project-overview.md](00-project-overview.md), and of `theme` from [05-ui-design.md](05-ui-design.md). Defaults stay those documents' defaults. View mode, the selected place, the provider choice, and the rename template are not keys. The HTTP port is not a key. The `httpx` timeout of 15 seconds is not a key. The job poll interval of 500 milliseconds is not a key.
+It is the only reader and writer of `library_roots`, `keep_cbr_original`, `write_poster_on_save`, `auto_save_metadata_on_switch`, `comicvine_api_key`, `nautiljon_base_url`, `nautiljon_api_key`, and `title_languages` from [00-project-overview.md](00-project-overview.md), and of `theme` and `animate_interface` from [05-ui-design.md](05-ui-design.md). Defaults stay those documents' defaults. View mode, the selected place, the provider choice, and the rename template are not keys. The HTTP port is not a key. The `httpx` timeout of 15 seconds is not a key. The job poll interval of 500 milliseconds is not a key.
 
 ## Testing
 
@@ -314,7 +314,9 @@ Importing `manga_tagger.config`, `manga_tagger.shell`, `manga_tagger.jobs`, or `
 
 Cover at least:
 
-- `load_config` on a missing path returns the ten known-key defaults and does not create the file. A relative `library_roots` entry is absent from the result and the file bytes are unchanged. An unknown key is still present after a `PUT` that changes `theme`. Invalid TOML raises `ConfigError` and the message includes the path. A non-boolean `auto_save_metadata_on_switch` on load becomes `false`. A `PUT` of a non-boolean for that key is `400`.
+- `animate_interface` defaults to false; invalid stored types fall back to false. GET exposes it, PUT accepts only booleans, omitted keys stay unchanged, and TOML round trips preserve it and unknown keys. Preview alone never writes configuration.
+
+- `load_config` on a missing path returns the known-key defaults and does not create the file. A relative `library_roots` entry is absent from the result and the file bytes are unchanged. An unknown key is still present after a `PUT` that changes `theme`. Invalid TOML raises `ConfigError` and the message includes the path. A non-boolean `auto_save_metadata_on_switch` on load becomes `false`. A `PUT` of a non-boolean for that key is `400`.
 - `app_paths("linux", {}, home)` uses `home/.config`, `home/.local/share`, and `home/.cache`. A set absolute `XDG_CONFIG_HOME` replaces only the config root. A relative `XDG_DATA_HOME` is ignored. `darwin` and `win32` use their table, including the `APPDATA` fallback under `home`.
 - Two volumes in `/books/Claymore` and one in `/books/Other/Claymore` produce two places. The colliding labels are `books / Claymore` and `Other / Claymore`. `/books/Claymore/extra/v01.cbz` is a place `/books/Claymore/extra` and is not listed for `/books/Claymore`. A volume directly in `/books` makes `/books` a place. Empty roots return no volumes and do not delete a row that is already in the index. `volumes_for_shelf` with `null` returns every row ordered by `name`. A missing place selection stays `null` after a library refresh; a place that left the list becomes `null`.
 - `selection_after_filter` drops a path that left `visible`. Hiding the anchor assigns the anchor to the first remaining selected path.
@@ -340,6 +342,7 @@ Cover at least:
 
 ## Acceptance criteria
 
+- Saving Animate interface persists it across restarts. Cancel/Close restores the saved preference; a failed save leaves Settings open with its preview. The UI design specification owns motion behavior.
 - One process loads config, binds `127.0.0.1` on an ephemeral port, and opens the pywebview window on that origin. The port is not config. Tests do not open the window.
 - The shelf is `GET /api/library`. That response does not scan, open an archive, or build a thumbnail. A missing config file is the defaults, is not created, and paints no volumes.
 - List and grid thumbs use `GET /api/thumbnail` as the `img` `src` with lazy/async decode; the client does not open a blob URL per row. A successful thumbnail response is cacheable (`Cache-Control` and `ETag` from the cached JPEG identity).

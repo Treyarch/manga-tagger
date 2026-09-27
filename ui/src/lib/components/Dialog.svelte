@@ -1,8 +1,7 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
   import { X } from "lucide-svelte";
-  import { fly } from "svelte/transition";
-  import { backOut, cubicIn } from "svelte/easing";
+  import { motion, panelTransition, settleMotion, smoothHeight } from "../motion";
   import Button from "./Button.svelte";
 
   let {
@@ -39,16 +38,21 @@
 </script>
 
 <div
-  class="fixed inset-0 z-30 flex items-center justify-center bg-zinc-900/40 p-4"
+  class="fixed inset-0 z-30 flex items-center justify-center p-4"
   role="presentation"
 >
   <div
-    class="w-full {width} rounded-lg border border-zinc-200 bg-white p-4 shadow-md dark:border-zinc-600 dark:bg-zinc-800 dark:shadow-lg dark:shadow-black/50"
+    class="absolute inset-0 bg-zinc-900/40"
+    use:settleMotion
+    transition:panelTransition|global={{ y: 0, enabled: $motion }}
+  ></div>
+  <div
+    class="relative max-h-full overflow-y-auto w-full {width} rounded-lg border border-zinc-200 bg-white p-4 shadow-md dark:border-zinc-600 dark:bg-zinc-800 dark:shadow-lg dark:shadow-black/50"
     role="dialog"
     aria-modal="true"
     aria-labelledby="dialog-title"
-    in:fly={{ y: 20, duration: 400, easing: backOut, opacity: 0 }}
-    out:fly={{ y: 12, duration: 220, easing: cubicIn, opacity: 0 }}
+    use:settleMotion
+    transition:panelTransition|global={{ y: 16, enabled: $motion }}
   >
     <div class="flex items-center gap-2">
       <h2
@@ -64,8 +68,8 @@
         <X size={20} />
       </Button>
     </div>
-    <div class="mt-3">
-      {@render children?.()}
+    <div class="mt-3" use:smoothHeight>
+      <div class="flow-root">{@render children?.()}</div>
     </div>
     <div class="mt-4 flex justify-end gap-2">
       {#if leadingLabel !== undefined && onLeading}

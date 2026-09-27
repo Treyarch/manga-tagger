@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onDestroy, untrack } from "svelte";
   import { ChevronLeft, ChevronRight } from "lucide-svelte";
+  import MotionPanel from "./MotionPanel.svelte";
+  import { releaseAfterMotion } from "../motion";
   import Button from "./Button.svelte";
   import {
     coverPageIndex,
@@ -49,7 +51,7 @@
     if (index === null || !requestsPage(anchor)) {
       const previous = pageUrl;
       pageUrl = null;
-      if (previous) URL.revokeObjectURL(previous);
+      if (previous) releaseAfterMotion(() => URL.revokeObjectURL(previous));
       return;
     }
     let cancelled = false;
@@ -66,7 +68,7 @@
       }
       const previous = pageUrl;
       pageUrl = objectUrl;
-      if (previous) URL.revokeObjectURL(previous);
+      if (previous) releaseAfterMotion(() => URL.revokeObjectURL(previous));
     });
     return () => {
       cancelled = true;
@@ -74,16 +76,19 @@
   });
 
   onDestroy(() => {
-    if (pageUrl) URL.revokeObjectURL(pageUrl);
+    const previous = pageUrl;
+    if (previous) releaseAfterMotion(() => URL.revokeObjectURL(previous));
   });
 </script>
 
 {#if showPage}
   <div class="flex flex-col gap-2">
     <div class="relative flex h-80 w-full items-center justify-center">
-      {#if pageUrl}
-        <img src={pageUrl} alt="" class="max-h-full max-w-full object-contain" />
-      {/if}
+      <MotionPanel identity={pageUrl} y={0} extra="h-full w-full" contentClass="h-full flex items-center justify-center">
+        {#if pageUrl}
+          <img src={pageUrl} alt="" class="max-h-full max-w-full object-contain" />
+        {/if}
+      </MotionPanel>
       {#if showCoverActions}
         <div
           class="absolute inset-x-0 bottom-0 flex justify-center gap-2 bg-gradient-to-t from-zinc-950/60 to-transparent p-2"

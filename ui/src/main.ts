@@ -3,8 +3,11 @@ import App from "./App.svelte";
 import { getConfig } from "./lib/api";
 import { applyDocumentClass, resolveDark } from "./lib/theme";
 import "./app.css";
+import { motion } from "./lib/motion";
 
 const config = await getConfig();
+motion.setSaved(config.animate_interface);
+motion.setReduced(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 applyDocumentClass(
   document.documentElement,
   resolveDark(

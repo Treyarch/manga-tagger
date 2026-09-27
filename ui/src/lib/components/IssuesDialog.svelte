@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from "svelte";
   import { Book, ListOrdered, LoaderCircle } from "lucide-svelte";
+  import MotionPanel from "./MotionPanel.svelte";
   import Dialog from "./Dialog.svelte";
   import type { Candidate, IssueCandidate } from "../library";
   import { matchCoverSrc, preferredIssueId } from "../library";
@@ -111,96 +112,102 @@
   {#snippet icon()}
     <ListOrdered size={20} />
   {/snippet}
-  {#if loading}
-    <div
-      class="flex items-center justify-center gap-2 py-8 text-sm text-zinc-500 dark:text-zinc-400"
-      aria-busy="true"
-      role="status"
-    >
-      <LoaderCircle size={20} class="animate-spin" aria-hidden="true" />
-      <span>Loading issues…</span>
-    </div>
-  {:else}
-    <div class="grid gap-3 sm:grid-cols-[minmax(10rem,14rem)_minmax(0,1fr)]">
+  <MotionPanel identity={loading}>
+    {#if loading}
       <div
-        class="flex aspect-[2/3] max-h-[28rem] items-center justify-center overflow-hidden rounded-sm bg-zinc-100 text-zinc-400 dark:bg-zinc-700 dark:text-zinc-500"
-        aria-hidden="true"
+        class="flex items-center justify-center gap-2 py-8 text-sm text-zinc-500 dark:text-zinc-400"
+        aria-busy="true"
+        role="status"
       >
-        {#if previewCover.trim() !== "" && !coverFailed(previewCover)}
-          <img
-            src={matchCoverSrc(previewCover)}
-            alt=""
-            referrerpolicy="no-referrer"
-            class="h-full w-full object-contain"
-            onerror={() => markCoverFailed(previewCover)}
-          />
-        {:else}
-          <Book size={40} />
-        {/if}
+        <LoaderCircle size={20} class="animate-spin" aria-hidden="true" />
+        <span>Loading issues…</span>
       </div>
-      <div class="flex min-h-0 min-w-0 flex-col gap-3">
+    {:else}
+      <div class="grid gap-3 sm:grid-cols-[minmax(10rem,14rem)_minmax(0,1fr)]">
         <div
-          bind:this={listEl}
-          class="max-h-64 overflow-auto rounded-sm border border-zinc-200 dark:border-zinc-600"
-          role="listbox"
-          aria-label="Issues"
-          tabindex="0"
-          onkeydown={onRowKeydown}
+          class="flex aspect-[2/3] max-h-[28rem] items-center justify-center overflow-hidden rounded-sm bg-zinc-100 text-zinc-400 dark:bg-zinc-700 dark:text-zinc-500"
+          aria-hidden="true"
         >
-          <table class="w-full border-collapse text-left text-sm">
-            <thead
-              class="sticky top-0 bg-white text-xs text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
-            >
-              <tr>
-                <th class="w-20 px-2 py-1.5 font-medium">Issue</th>
-                <th class="w-24 px-2 py-1.5 font-medium">Date</th>
-                <th class="px-2 py-1.5 font-medium">Title</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
-              {#each issues as issue (issue.id)}
-                <tr
-                  data-issue-id={issue.id}
-                  role="option"
-                  aria-selected={selected?.id === issue.id}
-                  class="cursor-pointer {selected?.id === issue.id
-                    ? 'bg-blue-600/10 dark:bg-blue-500/15'
-                    : 'hover:bg-blue-600/10 dark:hover:bg-blue-500/15'} {busy
-                    ? 'opacity-40'
-                    : ''}"
-                  onclick={() => {
-                    if (!busy) selectRow(issue.id);
-                  }}
-                  ondblclick={() => {
-                    if (!busy) {
-                      selectRow(issue.id);
-                      onIssue(issue.id);
-                    }
-                  }}
-                >
-                  <td class="px-2 py-1.5 text-zinc-900 dark:text-zinc-100"
-                    >{issue.number}</td
-                  >
-                  <td class="px-2 py-1.5 text-zinc-500 dark:text-zinc-400"
-                    >{issue.date}</td
-                  >
-                  <td
-                    class="max-w-0 truncate px-2 py-1.5 text-zinc-500 dark:text-zinc-400"
-                    >{issue.title}</td
-                  >
+          <MotionPanel identity={previewCover} y={0} extra="h-full w-full" contentClass="h-full flex items-center justify-center">
+            {#if previewCover.trim() !== "" && !coverFailed(previewCover)}
+              <img
+                src={matchCoverSrc(previewCover)}
+                alt=""
+                referrerpolicy="no-referrer"
+                class="h-full w-full object-contain"
+                onerror={() => markCoverFailed(previewCover)}
+              />
+            {:else}
+              <Book size={40} />
+            {/if}
+          </MotionPanel>
+        </div>
+        <div class="flex min-h-0 min-w-0 flex-col gap-3">
+          <div
+            bind:this={listEl}
+            class="max-h-64 overflow-auto rounded-sm border border-zinc-200 dark:border-zinc-600"
+            role="listbox"
+            aria-label="Issues"
+            tabindex="0"
+            onkeydown={onRowKeydown}
+          >
+            <table class="w-full border-collapse text-left text-sm">
+              <thead
+                class="sticky top-0 bg-white text-xs text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400"
+              >
+                <tr>
+                  <th class="w-20 px-2 py-1.5 font-medium">Issue</th>
+                  <th class="w-24 px-2 py-1.5 font-medium">Date</th>
+                  <th class="px-2 py-1.5 font-medium">Title</th>
                 </tr>
-              {/each}
-            </tbody>
-          </table>
-        </div>
-        <div
-          class="min-h-24 overflow-y-auto rounded-sm border border-zinc-200 px-3 py-2 text-sm text-zinc-500 dark:border-zinc-600 dark:text-zinc-400"
-        >
-          {#if selected !== null && selected.summary.trim() !== ""}
-            {selected.summary}
-          {/if}
+              </thead>
+              <tbody class="divide-y divide-zinc-200 dark:divide-zinc-700">
+                {#each issues as issue (issue.id)}
+                  <tr
+                    data-issue-id={issue.id}
+                    role="option"
+                    aria-selected={selected?.id === issue.id}
+                    class="cursor-pointer {selected?.id === issue.id
+                      ? 'bg-blue-600/10 dark:bg-blue-500/15'
+                      : 'hover:bg-blue-600/10 dark:hover:bg-blue-500/15'} {busy
+                      ? 'opacity-40'
+                      : ''}"
+                    onclick={() => {
+                      if (!busy) selectRow(issue.id);
+                    }}
+                    ondblclick={() => {
+                      if (!busy) {
+                        selectRow(issue.id);
+                        onIssue(issue.id);
+                      }
+                    }}
+                  >
+                    <td class="px-2 py-1.5 text-zinc-900 dark:text-zinc-100"
+                      >{issue.number}</td
+                    >
+                    <td class="px-2 py-1.5 text-zinc-500 dark:text-zinc-400"
+                      >{issue.date}</td
+                    >
+                    <td
+                      class="max-w-0 truncate px-2 py-1.5 text-zinc-500 dark:text-zinc-400"
+                      >{issue.title}</td
+                    >
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+          </div>
+          <div
+            class="min-h-24 overflow-y-auto rounded-sm border border-zinc-200 px-3 py-2 text-sm text-zinc-500 dark:border-zinc-600 dark:text-zinc-400"
+          >
+            <MotionPanel identity={selected?.id} y={0}>
+              {#if selected !== null && selected.summary.trim() !== ""}
+                {selected.summary}
+              {/if}
+            </MotionPanel>
+          </div>
         </div>
       </div>
-    </div>
-  {/if}
+    {/if}
+  </MotionPanel>
 </Dialog>

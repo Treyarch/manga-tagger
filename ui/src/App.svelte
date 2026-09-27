@@ -71,6 +71,8 @@
     type Selection,
     type Volume,
   } from "./lib/library";
+  import MotionPanel from "./lib/components/MotionPanel.svelte";
+  import { motion, watchReducedMotion } from "./lib/motion";
   import { applyDocumentClass, resolveDark } from "./lib/theme";
 
   type PendingNavigation =
@@ -648,6 +650,7 @@
   }
 
   onMount(() => {
+    const stopMotion = watchReducedMotion(window.matchMedia("(prefers-reduced-motion: reduce)"));
     void loadShelf();
     void poll();
     const timer = setInterval(() => {
@@ -655,10 +658,13 @@
     }, POLL_MS);
     window.addEventListener("folders-dropped", onFoldersDropped);
     return () => {
+      stopMotion();
       clearInterval(timer);
       window.removeEventListener("folders-dropped", onFoldersDropped);
     };
   });
+
+  $effect(() => motion.setSaved(config.animate_interface));
 
   $effect(() => {
     const theme = config.theme;
@@ -798,115 +804,119 @@
       {/each}
     </nav>
     <main class="min-w-0 flex-1 overflow-y-auto bg-white dark:bg-zinc-900">
-      {#if visible.length === 0}
-        <div class="flex h-full items-center justify-center">
-          <p class="text-sm text-zinc-500 dark:text-zinc-400">No volumes yet.</p>
-        </div>
-      {:else if view === "list"}
-        <ul>
-          {#each groups as group (group.series)}
-            {#if group.series !== ""}
-              <li
-                class="truncate px-2 pt-3 pb-1 text-xs text-zinc-500 dark:text-zinc-400"
-              >
-                {group.series}
-              </li>
-            {/if}
-            {#each group.volumes as row, index (row.path)}
-              <li>
-                <button
-                  type="button"
-                  class="flex h-9 w-full items-center gap-2 px-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:focus-visible:ring-blue-500 {selected(
-                    row.path,
-                  )
-                    ? 'bg-blue-600/10 dark:bg-blue-500/15'
-                    : ''}"
-                  onclick={(event) => onVolume(row.path, event)}
-                >
-                  {#if group.series !== ""}
-                    <span class="relative h-9 w-3 shrink-0" aria-hidden="true">
-                      <span
-                        class="absolute top-0 left-1 w-px bg-zinc-300 dark:bg-zinc-600 {index ===
-                        group.volumes.length - 1
-                          ? 'h-1/2'
-                          : 'bottom-0'}"
-                      ></span>
-                      <span
-                        class="absolute top-1/2 left-1 h-px w-2 bg-zinc-300 dark:bg-zinc-600"
-                      ></span>
-                    </span>
-                  {/if}
-                  <span class="flex size-4 shrink-0 items-center justify-center overflow-hidden">
-                    <Thumb revision={coverRevisions[row.path] ?? ""} path={row.path} failed={row.status === "failed"} fallback />
-                  </span>
-                  <span class="min-w-0 flex-1 truncate text-sm">{row.name}</span>
-                </button>
-              </li>
-            {/each}
-          {/each}
-        </ul>
-      {:else}
-        <div class="flex flex-col gap-4 p-3">
-          {#each groups as group (group.series)}
-            <section class="flex flex-col gap-2">
+      <MotionPanel identity={`${selectedPlace}:${view}`} extra={visible.length === 0 ? "h-full" : "min-h-full"} contentClass={visible.length === 0 ? "h-full" : ""}>
+        {#if visible.length === 0}
+          <div class="flex h-full items-center justify-center">
+            <p class="text-sm text-zinc-500 dark:text-zinc-400">No volumes yet.</p>
+          </div>
+        {:else if view === "list"}
+          <ul>
+            {#each groups as group (group.series)}
               {#if group.series !== ""}
-                <h3
-                  class="truncate text-xs text-zinc-500 dark:text-zinc-400"
+                <li
+                  class="truncate px-2 pt-3 pb-1 text-xs text-zinc-500 dark:text-zinc-400"
                 >
                   {group.series}
-                </h3>
+                </li>
               {/if}
-              <ul class="grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-3">
-                {#each group.volumes as row (row.path)}
-                  <li>
-                    <button
-                      type="button"
-                      class="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:focus-visible:ring-blue-500"
-                      onclick={(event) => onVolume(row.path, event)}
-                    >
-                      <span
-                        class="block aspect-[2/3] overflow-hidden bg-zinc-100 dark:bg-zinc-950 {selected(
-                          row.path,
-                        )
-                          ? 'ring-2 ring-blue-600 dark:ring-blue-500'
-                          : ''}"
-                      >
-                        {#if row.status !== "failed"}
-                          <Thumb revision={coverRevisions[row.path] ?? ""} path={row.path} failed={false} />
-                        {/if}
+              {#each group.volumes as row, index (row.path)}
+                <li>
+                  <button
+                    type="button"
+                    class="flex h-9 w-full items-center gap-2 px-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:focus-visible:ring-blue-500 {selected(
+                      row.path,
+                    )
+                      ? 'bg-blue-600/10 dark:bg-blue-500/15'
+                      : ''}"
+                    onclick={(event) => onVolume(row.path, event)}
+                  >
+                    {#if group.series !== ""}
+                      <span class="relative h-9 w-3 shrink-0" aria-hidden="true">
+                        <span
+                          class="absolute top-0 left-1 w-px bg-zinc-300 dark:bg-zinc-600 {index ===
+                          group.volumes.length - 1
+                            ? 'h-1/2'
+                            : 'bottom-0'}"
+                        ></span>
+                        <span
+                          class="absolute top-1/2 left-1 h-px w-2 bg-zinc-300 dark:bg-zinc-600"
+                        ></span>
                       </span>
-                      <span
-                        class="mt-1 block truncate text-xs {selected(row.path)
-                          ? 'bg-blue-600/10 dark:bg-blue-500/15'
-                          : ''}"
+                    {/if}
+                    <span class="flex size-4 shrink-0 items-center justify-center overflow-hidden">
+                      <Thumb revision={coverRevisions[row.path] ?? ""} path={row.path} failed={row.status === "failed"} fallback />
+                    </span>
+                    <span class="min-w-0 flex-1 truncate text-sm">{row.name}</span>
+                  </button>
+                </li>
+              {/each}
+            {/each}
+          </ul>
+        {:else}
+          <div class="flex flex-col gap-4 p-3">
+            {#each groups as group (group.series)}
+              <section class="flex flex-col gap-2">
+                {#if group.series !== ""}
+                  <h3
+                    class="truncate text-xs text-zinc-500 dark:text-zinc-400"
+                  >
+                    {group.series}
+                  </h3>
+                {/if}
+                <ul class="grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-3">
+                  {#each group.volumes as row (row.path)}
+                    <li>
+                      <button
+                        type="button"
+                        class="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:focus-visible:ring-blue-500"
+                        onclick={(event) => onVolume(row.path, event)}
                       >
-                        {row.name}
-                      </span>
-                    </button>
-                  </li>
-                {/each}
-              </ul>
-            </section>
-          {/each}
-        </div>
-      {/if}
+                        <span
+                          class="block aspect-[2/3] overflow-hidden bg-zinc-100 dark:bg-zinc-950 {selected(
+                            row.path,
+                          )
+                            ? 'ring-2 ring-blue-600 dark:ring-blue-500'
+                            : ''}"
+                        >
+                          {#if row.status !== "failed"}
+                            <Thumb revision={coverRevisions[row.path] ?? ""} path={row.path} failed={false} />
+                          {/if}
+                        </span>
+                        <span
+                          class="mt-1 block truncate text-xs {selected(row.path)
+                            ? 'bg-blue-600/10 dark:bg-blue-500/15'
+                            : ''}"
+                        >
+                          {row.name}
+                        </span>
+                      </button>
+                    </li>
+                  {/each}
+                </ul>
+              </section>
+            {/each}
+          </div>
+        {/if}
+      </MotionPanel>
     </main>
     <aside
       class="w-96 shrink-0 overflow-y-auto border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
     >
-      <Inspector
-        {anchor}
-        {form}
-        {formLocked}
-        lines={inspectorLines}
-        coverRevision={anchor ? coverRevisions[anchor.path] ?? "" : ""}
-        {coverActions}
-        {coverActionsDisabled}
-        {onEdit}
-        {onToggleLock}
-        onReplaceCover={() => void runCover("replace")}
-        onInsertCover={() => void runCover("insert")}
-      />
+      <MotionPanel identity={selectionKey(selection)} extra="min-h-full">
+        <Inspector
+          {anchor}
+          {form}
+          {formLocked}
+          lines={inspectorLines}
+          coverRevision={anchor ? coverRevisions[anchor.path] ?? "" : ""}
+          {coverActions}
+          {coverActionsDisabled}
+          {onEdit}
+          {onToggleLock}
+          onReplaceCover={() => void runCover("replace")}
+          onInsertCover={() => void runCover("insert")}
+        />
+      </MotionPanel>
     </aside>
   </div>
 </div>
@@ -942,6 +952,8 @@
       const rootsChanged =
         next.library_roots.length !== config.library_roots.length ||
         next.library_roots.some((root, index) => root !== config.library_roots[index]);
+      motion.setSaved(next.animate_interface);
+      motion.clearPreview();
       config = next;
       provider = clampProvider(provider, next.enabled_providers);
       applyDocumentClass(

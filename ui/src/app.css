@@ -31,3 +31,9 @@ html {
 html.dark {
   color-scheme: dark;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin {
+    animation: none;
+  }
+}
