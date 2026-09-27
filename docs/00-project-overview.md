@@ -152,6 +152,7 @@ Write these before the code they describe. Each one is a normal spec: YAML front
 | `06-select-issue.md` | Issue/volume picker after a series match, Comic Vine and Nautiljon |
 | `07-field-locks.md` | Per-volume field locks in the index that block scrape overwrite and manual edits |
 | `08-cover-from-provider.md` | Replace or insert the archive cover page from a full-size catalog cover resolved via ComicInfo `Web` |
+| `09-keyboard-shortcuts.md` | Fixed desktop shortcuts for save, rename, scan, view switching, Settings, dialogs, and page preview navigation |
 
 ## Testing
 

@@ -74,6 +74,15 @@
   import MotionPanel from "./lib/components/MotionPanel.svelte";
   import { motion, watchReducedMotion } from "./lib/motion";
   import { applyDocumentClass, resolveDark } from "./lib/theme";
+  import {
+    SHORTCUT_HINTS,
+    activeDialog,
+    appShortcut,
+    dialogDismissal,
+    shortcutDisposition,
+    shortcutTooltip,
+    type DialogKind,
+  } from "./lib/shortcuts";
 
   type PendingNavigation =
     | { type: "place"; path: string }
@@ -137,6 +146,16 @@
   );
   const matchesOpen = $derived(searching || candidates.length > 0);
   const issuesOpen = $derived(listingIssues || issues.length > 0);
+  const activeModal = $derived(
+    activeDialog({
+      matchesOpen,
+      issuesOpen,
+      settingsOpen,
+      renameOpen,
+      convertOpen,
+      unsavedOpen,
+    }),
+  );
   const formLocked = $derived(
     currentJob !== null &&
       isBusy(currentJob) &&
@@ -610,6 +629,37 @@
     if (terminal(job.state)) await settle(job);
   }
 
+  async function dismissActiveDialog(dialog: DialogKind) {
+    const dismissal = dialogDismissal(dialog);
+    if (dismissal === "dismiss-unsaved") dismissUnsaved();
+    else if (dismissal === "close-convert") convertOpen = false;
+    else if (dismissal === "close-rename") renameOpen = false;
+    else if (dismissal === "close-settings") settingsOpen = false;
+    else if (dismissal === "cancel-issues") await dismissIssues();
+    else await dismissMatches();
+  }
+
+  function onShortcutKeydown(event: KeyboardEvent) {
+    const shortcut = appShortcut(event);
+    if (shortcut === null) return;
+    event.preventDefault();
+    if (event.repeat) return;
+
+    const disposition = shortcutDisposition(shortcut, activeModal);
+    if (disposition === "dismiss" && activeModal !== null) {
+      void dismissActiveDialog(activeModal);
+      return;
+    }
+    if (disposition !== "run") return;
+
+    if (shortcut === "save") void save();
+    else if (shortcut === "rename") openRename();
+    else if (shortcut === "scan") void rescan();
+    else if (shortcut === "list-view") view = "list";
+    else if (shortcut === "grid-view") view = "grid";
+    else if (shortcut === "settings") settingsOpen = true;
+  }
+
   function selected(path: string): boolean {
     return selection.paths.includes(path);
   }
@@ -681,6 +731,8 @@
   });
 </script>
 
+<svelte:window onkeydown={onShortcutKeydown} />
+
 <div
   class="flex h-full flex-col gap-2 bg-zinc-100 p-2 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100"
 >
@@ -711,6 +763,7 @@
       <Button
         icon
         label="Save"
+        tooltip={shortcutTooltip("Save", SHORTCUT_HINTS.save)}
         disabled={busy || selection.paths.length === 0}
         onclick={save}
       >
@@ -719,6 +772,7 @@
       <Button
         icon
         label="Rename file(s)"
+        tooltip={shortcutTooltip("Rename file(s)", SHORTCUT_HINTS.rename)}
         disabled={busy || selectedPlace === null}
         onclick={openRename}
       >
@@ -727,18 +781,41 @@
       <Button icon label="Convert CBR" disabled={busy || selectedCbr === 0} onclick={requestConvert}>
         <FileArchive size={20} />
       </Button>
-      <Button icon label="Scan library" disabled={busy} onclick={rescan}>
+      <Button
+        icon
+        label="Scan library"
+        tooltip={shortcutTooltip("Scan library", SHORTCUT_HINTS.scan)}
+        disabled={busy}
+        onclick={rescan}
+      >
         <RefreshCw size={20} />
       </Button>
-      <Button icon label="List view" pressed={view === "list"} onclick={() => (view = "list")}>
+      <Button
+        icon
+        label="List view"
+        tooltip={shortcutTooltip("List view", SHORTCUT_HINTS.listView)}
+        pressed={view === "list"}
+        onclick={() => (view = "list")}
+      >
         <List size={20} />
       </Button>
-      <Button icon label="Grid view" pressed={view === "grid"} onclick={() => (view = "grid")}>
+      <Button
+        icon
+        label="Grid view"
+        tooltip={shortcutTooltip("Grid view", SHORTCUT_HINTS.gridView)}
+        pressed={view === "grid"}
+        onclick={() => (view = "grid")}
+      >
         <LayoutGrid size={20} />
       </Button>
     </div>
     <div class="flex items-center justify-self-end gap-1">
-      <Button icon label="Settings" onclick={() => (settingsOpen = true)}>
+      <Button
+        icon
+        label="Settings"
+        tooltip={shortcutTooltip("Settings", SHORTCUT_HINTS.settings)}
+        onclick={() => (settingsOpen = true)}
+      >
         <Settings size={20} />
       </Button>
       <Button
@@ -913,6 +990,7 @@
           coverRevision={anchor ? coverRevisions[anchor.path] ?? "" : ""}
           {coverActions}
           {coverActionsDisabled}
+          shortcutsDisabled={activeModal !== null}
           {onEdit}
           {onToggleLock}
           onReplaceCover={() => void runCover("replace")}

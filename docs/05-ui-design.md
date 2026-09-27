@@ -162,7 +162,7 @@ Every control shows a 2px accent focus ring on `:focus-visible` (`blue-600` in l
 
 The header icon button is `quiet`, 32px square (`size-8`), with a 20px icon. The default button height is 36px (`h-9`) and `text-sm`. Enabled buttons use `cursor-pointer`; disabled buttons use `cursor-not-allowed`.
 
-When a button has an accessible name and no visible text (icon buttons), that name is also the native `title` attribute. Hovering shows the browser tooltip after the platform delay so the user can learn what Scrape, Save, Rename file(s), Convert CBR, Scan library, List view, Grid view, and the other chrome icons do. Do not add a custom tooltip component.
+When a button has an accessible name and no visible text (icon buttons), that name is also the native `title` attribute by default. A caller may provide a longer tooltip without changing the accessible name; [09-keyboard-shortcuts.md](09-keyboard-shortcuts.md) uses that for shortcut hints. Hovering shows the browser tooltip after the platform delay so the user can learn what Scrape, Save, Rename file(s), Convert CBR, Scan library, List view, Grid view, and the other chrome icons do. Do not add a custom tooltip component.
 
 ### Text input
 

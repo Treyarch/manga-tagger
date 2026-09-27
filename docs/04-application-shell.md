@@ -271,6 +271,8 @@ When the result names a skipped root, the inspector shows `{path} was skipped.` 
 
 ## Header and settings
 
+Keyboard activation of header actions and dialog dismissal is defined in [09-keyboard-shortcuts.md](09-keyboard-shortcuts.md). A shortcut calls the same client function as its matching control, so job, selection, and dialog guards stay identical.
+
 Leading to trailing, the header contains: the product brand (mini SVG and the wordmark `Manga Tagger` at the leading edge), then the provider select, Scrape (`ScanSearch`), Save (`Save`), Rename file(s) (`Pencil`), Convert CBR (`FileArchive`), Scan library (`RefreshCw`), the list and grid switch, then Settings (`Settings`), and Close (`X`) at the trailing edge. The brand, the centered action cluster, and the trailing utilities are the three header zones in the UI specification. The view switch and theme menu are the controls in the UI specification. The controls this specification adds are quiet header icon buttons with those accessible names, except the provider select, which is the select component. Close sits at the trailing edge. It calls `POST /api/window/close`, which destroys the pywebview window. That ends the process the same way the window chrome close does. No closer returns 503.
 
 Choosing a theme calls `PUT /api/config` with that `theme` value. On success the class updates from the UI specification's `resolveDark`. That change does not rescan. A failed write leaves the previous theme in memory and does not change the class.

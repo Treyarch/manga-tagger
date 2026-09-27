@@ -21,6 +21,7 @@
     coverRevision = "",
     coverActions = false,
     coverActionsDisabled = true,
+    shortcutsDisabled = false,
     onEdit,
     onToggleLock,
     onReplaceCover,
@@ -33,6 +34,7 @@
     coverRevision?: string;
     coverActions?: boolean;
     coverActionsDisabled?: boolean;
+    shortcutsDisabled?: boolean;
     onEdit: (key: string, value: string) => void;
     onToggleLock: (key: string, locked: boolean) => void;
     onReplaceCover?: () => void;
@@ -58,6 +60,7 @@
         {anchor}
         {coverActions}
         {coverActionsDisabled}
+        {shortcutsDisabled}
         {onReplaceCover}
         {onInsertCover}
       />

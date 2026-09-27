@@ -10,17 +10,25 @@
     requestsPage,
     type Volume,
   } from "../library";
+  import {
+    pageAfterShortcut,
+    previewShortcut,
+    shortcutTooltip,
+    SHORTCUT_HINTS,
+  } from "../shortcuts";
 
   let {
     anchor,
     coverActions = false,
     coverActionsDisabled = true,
+    shortcutsDisabled = false,
     onReplaceCover,
     onInsertCover,
   }: {
     anchor: Volume;
     coverActions?: boolean;
     coverActionsDisabled?: boolean;
+    shortcutsDisabled?: boolean;
     onReplaceCover?: () => void;
     onInsertCover?: () => void;
   } = $props();
@@ -43,6 +51,15 @@
   function goTo(index: number) {
     if (index < 0 || index >= pageCount) return;
     pageIndex = index;
+  }
+
+  function onShortcutKeydown(event: KeyboardEvent) {
+    if (!showPage) return;
+    const shortcut = previewShortcut(event);
+    if (shortcut === null) return;
+    event.preventDefault();
+    if (shortcutsDisabled || pageIndex === null) return;
+    goTo(pageAfterShortcut(pageIndex, pageCount, shortcut));
   }
 
   $effect(() => {
@@ -81,6 +98,8 @@
   });
 </script>
 
+<svelte:window onkeydown={onShortcutKeydown} />
+
 {#if showPage}
   <div class="flex flex-col gap-2">
     <div class="relative flex h-80 w-full items-center justify-center">
@@ -116,6 +135,7 @@
       <Button
         icon
         label="Previous page"
+        tooltip={shortcutTooltip("Previous page", SHORTCUT_HINTS.previousPage)}
         disabled={pageIndex === null || pageIndex <= 0}
         onclick={() => pageIndex !== null && goTo(pageIndex - 1)}
       >
@@ -124,6 +144,7 @@
       <Button
         icon
         label="Next page"
+        tooltip={shortcutTooltip("Next page", SHORTCUT_HINTS.nextPage)}
         disabled={pageIndex === null || pageIndex >= pageCount - 1}
         onclick={() => pageIndex !== null && goTo(pageIndex + 1)}
       >

@@ -64,7 +64,7 @@
         {/if}
         {title}
       </h2>
-      <Button icon label="Close" onclick={onDismiss}>
+      <Button icon label="Close" tooltip="Close (Esc)" onclick={onDismiss}>
         <X size={20} />
       </Button>
     </div>

@@ -10,6 +10,7 @@
     type = "button",
     disabled = false,
     label = undefined,
+    tooltip = undefined,
     onclick,
     children,
   }: {
@@ -19,6 +20,7 @@
     type?: "button" | "submit";
     disabled?: boolean;
     label?: string;
+    tooltip?: string;
     onclick?: (event: MouseEvent) => void;
     children?: Snippet;
   } = $props();
@@ -40,7 +42,7 @@
   {type}
   {disabled}
   aria-label={label}
-  title={label}
+  title={tooltip ?? label}
   aria-pressed={pressed ? true : undefined}
   class="inline-flex cursor-pointer items-center justify-center rounded-md text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:opacity-40 dark:focus-visible:ring-blue-500 {icon
     ? 'size-8'
