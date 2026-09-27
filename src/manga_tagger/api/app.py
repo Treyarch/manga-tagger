@@ -33,6 +33,7 @@ from manga_tagger.api.models import (
     RootsResponse,
     SaveRequest,
     SearchRequest,
+    SystemThemeModel,
     VolumeModel,
 )
 from manga_tagger.archives.errors import ArchiveError
@@ -88,6 +89,7 @@ from manga_tagger.shell import (
     validate_rename,
     validate_save,
 )
+from manga_tagger.theme import SystemTheme, read_system_theme
 
 
 class DialogUnavailableError(Exception):
@@ -140,6 +142,7 @@ class AppState:
     services: Services
     pick_folder: Callable[[], str | None] | None = None
     destroy_window: Callable[[], None] | None = None
+    system_theme: Callable[[], SystemTheme | None] = read_system_theme
 
 
 def default_services() -> Services:
@@ -181,6 +184,7 @@ def create_app(
     services: Services | None = None,
     pick_folder: Callable[[], str | None] | None = None,
     destroy_window: Callable[[], None] | None = None,
+    system_theme: Callable[[], SystemTheme | None] | None = None,
 ) -> FastAPI:
     """Build the local API.
 
@@ -194,6 +198,7 @@ def create_app(
             the real archive, index, and provider operations.
         pick_folder: Native folder dialog. Omitted, the dialog route is 503.
         destroy_window: Closes the desktop window. Omitted, close is 503.
+        system_theme: Reads a desktop palette. Omitted, read Omarchy on Linux.
 
     Returns:
         The FastAPI app. Routes do not open archives, query SQLite, or call
@@ -209,6 +214,7 @@ def create_app(
         services=services if services is not None else default_services(),
         pick_folder=pick_folder,
         destroy_window=destroy_window,
+        system_theme=system_theme if system_theme is not None else read_system_theme,
     )
     app.state.box = state
     _register_errors(app)
@@ -358,6 +364,12 @@ def _register_routes(app: FastAPI) -> None:
     @app.get("/api/config", response_model=ConfigModel)
     def get_config() -> ConfigModel:
         return ConfigModel(**_state(app).config.to_dict())
+
+    @app.get("/api/system-theme", response_model=SystemThemeModel | None)
+    def get_system_theme(response: Response) -> SystemThemeModel | None:
+        response.headers["Cache-Control"] = "no-store"
+        theme = _state(app).system_theme()
+        return None if theme is None else SystemThemeModel(**theme.to_dict())
 
     @app.put("/api/config", response_model=ConfigModel)
     def put_config(body: ConfigPut) -> ConfigModel:

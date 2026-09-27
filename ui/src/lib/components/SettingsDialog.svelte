@@ -136,10 +136,10 @@
       {#each TABS as item (item.id)}
         <button
           type="button"
-          class="rounded-md px-2 py-1.5 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:focus-visible:ring-blue-500 {tab ===
+          class="rounded-md px-2 py-1.5 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent {tab ===
           item.id
-            ? 'bg-blue-600/10 text-zinc-900 dark:bg-blue-500/15 dark:text-zinc-100'
-            : 'text-zinc-900 hover:bg-blue-600/10 dark:text-zinc-100 dark:hover:bg-blue-500/15'}"
+            ? 'bg-app-selection text-app-text'
+            : 'text-app-text hover:bg-app-selection'}"
           aria-current={tab === item.id ? "page" : undefined}
           onclick={() => switchTab(item.id)}
         >
@@ -152,7 +152,7 @@
         {#if tab === "general"}
           <div class="flex flex-col gap-3">
             <label class="flex flex-col gap-1">
-              <span class="text-xs text-zinc-500 dark:text-zinc-400">Theme</span>
+              <span class="text-xs text-app-muted">Theme</span>
               <Select
                 label="Theme"
                 value={theme}
@@ -168,16 +168,16 @@
                   motion.preview(value);
                 }}
               />
-              <p class="text-xs text-zinc-500 dark:text-zinc-400">
+              <p class="text-xs text-app-muted">
                 Smooth panel transitions and resizing. Respects reduced motion settings.
               </p>
             </div>
             <label class="flex flex-col gap-1">
-              <span class="text-xs text-zinc-500 dark:text-zinc-400">Library roots</span>
+              <span class="text-xs text-app-muted">Library roots</span>
               <Textarea value={roots} rows={4} onValue={(value) => (roots = value)} />
             </label>
             <label class="flex flex-col gap-1">
-              <span class="text-xs text-zinc-500 dark:text-zinc-400">Title languages</span>
+              <span class="text-xs text-app-muted">Title languages</span>
               <TextInput value={languages} onValue={(value) => (languages = value)} />
             </label>
           </div>
@@ -185,7 +185,7 @@
           <div class="flex flex-col gap-4">
             <div class="flex flex-col gap-2">
               <Checkbox label="Keep the original CBR" bind:checked={keepOriginal} />
-              <p class="text-xs text-zinc-500 dark:text-zinc-400">
+              <p class="text-xs text-app-muted">
                 Convert writes a sibling CBZ. When this is on (the default), the original
                 CBR is kept beside the new CBZ. When off, the CBR is deleted after a
                 successful convert so each book stays one file.
@@ -193,7 +193,7 @@
             </div>
             <div class="flex flex-col gap-2">
               <Checkbox label="Write poster on save" bind:checked={writePosterOnSave} />
-              <p class="text-xs text-zinc-500 dark:text-zinc-400">
+              <p class="text-xs text-app-muted">
                 When on (the default), a successful save or rename writes a sibling
                 poster JPEG from the cover. When off, those jobs do not extract a
                 poster; rename still moves an existing poster with the archive.
@@ -204,7 +204,7 @@
                 label="Auto-save metadata on switch"
                 bind:checked={autoSaveOnSwitch}
               />
-              <p class="text-xs text-zinc-500 dark:text-zinc-400">
+              <p class="text-xs text-app-muted">
                 When off (the default), changing issue or place with unsaved metadata
                 asks Save / Don't save / Cancel. When on, the app saves that form then
                 switches.
@@ -215,14 +215,14 @@
           <ul class="flex flex-col gap-3">
             {#each scrapers as item (item.id)}
               <li
-                class="flex flex-col gap-2 rounded-md border border-zinc-200 p-3 dark:border-zinc-700"
+                class="flex flex-col gap-2 rounded-md border border-app-border p-3"
               >
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
-                    <p class="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                    <p class="text-sm font-medium text-app-text">
                       {item.label}
                     </p>
-                    <p class="text-xs text-zinc-500 dark:text-zinc-400">{item.note}</p>
+                    <p class="text-xs text-app-muted">{item.note}</p>
                   </div>
                   <Checkbox
                     label="Enable {item.label}"
@@ -232,14 +232,14 @@
                 </div>
                 {#if item.id === "comicvine"}
                   <label class="flex flex-col gap-1">
-                    <span class="text-xs text-zinc-500 dark:text-zinc-400"
+                    <span class="text-xs text-app-muted"
                       >Comic Vine API key</span
                     >
                     <TextInput value={apiKey} onValue={(value) => (apiKey = value)} />
                   </label>
                 {:else if item.id === "nautiljon"}
                   <label class="flex flex-col gap-1">
-                    <span class="text-xs text-zinc-500 dark:text-zinc-400"
+                    <span class="text-xs text-app-muted"
                       >Nautiljon base URL</span
                     >
                     <TextInput
@@ -248,7 +248,7 @@
                     />
                   </label>
                   <label class="flex flex-col gap-1">
-                    <span class="text-xs text-zinc-500 dark:text-zinc-400"
+                    <span class="text-xs text-app-muted"
                       >Nautiljon API key</span
                     >
                     <TextInput
@@ -263,7 +263,7 @@
         {/if}
       </MotionPanel>
       {#if error}
-        <p class="mt-3 text-sm text-zinc-900 dark:text-zinc-100">{error}</p>
+        <p class="mt-3 text-sm text-app-text">{error}</p>
       {/if}
     </div>
   </div>

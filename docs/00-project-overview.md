@@ -125,7 +125,7 @@ On Linux, unset XDG variables mean `~/.config`, `~/.local/share`, and `~/.cache`
 | `nautiljon_api_key` | string | `""` | Nautiljon wrapper API key (`X-Api-Key`). Empty disables that provider. |
 | `title_languages` | list of strings | `["fr", "en"]` | Title preference order. Each entry is a language the catalog may have. The original title is used when none of them exist. |
 | `enabled_providers` | list of strings | `["mangadex", "anilist", "jikan", "comicvine", "nautiljon"]` | Catalog providers available in the header picker and for scrape. Unknown ids are dropped. An empty list leaves no provider selectable. |
-| `theme` | string | `system` | `system` follows `prefers-color-scheme`. `light` and `dark` force that theme. Any other value is treated as `system`. Defined in [05-ui-design.md](05-ui-design.md). Chosen in Settings, not the header. |
+| `theme` | string | `system` | `system` uses the active Omarchy palette when its generated `colors.toml` is available, otherwise it follows `prefers-color-scheme`. `light` and `dark` force the built-in theme. Any other value is treated as `system`. Defined in [05-ui-design.md](05-ui-design.md). Chosen in Settings, not the header. |
 
 Unknown keys are ignored. The feature specification that introduces a key must document it here or in its own Configuration section before that specification becomes `active`.
 

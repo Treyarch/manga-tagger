@@ -27,10 +27,10 @@
   <div class="flex flex-col gap-3">
     <TextInput label="Template" value={template} onValue={onTemplate} />
     {#if error}
-      <p class="text-sm text-zinc-900 dark:text-zinc-100">{error}</p>
+      <p class="text-sm text-app-text">{error}</p>
     {/if}
     {#if lines.length > 0}
-      <ul class="flex flex-col gap-1 text-sm text-zinc-900 dark:text-zinc-100">
+      <ul class="flex flex-col gap-1 text-sm text-app-text">
         {#each lines as line}
           <li>{line}</li>
         {/each}

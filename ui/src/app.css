@@ -9,8 +9,26 @@
   src: url("./assets/fonts/DelaGothicOne-Regular.ttf") format("truetype");
 }
 
-@theme {
+@theme inline {
   --font-brand: "Dela Gothic One", ui-sans-serif, system-ui, sans-serif;
+  --color-app-window: var(--app-window);
+  --color-app-view: var(--app-view);
+  --color-app-raised: var(--app-raised);
+  --color-app-secondary: var(--app-secondary);
+  --color-app-secondary-hover: var(--app-secondary-hover);
+  --color-app-quiet-hover: var(--app-quiet-hover);
+  --color-app-border: var(--app-border);
+  --color-app-strong-border: var(--app-strong-border);
+  --color-app-text: var(--app-text);
+  --color-app-muted: var(--app-muted);
+  --color-app-accent: var(--app-accent);
+  --color-app-on-accent: var(--app-on-accent);
+  --color-app-selection: var(--app-selection);
+  --color-app-dirty: var(--app-dirty);
+  --color-app-danger: var(--app-danger);
+  --color-app-danger-hover: var(--app-danger-hover);
+  --color-app-danger-text: var(--app-danger-text);
+  --color-app-on-danger: var(--app-on-danger);
 }
 
 .font-brand {
@@ -26,10 +44,46 @@ body,
 
 html {
   color-scheme: light;
+  --app-window: #f4f4f5;
+  --app-view: #ffffff;
+  --app-raised: #ffffff;
+  --app-secondary: #f4f4f5;
+  --app-secondary-hover: #e4e4e7;
+  --app-quiet-hover: rgb(228 228 231 / 70%);
+  --app-border: #e4e4e7;
+  --app-strong-border: #d4d4d8;
+  --app-text: #18181b;
+  --app-muted: #71717a;
+  --app-accent: #2563eb;
+  --app-on-accent: #ffffff;
+  --app-selection: rgb(37 99 235 / 10%);
+  --app-dirty: #b45309;
+  --app-danger: #dc2626;
+  --app-danger-hover: #b91c1c;
+  --app-danger-text: #dc2626;
+  --app-on-danger: #ffffff;
 }
 
 html.dark {
   color-scheme: dark;
+  --app-window: #09090b;
+  --app-view: #18181b;
+  --app-raised: #27272a;
+  --app-secondary: #3f3f46;
+  --app-secondary-hover: #52525b;
+  --app-quiet-hover: #27272a;
+  --app-border: #27272a;
+  --app-strong-border: #52525b;
+  --app-text: #f4f4f5;
+  --app-muted: #a1a1aa;
+  --app-accent: #3b82f6;
+  --app-on-accent: #ffffff;
+  --app-selection: rgb(59 130 246 / 15%);
+  --app-dirty: #fbbf24;
+  --app-danger: #dc2626;
+  --app-danger-hover: #b91c1c;
+  --app-danger-text: #f87171;
+  --app-on-danger: #ffffff;
 }
 
 @media (prefers-reduced-motion: reduce) {

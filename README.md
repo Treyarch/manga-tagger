@@ -86,7 +86,9 @@ Linux honors `$XDG_CONFIG_HOME`, `$XDG_DATA_HOME`, and `$XDG_CACHE_HOME` when se
 | `nautiljon_base_url` | `""` | Absolute origin of the Nautiljon wrapper; empty disables it |
 | `nautiljon_api_key` | `""` | Wrapper `X-Api-Key`; empty disables Nautiljon |
 | `title_languages` | `["fr", "en"]` | Title preference order; original title is the fallback |
-| `theme` | `system` | `system`, `light`, or `dark` |
+| `theme` | `system` | `system`, `light`, or `dark`; System live-follows the active Omarchy palette when available, then falls back to the desktop light/dark preference |
+
+On Omarchy, System reads the generated palette at `~/.local/state/omarchy/current/theme/colors.toml` and updates the open window after a theme switch. Manga Tagger only reads this file; it does not install hooks or modify Omarchy configuration. Forced Light and Dark always use Manga Tagger's built-in palette.
 
 The HTTP API binds to `127.0.0.1` on an ephemeral port. The port is not configurable.
 

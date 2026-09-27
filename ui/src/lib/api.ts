@@ -24,6 +24,20 @@ export type Config = {
   animate_interface: boolean;
 };
 
+export type SystemTheme = {
+  mode: "light" | "dark";
+  background: string;
+  dark_background: string;
+  lighter_background: string;
+  foreground: string;
+  dark_foreground: string;
+  accent: string;
+  selection: string;
+  red: string;
+  yellow: string;
+  orange: string;
+};
+
 async function parse<T>(response: Response): Promise<T> {
   if (response.ok) {
     if (response.status === 204) return undefined as T;
@@ -48,6 +62,12 @@ async function parse<T>(response: Response): Promise<T> {
 
 export function getConfig(): Promise<Config> {
   return fetch("/api/config").then((response) => parse<Config>(response));
+}
+
+export function getSystemTheme(): Promise<SystemTheme | null> {
+  return fetch("/api/system-theme", { cache: "no-store" }).then((response) =>
+    parse<SystemTheme | null>(response),
+  );
 }
 
 export function putConfig(body: Partial<Config>): Promise<Config> {

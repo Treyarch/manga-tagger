@@ -125,6 +125,22 @@ class ConfigPut(BaseModel):
     animate_interface: Any = None
 
 
+class SystemThemeModel(BaseModel):
+    """A validated semantic palette supplied by the desktop environment."""
+
+    mode: Literal["light", "dark"]
+    background: str
+    dark_background: str
+    lighter_background: str
+    foreground: str
+    dark_foreground: str
+    accent: str
+    selection: str
+    red: str
+    yellow: str
+    orange: str
+
+
 class SearchRequest(BaseModel):
     """Body for ``POST /api/jobs/search``."""
 

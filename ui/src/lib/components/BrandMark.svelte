@@ -5,7 +5,7 @@
   Product brand for the header leading edge.
   Font: Dela Gothic One (OFL) — see ../assets/fonts/OFL.txt
 -->
-<div class="flex items-center gap-2 px-1 text-zinc-900 dark:text-zinc-100">
+<div class="flex items-center gap-2 px-1 text-app-text">
   <svg
     width="20"
     height="20"
@@ -29,7 +29,7 @@
     <!-- Accent spine -->
     <path
       d="M5 2.75v14.5"
-      class="stroke-blue-600 dark:stroke-blue-500"
+      class="stroke-app-accent"
       stroke-width="1.5"
       stroke-linecap="round"
     />

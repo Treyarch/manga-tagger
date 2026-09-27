@@ -13,7 +13,13 @@
     Settings,
     X,
   } from "lucide-svelte";
-  import { getJson, postJson, type Config } from "./lib/api";
+  import {
+    getJson,
+    getSystemTheme,
+    postJson,
+    type Config,
+    type SystemTheme,
+  } from "./lib/api";
   import BrandMark from "./lib/components/BrandMark.svelte";
   import Button from "./lib/components/Button.svelte";
   import Dialog from "./lib/components/Dialog.svelte";
@@ -73,7 +79,7 @@
   } from "./lib/library";
   import MotionPanel from "./lib/components/MotionPanel.svelte";
   import { motion, watchReducedMotion } from "./lib/motion";
-  import { applyDocumentClass, resolveDark } from "./lib/theme";
+  import { applyTheme } from "./lib/theme";
   import {
     SHORTCUT_HINTS,
     activeDialog,
@@ -88,9 +94,13 @@
     | { type: "place"; path: string }
     | { type: "volume"; path: string; shift: boolean; toggle: boolean };
 
-  let { initialConfig }: { initialConfig: Config } = $props();
+  let {
+    initialConfig,
+    initialSystemTheme,
+  }: { initialConfig: Config; initialSystemTheme: SystemTheme | null } = $props();
 
   let config = $state(untrack(() => initialConfig));
+  let systemTheme = $state<SystemTheme | null>(untrack(() => initialSystemTheme));
   let places = $state<Place[]>([]);
   let volumes = $state<Volume[]>([]);
   let selectedPlace = $state<string | null>(null);
@@ -118,6 +128,7 @@
   let newestSearchId = $state<string | null>(null);
   let newestIssuesId = $state<string | null>(null);
   let newestLoadId = $state<string | null>(null);
+  let themePollActive = false;
   let loadSelectionKey = $state("");
   let planToken = 0;
   let coverStarting = $state(false);
@@ -349,6 +360,18 @@
     activeId = null;
     const job = await getJson<Job>(`/api/jobs/${id}`);
     await settle(job);
+  }
+
+  async function pollSystemTheme() {
+    if (themePollActive) return;
+    themePollActive = true;
+    try {
+      systemTheme = await getSystemTheme();
+    } catch {
+      // A desktop-theme read must never interrupt job polling or app work.
+    } finally {
+      themePollActive = false;
+    }
   }
 
   async function startJob(path: string, body?: unknown): Promise<Job> {
@@ -705,6 +728,7 @@
     void poll();
     const timer = setInterval(() => {
       void poll().catch(() => undefined);
+      void pollSystemTheme();
     }, POLL_MS);
     window.addEventListener("folders-dropped", onFoldersDropped);
     return () => {
@@ -718,11 +742,14 @@
 
   $effect(() => {
     const theme = config.theme;
+    const palette = systemTheme;
     const queryMedia = window.matchMedia("(prefers-color-scheme: dark)");
     const apply = () => {
-      applyDocumentClass(
+      applyTheme(
         document.documentElement,
-        resolveDark(theme, queryMedia.matches),
+        theme,
+        queryMedia.matches,
+        palette,
       );
     };
     apply();
@@ -734,10 +761,10 @@
 <svelte:window onkeydown={onShortcutKeydown} />
 
 <div
-  class="flex h-full flex-col gap-2 bg-zinc-100 p-2 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100"
+  class="flex h-full flex-col gap-2 bg-app-window p-2 text-app-text"
 >
   <header
-    class="grid h-12 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-1 border border-zinc-200 bg-white px-2 dark:border-zinc-800 dark:bg-zinc-900"
+    class="grid h-12 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-1 border border-app-border bg-app-view px-2"
   >
     <div class="justify-self-start">
       <BrandMark />
@@ -830,13 +857,13 @@
     </div>
   </header>
   <div
-    class="flex min-h-0 flex-1 overflow-hidden border border-zinc-200 dark:border-zinc-800"
+    class="flex min-h-0 flex-1 overflow-hidden border border-app-border"
   >
     <nav
       id="places"
       class="w-60 shrink-0 overflow-y-auto {dragDepth > 0
-        ? 'bg-blue-600/10 dark:bg-blue-500/15'
-        : 'bg-zinc-100 dark:bg-zinc-950'}"
+        ? 'bg-app-selection'
+        : 'bg-app-window'}"
       ondragenter={(event) => {
         event.preventDefault();
         dragDepth += 1;
@@ -853,7 +880,7 @@
       }}
     >
       <div class="flex h-9 items-center gap-1 px-2">
-        <span class="min-w-0 flex-1 truncate text-xs text-zinc-500 dark:text-zinc-400"
+        <span class="min-w-0 flex-1 truncate text-xs text-app-muted"
           >My library</span
         >
         <Button icon label="Add folder" onclick={() => void addFolder()}>
@@ -861,17 +888,17 @@
         </Button>
       </div>
       {#if folderError}
-        <p class="px-2 pb-1 text-xs text-zinc-900 dark:text-zinc-100">{folderError}</p>
+        <p class="px-2 pb-1 text-xs text-app-text">{folderError}</p>
       {/if}
       {#if places.length === 0}
-        <p class="px-2 text-xs text-zinc-500 dark:text-zinc-400">Drop a folder here.</p>
+        <p class="px-2 text-xs text-app-muted">Drop a folder here.</p>
       {/if}
       {#each places as place (place.path)}
         <button
           type="button"
-          class="flex h-9 w-full items-center gap-2 px-2 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:focus-visible:ring-blue-500 {selectedPlace ===
+          class="flex h-9 w-full items-center gap-2 px-2 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent {selectedPlace ===
           place.path
-            ? 'bg-blue-600/10 dark:bg-blue-500/15'
+            ? 'bg-app-selection'
             : ''}"
           onclick={() => onPlace(place.path)}
         >
@@ -882,18 +909,18 @@
         </button>
       {/each}
     </nav>
-    <main class="min-w-0 flex-1 overflow-y-auto bg-white dark:bg-zinc-900">
+    <main class="min-w-0 flex-1 overflow-y-auto bg-app-view">
       <MotionPanel identity={`${selectedPlace}:${view}`} extra={visible.length === 0 ? "h-full" : "min-h-full"} contentClass={visible.length === 0 ? "h-full" : ""}>
         {#if visible.length === 0}
           <div class="flex h-full items-center justify-center">
-            <p class="text-sm text-zinc-500 dark:text-zinc-400">No volumes yet.</p>
+            <p class="text-sm text-app-muted">No volumes yet.</p>
           </div>
         {:else if view === "list"}
           <ul>
             {#each groups as group (group.series)}
               {#if group.series !== ""}
                 <li
-                  class="truncate px-2 pt-3 pb-1 text-xs text-zinc-500 dark:text-zinc-400"
+                  class="truncate px-2 pt-3 pb-1 text-xs text-app-muted"
                 >
                   {group.series}
                 </li>
@@ -902,23 +929,23 @@
                 <li>
                   <button
                     type="button"
-                    class="flex h-9 w-full items-center gap-2 px-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:focus-visible:ring-blue-500 {selected(
+                    class="flex h-9 w-full items-center gap-2 px-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent {selected(
                       row.path,
                     )
-                      ? 'bg-blue-600/10 dark:bg-blue-500/15'
+                      ? 'bg-app-selection'
                       : ''}"
                     onclick={(event) => onVolume(row.path, event)}
                   >
                     {#if group.series !== ""}
                       <span class="relative h-9 w-3 shrink-0" aria-hidden="true">
                         <span
-                          class="absolute top-0 left-1 w-px bg-zinc-300 dark:bg-zinc-600 {index ===
+                          class="absolute top-0 left-1 w-px bg-app-strong-border {index ===
                           group.volumes.length - 1
                             ? 'h-1/2'
                             : 'bottom-0'}"
                         ></span>
                         <span
-                          class="absolute top-1/2 left-1 h-px w-2 bg-zinc-300 dark:bg-zinc-600"
+                          class="absolute top-1/2 left-1 h-px w-2 bg-app-strong-border"
                         ></span>
                       </span>
                     {/if}
@@ -937,7 +964,7 @@
               <section class="flex flex-col gap-2">
                 {#if group.series !== ""}
                   <h3
-                    class="truncate text-xs text-zinc-500 dark:text-zinc-400"
+                    class="truncate text-xs text-app-muted"
                   >
                     {group.series}
                   </h3>
@@ -947,14 +974,14 @@
                     <li>
                       <button
                         type="button"
-                        class="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 dark:focus-visible:ring-blue-500"
+                        class="w-full text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent"
                         onclick={(event) => onVolume(row.path, event)}
                       >
                         <span
-                          class="block aspect-[2/3] overflow-hidden bg-zinc-100 dark:bg-zinc-950 {selected(
+                          class="block aspect-[2/3] overflow-hidden bg-app-window {selected(
                             row.path,
                           )
-                            ? 'ring-2 ring-blue-600 dark:ring-blue-500'
+                            ? 'ring-2 ring-app-accent'
                             : ''}"
                         >
                           {#if row.status !== "failed"}
@@ -963,7 +990,7 @@
                         </span>
                         <span
                           class="mt-1 block truncate text-xs {selected(row.path)
-                            ? 'bg-blue-600/10 dark:bg-blue-500/15'
+                            ? 'bg-app-selection'
                             : ''}"
                         >
                           {row.name}
@@ -979,7 +1006,7 @@
       </MotionPanel>
     </main>
     <aside
-      class="w-96 shrink-0 overflow-y-auto border-l border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900"
+      class="w-96 shrink-0 overflow-y-auto border-l border-app-border bg-app-view"
     >
       <MotionPanel identity={selectionKey(selection)} extra="min-h-full">
         <Inspector
@@ -1036,12 +1063,11 @@
       motion.clearPreview();
       config = next;
       provider = clampProvider(provider, next.enabled_providers);
-      applyDocumentClass(
+      applyTheme(
         document.documentElement,
-        resolveDark(
-          next.theme,
-          window.matchMedia("(prefers-color-scheme: dark)").matches,
-        ),
+        next.theme,
+        window.matchMedia("(prefers-color-scheme: dark)").matches,
+        systemTheme,
       );
       settingsOpen = false;
       if (rootsChanged) {

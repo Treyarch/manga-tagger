@@ -50,10 +50,10 @@
     {@const Icon = icons[item.icon]}
     <button
       type="button"
-      class="pointer-events-auto flex w-fit max-w-full items-start gap-2 rounded-lg border border-zinc-200 bg-white px-4 py-3 text-left text-sm shadow-md dark:border-zinc-600 dark:bg-zinc-800 dark:shadow-lg dark:shadow-black/50 {item.tone ===
-      'error'
-        ? 'text-red-600 dark:text-red-400'
-        : 'text-zinc-900 dark:text-zinc-100'}"
+      class="pointer-events-auto flex w-fit max-w-full items-start gap-2 rounded-lg border border-app-strong-border bg-app-raised px-4 py-3 text-left text-sm shadow-md dark:shadow-lg dark:shadow-black/50 {item.tone ===
+        'error'
+        ? 'text-app-danger-text'
+        : 'text-app-text'}"
       use:settleMotion
       transition:panelTransition={{ y: -16, enabled: $motion }}
       animate:flip={{ duration: $motion ? MOTION_DURATION : 0, easing: easeInOut }}

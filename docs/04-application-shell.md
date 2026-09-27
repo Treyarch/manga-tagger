@@ -153,7 +153,7 @@ The header contains only its persistent controls. No job adds a contextual name,
 
 `serve(app)` binds `127.0.0.1` and port `0`, so the port is chosen by the operating system. The host is not configurable. `serve` returns the chosen port and a `close()` that stops the server. The UI origin is `http://127.0.0.1:{port}/`.
 
-`create_app` takes the in-memory config, the index path, the thumbnail directory, the UI directory or null, an optional runner, optional service callables, an optional `pick_folder`, and an optional `destroy_window`. Omitted services are the archive, index, and provider operations this document names. The default runner is one worker thread. An omitted `pick_folder` makes `POST /api/dialogs/folder` return 503. An omitted `destroy_window` makes `POST /api/window/close` return 503.
+`create_app` takes the in-memory config, the index path, the thumbnail directory, the UI directory or null, an optional runner, optional service callables, an optional `pick_folder`, an optional `destroy_window`, and an optional `system_theme` reader. Omitted services are the archive, index, and provider operations this document names. The default runner is one worker thread. An omitted `pick_folder` makes `POST /api/dialogs/folder` return 503. An omitted `destroy_window` makes `POST /api/window/close` return 503. The default system-theme reader checks Omarchy's generated current theme on Linux and returns null elsewhere; tests inject a reader and never inspect the developer's home directory.
 
 JSON errors are `{ "error_type", "error_message" }`. Expected client errors are HTTP 400, including an archive exception raised by `GET /api/page` or `GET /api/thumbnail`, and a rejected or failed `GET /api/cover`. An unknown job id is HTTP 404. A thumbnail that `thumbnail_for` does not create is HTTP 404 with `error_type` `NoThumbnailError`.
 
@@ -166,6 +166,7 @@ Archive, page, thumbnail, save, rename, and convert paths must be absolute. A re
 | `GET /api/thumbnail?path=` | The cached cover JPEG, building it on demand through `thumbnail_for`. `Cache-Control: private, max-age=3600`. `ETag` is the JPEG filename stem |
 | `GET /api/cover?url=` | Bytes of one allow-listed remote catalog cover. Only `https` URLs whose host is `uploads.mangadex.org`, `www.nautiljon.com`, or `nautiljon.com` are accepted. Used by Matches so the WebView loads a same-origin image |
 | `GET /api/config` | The known keys |
+| `GET /api/system-theme` | The active Omarchy semantic palette, or JSON null when it is missing or invalid. The response is `Cache-Control: no-store` |
 | `PUT /api/config` | A partial object of those keys. Returns the full config. Roots in the body enqueue a scan after a successful write |
 | `POST /api/dialogs/folder` | Calls the injected `pick_folder`. Returns `{ "path" }` or `{ "path": null }` when the dialog is cancelled. No picker is HTTP 503 |
 | `POST /api/window/close` | Calls the injected `destroy_window`. Returns an empty 204. No closer is HTTP 503 |
@@ -188,9 +189,11 @@ Archive, page, thumbnail, save, rename, and convert paths must be absolute. A re
 
 `/api` routes are matched before static files. A missing UI build does not disable `/api`.
 
+`GET /api/system-theme` returns null, or `{ "mode", "background", "dark_background", "lighter_background", "foreground", "dark_foreground", "accent", "selection", "red", "yellow", "orange" }`. `mode` is `light` or `dark`; every color is normalized lowercase `#rrggbb`. The reader accepts only a complete palette and turns a missing file, malformed TOML, unsupported mode, missing role, or invalid color into null. On Linux its source is `~/.local/state/omarchy/current/theme/colors.toml`. It never writes that file or invokes an Omarchy command.
+
 Job JSON is `{ "id", "name", "state", "error_type", "error_message", "result", "completed", "total" }`. Start endpoints return that object. A start while a job is `queued` or `running` is HTTP 409 `JobBusyError` and does not enqueue.
 
-The client polls `GET /api/jobs/current` from startup, and polls `GET /api/jobs/{id}` for a job it started, while the state is `queued` or `running`. The poll interval is 500 milliseconds. It is not a TOML key. Tests do not wait on it. When `scan`, `save`, `rename`, or `convert` reaches `succeeded`, `failed`, or `cancelled`, the client fetches the library once for that job id. `search`, `issues`, and `load` do not refetch the library. A search, issues, or load result is applied only when its id is the newest search, issues, or load the client started. While that load is `queued` or `running`, the form controls are disabled. While that save is `queued` or `running`, the form controls are disabled.
+The client polls `GET /api/jobs/current` from startup, and polls `GET /api/jobs/{id}` for a job it started, while the state is `queued` or `running`. The same 500 millisecond timer also refreshes `GET /api/system-theme`; a theme failure is isolated from job polling. The interval is not a TOML key. Tests do not wait on it. When `scan`, `save`, `rename`, or `convert` reaches `succeeded`, `failed`, or `cancelled`, the client fetches the library once for that job id. `search`, `issues`, and `load` do not refetch the library. A search, issues, or load result is applied only when its id is the newest search, issues, or load the client started. While that load is `queued` or `running`, the form controls are disabled. While that save is `queued` or `running`, the form controls are disabled.
 
 When a watched job reaches `succeeded` or `failed`, the client also shows one toast summary from [05-ui-design.md](05-ui-design.md). A `cancelled` job does not toast. Stale search, issues, or load ids (not the newest the client started) do not toast. Rename preview errors and folder-drop validation stay in their dialogs and sidebar lines; they are not toasts. Search, issues, and load outcomes (match count, no matches, no issues, and provider errors) are toast-only; the inspector does not repeat them. Inspector lines for per-file save/rename/convert errors and scan-root detail stay as they are. Cover jobs refetch the library and toast like Save; see [08-cover-from-provider.md](08-cover-from-provider.md).
 
@@ -311,6 +314,8 @@ It is the only reader and writer of `library_roots`, `keep_cbr_original`, `write
 ## Testing
 
 Tests are hermetic. They use temporary config, index, library, and UI paths. They do not open pywebview, do not use the network, do not call `time.sleep`, and do not read the developer's config, index, or library. They do not open `src/Claymore/`. Provider calls are the real `search` and `load` with `httpx.MockTransport`, or fakes passed into `create_app`. Archive and index behavior is covered by their own specifications. Shell tests replace those services and assert which ones ran.
+
+Omarchy palette tests read only temporary `colors.toml` fixtures. API tests inject the system-theme reader and cover a complete palette, null fallback, and the no-store response without reading desktop state.
 
 Importing `manga_tagger.config`, `manga_tagger.shell`, `manga_tagger.jobs`, or `manga_tagger.api` does not import pywebview.
 

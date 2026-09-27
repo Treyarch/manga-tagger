@@ -153,5 +153,5 @@
     </div>
   </div>
 {:else if anchor.error_message}
-  <p class="text-sm text-zinc-900 dark:text-zinc-100">{anchor.error_message}</p>
+  <p class="text-sm text-app-text">{anchor.error_message}</p>
 {/if}

@@ -47,7 +47,7 @@
     transition:panelTransition|global={{ y: 0, enabled: $motion }}
   ></div>
   <div
-    class="relative max-h-full overflow-y-auto w-full {width} rounded-lg border border-zinc-200 bg-white p-4 shadow-md dark:border-zinc-600 dark:bg-zinc-800 dark:shadow-lg dark:shadow-black/50"
+    class="relative max-h-full overflow-y-auto w-full {width} rounded-lg border border-app-strong-border bg-app-raised p-4 shadow-md dark:shadow-lg dark:shadow-black/50"
     role="dialog"
     aria-modal="true"
     aria-labelledby="dialog-title"
@@ -57,7 +57,7 @@
     <div class="flex items-center gap-2">
       <h2
         id="dialog-title"
-        class="flex min-h-8 min-w-0 flex-1 items-center gap-2 text-base font-bold leading-none text-zinc-900 dark:text-zinc-100"
+        class="flex min-h-8 min-w-0 flex-1 items-center gap-2 text-base font-bold leading-none text-app-text"
       >
         {#if icon}
           <span class="inline-flex shrink-0" aria-hidden="true">{@render icon()}</span>

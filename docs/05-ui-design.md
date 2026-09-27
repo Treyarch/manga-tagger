@@ -72,7 +72,7 @@ An empty library, or an empty place, shows one sentence in the main pane, center
 
 ## Color
 
-Use Tailwind's built-in `zinc` and `blue` scales for chrome so a control can keep the classes from the official Tailwind CSS examples. Dirty inspector fields use `amber` the same way danger buttons use `red`. Do not add a custom palette, and do not add an accent picker.
+The built-in light and dark themes use Tailwind's `zinc`, `blue`, `amber`, and `red` values through semantic CSS color tokens. Components use only those semantic tokens, so System mode can replace the palette without changing layout or component code. Do not add an accent picker.
 
 | Role | Light | Dark |
 | --- | --- | --- |
@@ -103,14 +103,14 @@ The product wordmark is the one exception: it uses a self-hosted **Dela Gothic O
 
 ## Theme
 
-`ui/src/app.css` contains the Tailwind import, the `dark` custom variant, the Dela Gothic One `@font-face` and `.font-brand` class, and:
+`ui/src/app.css` contains the Tailwind import, the `dark` custom variant, the Dela Gothic One `@font-face`, `.font-brand`, and semantic application color tokens. The token defaults exactly match the color table above.
 
 ```css
 @import "tailwindcss";
 @custom-variant dark (&:where(.dark, .dark *));
 ```
 
-Dark mode is the `dark` class on an ancestor. Components use `dark:` variants for every color in the table above. There is no second stylesheet.
+Dark mode is the `dark` class on an ancestor. That class selects the built-in dark token defaults; components consume semantic color utilities rather than carrying separate light and dark color classes. There is no second stylesheet.
 
 `ui/src/lib/theme.ts` exports `resolveDark(theme: string, prefersDark: boolean): boolean`.
 
@@ -122,11 +122,13 @@ Dark mode is the `dark` class on an ancestor. Components use `dark:` variants fo
 | `system` | `false` | `false` |
 | any other string | either | same as `system` |
 
-The shell reads `theme` before the first paint and puts `dark` on `document.documentElement` when `resolveDark` is true. It removes that class when `resolveDark` is false. The first frame uses the resolved theme. When `dark` is present, the document sets `color-scheme: dark` so native controls such as the provider `<select>` popup use the dark system palette. Without `dark`, it sets `color-scheme: light`.
+The shell reads both config and `GET /api/system-theme` before the first paint. When `theme` is `system` and that endpoint returns a valid Omarchy palette, its mode controls the `dark` class and its colors replace the semantic tokens. The mapping is: `background` for view/input/menu surfaces, `dark_background` for the window and sidebar, `lighter_background` for raised and secondary surfaces and borders, `foreground` for primary text, `dark_foreground` for muted text, `accent` for focus and active controls, `selection` for selected and hover fills, yellow/orange for dirty state, and red for danger state. Text colors are mixed toward `foreground` as needed for readable contrast, and text on filled accent or danger controls uses the higher-contrast palette foreground or background.
+
+When no valid Omarchy palette is available, System follows `prefers-color-scheme` and uses the built-in palette. Forced `light` and `dark` always clear Omarchy overrides and use the built-in palette. The first frame uses the resolved mode and colors. The `dark` class also sets `color-scheme: dark` so native controls such as the provider `<select>` popup use the dark system palette; without it the document uses `color-scheme: light`.
 
 Theme is chosen in Settings on the General tab (`system`, `light`, or `dark` via `Select`). There is no theme control in the header. Saving Settings writes `theme` and applies the class. Cancel leaves the previous theme.
 
-While `theme` is `system`, the class follows later changes to `prefers-color-scheme` for the life of the window. A forced `light` or `dark` ignores those changes until the user picks System again.
+While `theme` is `system`, the client refreshes the Omarchy palette on the existing 500 millisecond poll and applies a changed palette without restarting. If no palette is available it follows later changes to `prefers-color-scheme`. A forced `light` or `dark` ignores both sources until the user picks System again.
 
 ## Icons
 
@@ -155,10 +157,10 @@ Every control shows a 2px accent focus ring on `:focus-visible` (`blue-600` in l
 
 | Variant | Look |
 | --- | --- |
-| `primary` | Accent fill, white text |
-| `secondary` | Hairline border, zinc fill (`zinc-100` light, `zinc-700` dark), primary text. Hover darkens the fill (`zinc-200` light, `zinc-600` dark). Used for dialog alternate actions so they read as buttons beside a filled confirm |
-| `quiet` | Transparent, primary text, hover is a zinc wash (`zinc-200/70` light, `zinc-800` dark). Header and inspector icon buttons stay quiet |
-| `danger` | `red-600` fill, white text. Hover is `red-700` in both themes |
+| `primary` | Accent fill, contrasting on-accent text (white in the built-in themes) |
+| `secondary` | Hairline border, secondary fill (`zinc-100` light, `zinc-700` dark), primary text. The secondary-hover token is `zinc-200` light and `zinc-600` dark. Used for dialog alternate actions so they read as buttons beside a filled confirm |
+| `quiet` | Transparent, primary text, semantic quiet-hover wash (`zinc-200/70` light, `zinc-800` dark). Header and inspector icon buttons stay quiet |
+| `danger` | Danger fill (`red-600` built-in), contrasting on-danger text, and danger-hover (`red-700` built-in) |
 
 The header icon button is `quiet`, 32px square (`size-8`), with a 20px icon. The default button height is 36px (`h-9`) and `text-sm`. Enabled buttons use `cursor-pointer`; disabled buttons use `cursor-not-allowed`.
 
@@ -166,7 +168,7 @@ When a button has an accessible name and no visible text (icon buttons), that na
 
 ### Text input
 
-`TextInput.svelte`. Height 36px, `text-sm`, `rounded-md`, hairline border, view background, muted placeholder. Settings, rename, and inspector fields use it. An optional `extra` class string is appended for callers that need it. When `dirty` is true, value text and border use the dirty amber colors instead of primary text and the hairline border (not both; amber must replace zinc so it wins). When `disabled` is true (including a locked inspector field), the control uses `cursor-not-allowed` and `opacity-60`.
+`TextInput.svelte`. Height 36px, `text-sm`, `rounded-md`, hairline border, view background, muted placeholder. Settings, rename, and inspector fields use it. An optional `extra` class string is appended for callers that need it. When `dirty` is true, value text and border use the semantic dirty color instead of primary text and the hairline border. When `disabled` is true (including a locked inspector field), the control uses `cursor-not-allowed` and `opacity-60`.
 
 ### Textarea
 
@@ -174,7 +176,7 @@ When a button has an accessible name and no visible text (icon buttons), that na
 
 ### Checkbox
 
-`Checkbox.svelte`. A custom-styled checkbox (`appearance-none`) with a `text-sm` label beside it: zinc hairline border, white / `zinc-900` fill, and blue fill with a white check when on. Focus uses the shared accent ring. Optional `hideLabel` keeps the accessible name and hides the visible caption — Settings Scrapers uses that so each row shows only the box. Settings Archives keeps the visible `Keep the original CBR` label.
+`Checkbox.svelte`. A custom-styled checkbox (`appearance-none`) with a `text-sm` label beside it: semantic strong border, view fill, and accent fill with contrasting on-accent check when on. Focus uses the shared accent ring. Optional `hideLabel` keeps the accessible name and hides the visible caption — Settings Scrapers uses that so each row shows only the box. Settings Archives keeps the visible `Keep the original CBR` label.
 
 ### Select
 
@@ -208,7 +210,7 @@ Actions sit at the trailing edge by default: a `secondary` dismiss button labele
 
 ### Toast
 
-`ToastHost.svelte` plus `ui/src/lib/toast.ts`. The host is a fixed stack at the top-center of the window (`top-16 left-1/2 -translate-x-1/2`), clear of the 8px window inset and 48px header, `z-40` so it sits above dialogs. The host stays mounted even when empty so the first toast still runs its enter transition. Each toast is a flex row sized to its icon and message rather than stretched to a fixed width: a leading 16px Lucide icon (`currentColor`, decorative, `aria-hidden`) and one short sentence. The row is `rounded-lg`, `text-sm`, at most 375px wide, and `px-4 py-3`; longer content wraps within that maximum, and the toast remains within narrower viewports. Success uses primary text. Failure uses `text-red-600` in light and `text-red-400` in dark. No badges or progress bars.
+`ToastHost.svelte` plus `ui/src/lib/toast.ts`. The host is a fixed stack at the top-center of the window (`top-16 left-1/2 -translate-x-1/2`), clear of the 8px window inset and 48px header, `z-40` so it sits above dialogs. The host stays mounted even when empty so the first toast still runs its enter transition. Each toast is a flex row sized to its icon and message rather than stretched to a fixed width: a leading 16px Lucide icon (`currentColor`, decorative, `aria-hidden`) and one short sentence. The row is `rounded-lg`, `text-sm`, at most 375px wide, and `px-4 py-3`; longer content wraps within that maximum, and the toast remains within narrower viewports. Success uses primary text. Failure uses the semantic danger-text color (`red-600` light and `red-400` dark in the built-in themes). No badges or progress bars.
 
 The icon follows the job that produced the toast (same glyphs as the chrome that started it). Failures always use Lucide `CircleAlert`. A direct `pushToast` with no job defaults to `Check` on success and `CircleAlert` on failure.
 
@@ -243,7 +245,7 @@ This specification adds two keys to the TOML file described in [00-project-overv
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `animate_interface` | boolean | `false` | Enable decorative panel, dialog, preview, and notification transitions, unless the system requests reduced motion. |
-| `theme` | string | `system` | `system` follows `prefers-color-scheme`. `light` forces the light surfaces. `dark` forces the dark surfaces. Any other value is treated as `system`. |
+| `theme` | string | `system` | `system` follows a valid active Omarchy palette, then falls back to `prefers-color-scheme`. `light` and `dark` force the built-in surfaces. Any other value is treated as `system`. |
 
 The application shell reads and writes these keys. This specification defines their UI behavior. A missing config file uses `theme = "system"` and `animate_interface = false`.
 
@@ -275,6 +277,7 @@ Cover at least:
 - `issuesOf` maps `id`, `number`, `title`, `date`, `cover`, and `summary` from the issues result, coercing missing fields to `""`.
 - `preferredIssueId` returns the id of the issue whose `number` matches the preferred number after normalizing leading zeros on the integer part, or the first issue when none match, or `null` when the list is empty.
 - `jobToastMessage` for Issues returns `No issues available.` on success with an empty list, null on success with hits, and the failure toast on failure.
+- `resolveDark` gives forced Light/Dark precedence, uses an available Omarchy mode for System and unknown values, and otherwise follows `prefers-color-scheme`. Palette-token tests cover role mapping, live replacement, clearing overrides, and readable muted/dirty/filled-control text.
 
 The product brand (SVG logo and wordmark) is presentational chrome. It is covered by the acceptance criteria below, not by a separate unit test.
 
@@ -288,16 +291,16 @@ The product brand (SVG logo and wordmark) is presentational chrome. It is covere
 - List is the view when the window opens. Rows are 36px. List and grid both group by series: a muted series header above the volumes that share it, blank-series volumes first with no header, then named series in case-folded alphabetical order. List rows are filename-only with a muted tree marker (tee or L). Grid cells show a 2:3 cover, the filename as a truncated label, and a 2px accent ring when selected, with no tree marker. List selection is the accent wash on the row. List and grid thumbs use `Thumb` with a lazy `img` on `/api/thumbnail`, not blob URLs.
 - An empty main pane shows the sentence `No volumes yet.` and no illustration. An empty sidebar shows `Drop a folder here.` under the Add folder button.
 - The first sidebar row is the muted caption `My library`, then Add folder, Lucide `FolderPlus`, 16px, trailing in a 36px row. A drag over the sidebar uses the selection wash.
-- Light and dark use the color table in this document. Dark mode is the `dark` class. The layout does not change between themes. With `dark`, native selects use a dark popup through `color-scheme: dark`.
-- A dirty inspector field (edited or loaded, `dirty` true) shows amber value text and border on its text input, textarea, or select. A clean field keeps primary text and the hairline border. After Save rebuilds the form, dirty styling is gone.
+- Built-in light and dark use the color table in this document. Dark mode is the `dark` class. The layout does not change between themes. With `dark`, native selects use a dark popup through `color-scheme: dark`. System mode replaces the semantic colors with a valid Omarchy palette without changing layout.
+- A dirty inspector field (edited or loaded, `dirty` true) shows the dirty semantic color on its value text and border. In the built-in palette that color is amber; an Omarchy palette supplies yellow/orange. A clean field keeps primary text and the hairline border. After Save rebuilds the form, dirty styling is gone.
 - Each inspector field has a 20px circular lock toggle (custom SVG padlock) on the top-right border corner of the control. A locked field disables the control. The lock toggle does not mark the form dirty.
-- `theme` defaults to `system`. `light` and `dark` force that theme. Any other value follows the system. Settings General can set each of the three values; the class updates when Settings is saved. `system` keeps following `prefers-color-scheme`.
+- `theme` defaults to `system`. `light` and `dark` force the built-in theme. Any other value follows System. Settings General can set each of the three values; the colors update when Settings is saved. `system` uses and live-refreshes a valid Omarchy palette, otherwise it keeps following `prefers-color-scheme`.
 - The resolved theme is applied before the first paint.
 - Icons are Lucide, `currentColor`, 16px in rows and menu items and 20px in the header. The view switch is `List` / `List view` and `LayoutGrid` / `Grid view`. Add folder is `FolderPlus`. Close is `X` at the trailing edge of the header. Icon buttons expose their accessible name as a native `title` so a short hover shows that label.
 - Buttons, text inputs, textareas, checkboxes, selects, menus, dialogs, and toasts are the local components in this document, styled with Tailwind utilities. The UI package does not depend on a third-party component kit.
-- Dialogs are centered over the window with a dimmed backdrop. Their panels use the same raised surface as toasts (white / `zinc-800` in dark, hairline, shadow) and use the optional interface motion policy. The title is bold with the opening control's Lucide icon ahead of it, and a Close `X` at the trailing edge of the title row. Settings, Rename, Convert, Unsaved metadata, Matches, and Issues share that chrome. Settings uses the `lg` panel with a General / Archives / Scrapers tab rail. Matches and Issues use the `xl` panel width. Matches shows secondary Cancel and primary OK; when one volume is selected it also shows secondary Select Issue before Cancel; while searching it shows `Searching…` with a spinner, then a large cover beside a Series/Year/Issues/(Publisher or Author) table and a summary pane. Issues shows Loading issues… then Issue/Date/Title with the same cover and summary layout, preselects the preferred-number row (else the first), and scrolls that row into view in the issues table. Rename and Convert keep `md` width, secondary Cancel, and a confirm action. Unsaved metadata keeps `md` width, leading Don't save, secondary Cancel, and primary Save.
+- Dialogs are centered over the window with a dimmed backdrop. Their panels use the same semantic raised surface as toasts (white / `zinc-800` in the built-in themes, hairline, shadow) and use the optional interface motion policy. The title is bold with the opening control's Lucide icon ahead of it, and a Close `X` at the trailing edge of the title row. Settings, Rename, Convert, Unsaved metadata, Matches, and Issues share that chrome. Settings uses the `lg` panel with a General / Archives / Scrapers tab rail. Matches and Issues use the `xl` panel width. Matches shows secondary Cancel and primary OK; when one volume is selected it also shows secondary Select Issue before Cancel; while searching it shows `Searching…` with a spinner, then a large cover beside a Series/Year/Issues/(Publisher or Author) table and a summary pane. Issues shows Loading issues… then Issue/Date/Title with the same cover and summary layout, preselects the preferred-number row (else the first), and scrolls that row into view in the issues table. Rename and Convert keep `md` width, secondary Cancel, and a confirm action. Unsaved metadata keeps `md` width, leading Don't save, secondary Cancel, and primary Save.
 - The header keeps its persistent controls during all jobs, without contextual job names, progress text, or Cancel buttons.
-- Action toasts appear in a top-center stack below the header bar, size to their icon and message up to 375px (wrapping longer content and fitting narrower viewports), use the optional interface motion policy (including the first toast), show a leading 16px Lucide icon that fades once on mount (job-matched on success, `CircleAlert` on failure), and disappear after 5 seconds or on click. In dark mode they use a raised `zinc-800` surface and a stronger shadow so they stand apart from the panes. They summarize scrape, load, save, rename, convert, and scan outcomes only—not in-progress search. Scrape match count, no matches, and provider errors are toast-only. Detailed per-file save/rename/convert errors and scan-root lines stay in the inspector.
+- Action toasts appear in a top-center stack below the header bar, size to their icon and message up to 375px (wrapping longer content and fitting narrower viewports), use the optional interface motion policy (including the first toast), show a leading 16px Lucide icon that fades once on mount (job-matched on success, `CircleAlert` on failure), and disappear after 5 seconds or on click. They use the semantic raised surface and a stronger dark-mode shadow so they stand apart from the panes. They summarize scrape, load, save, rename, convert, and scan outcomes only—not in-progress search. Scrape match count, no matches, and provider errors are toast-only. Detailed per-file save/rename/convert errors and scan-root lines stay in the inspector.
 - Type is the default sans stack at `text-sm` for controls and rows, and `text-xs` for captions. The product wordmark alone uses the bundled Dela Gothic One face via `.font-brand`.
 - The header is three zones: leading brand (mini SVG + `Manga Tagger`), centered action cluster, trailing Settings / Close. The brand is readable in light and dark.
 - A keyboard focus ring is visible on the shared controls.

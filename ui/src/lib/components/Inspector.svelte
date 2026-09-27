@@ -48,7 +48,7 @@
 
 <div class="flex flex-col gap-3 p-4">
   {#if lines.length > 0}
-    <ul class="flex flex-col gap-1 text-sm text-zinc-900 dark:text-zinc-100">
+    <ul class="flex flex-col gap-1 text-sm text-app-text">
       {#each lines as line}
         <li>{line}</li>
       {/each}
@@ -74,7 +74,7 @@
         {@const controlDisabled = formLocked || field.locked}
         {@const lockLabel = field.locked ? `Unlock ${caption}` : `Lock ${caption}`}
         <div class="flex flex-col gap-1">
-          <span class="text-xs text-zinc-500 dark:text-zinc-400">{caption}</span>
+          <span class="text-xs text-app-muted">{caption}</span>
           <div class="relative">
             {#if name === "Summary" || name === "Notes"}
               <Textarea
@@ -108,9 +108,9 @@
             {/if}
             <button
               type="button"
-              class="absolute -top-[12px] right-1.5 z-10 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-zinc-900 dark:focus-visible:ring-blue-500 {field.locked
-                ? 'text-zinc-900 dark:text-zinc-100'
-                : 'text-zinc-400 dark:text-zinc-500'}"
+              class="absolute -top-[12px] right-1.5 z-10 flex h-5 w-5 cursor-pointer items-center justify-center rounded-full bg-app-view focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent disabled:cursor-not-allowed disabled:opacity-50 {field.locked
+                ? 'text-app-text'
+                : 'text-app-muted'}"
               disabled={formLocked}
               title={lockLabel}
               aria-label={lockLabel}

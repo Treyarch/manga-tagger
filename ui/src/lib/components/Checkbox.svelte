@@ -13,7 +13,7 @@
 </script>
 
 <label
-  class="inline-flex items-center gap-2 text-sm text-zinc-900 dark:text-zinc-100 {disabled
+  class="inline-flex items-center gap-2 text-sm text-app-text {disabled
     ? 'opacity-40'
     : 'cursor-pointer'}"
 >
@@ -23,10 +23,10 @@
       {disabled}
       bind:checked
       aria-label={hideLabel ? label : undefined}
-      class="peer size-4 appearance-none rounded border border-zinc-300 bg-white checked:border-blue-600 checked:bg-blue-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:cursor-not-allowed dark:border-zinc-600 dark:bg-zinc-900 dark:checked:border-blue-500 dark:checked:bg-blue-500 dark:focus-visible:ring-blue-500"
+      class="peer size-4 appearance-none rounded border border-app-strong-border bg-app-view checked:border-app-accent checked:bg-app-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent disabled:cursor-not-allowed"
     />
     <svg
-      class="pointer-events-none absolute size-3 text-white opacity-0 peer-checked:opacity-100"
+      class="pointer-events-none absolute size-3 text-app-on-accent opacity-0 peer-checked:opacity-100"
       viewBox="0 0 12 12"
       fill="none"
       aria-hidden="true"

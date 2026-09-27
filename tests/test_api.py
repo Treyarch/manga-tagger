@@ -16,6 +16,7 @@ from manga_tagger.index import Volume
 from manga_tagger.jobs import JobRunner
 from manga_tagger.providers import search as provider_search
 from manga_tagger.shell import form_from_volumes
+from manga_tagger.theme import SystemTheme
 
 
 def test_library_does_not_scan(tmp_path: Path) -> None:
@@ -182,6 +183,46 @@ def test_config_put_keeps_unknown_keys_and_rejects_a_busy_rescan(
         assert again.status_code == 409
     held.shutdown()
     assert scans == []
+
+
+def test_system_theme_endpoint_is_injected_and_never_cached(tmp_path: Path) -> None:
+    palette = SystemTheme(
+        mode="light",
+        background="#faf4ed",
+        dark_background="#ede7e1",
+        lighter_background="#f2e9e1",
+        foreground="#575279",
+        dark_foreground="#9893a5",
+        accent="#56949f",
+        selection="#dfdad9",
+        red="#b4637a",
+        yellow="#ea9d34",
+        orange="#cf8057",
+    )
+    app = create_app(
+        load_config(tmp_path / "config.toml"),
+        tmp_path / "index.db",
+        tmp_path / "covers",
+        system_theme=lambda: palette,
+    )
+    with TestClient(app) as client:
+        response = client.get("/api/system-theme")
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert response.json()["mode"] == "light"
+    assert response.json()["accent"] == "#56949f"
+
+    missing = create_app(
+        load_config(tmp_path / "missing-config.toml"),
+        tmp_path / "missing.db",
+        tmp_path / "missing-covers",
+        system_theme=lambda: None,
+    )
+    with TestClient(missing) as client:
+        unavailable = client.get("/api/system-theme")
+    assert unavailable.status_code == 200
+    assert unavailable.headers["cache-control"] == "no-store"
+    assert unavailable.json() is None
 
 
 def test_folder_dialog_and_root_append(tmp_path: Path) -> None:
