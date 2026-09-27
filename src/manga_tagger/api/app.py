@@ -85,6 +85,7 @@ from manga_tagger.shell import (
     run_scan,
     run_search,
     thumbnail_path,
+    validate_rename,
     validate_save,
 )
 
@@ -521,12 +522,13 @@ def _register_routes(app: FastAPI) -> None:
     @app.post("/api/jobs/rename", response_model=JobModel)
     def post_rename(body: RenameRequest) -> JobModel:
         state = _state(app)
-        ensure_inside(body.directory, state.config.library_roots)
+        validate_rename(body.directory, body.paths, state.config.library_roots)
 
         def fn(cancel, progress):
             return run_rename(
                 directory=body.directory,
                 template=body.template,
+                paths=body.paths,
                 roots=list(state.config.library_roots),
                 write_poster_on_save=state.config.write_poster_on_save,
                 db_path=str(state.index_path),
@@ -551,6 +553,7 @@ def _register_routes(app: FastAPI) -> None:
             body.template,
             state.config.library_roots,
             plan_rename=state.services.plan_rename,
+            paths=body.paths,
         )
         return RenamePreviewResponse(
             entries=[

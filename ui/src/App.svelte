@@ -47,7 +47,6 @@
     formOf,
     isBusy,
     issuesOf,
-    jobLabel,
     placeAfterLibrary,
     preferredIssueNumber,
     preserveDirtyFields,
@@ -88,7 +87,7 @@
   let selection = $state<Selection>({ paths: [], anchor: null });
   let form = $state<InspectorForm | null>(null);
   let provider = $state("mangadex");
-  let headerJob = $state<Job | null>(null);
+  let currentJob = $state<Job | null>(null);
   let candidates = $state<Candidate[]>([]);
   let issues = $state<IssueCandidate[]>([]);
   let issuesSeries = $state<Candidate | null>(null);
@@ -101,6 +100,7 @@
   let unsavedOpen = $state(false);
   let pendingNavigation = $state<PendingNavigation | null>(null);
   let renameTemplate = $state(OFFERED_RENAME_TEMPLATE);
+  let renamePaths = $state<string[]>([]);
   let renameLines = $state<string[]>([]);
   let renameError = $state("");
   let activeId = $state<string | null>(null);
@@ -126,30 +126,19 @@
   const anchor = $derived(
     volumes.find((row) => row.path === selection.anchor) ?? null,
   );
-  const busy = $derived(isBusy(headerJob));
+  const busy = $derived(isBusy(currentJob));
   const searching = $derived(
-    headerJob !== null && isBusy(headerJob) && headerJob.name === "Search",
+    currentJob !== null && isBusy(currentJob) && currentJob.name === "Search",
   );
   const listingIssues = $derived(
-    headerJob !== null && isBusy(headerJob) && headerJob.name === "Issues",
+    currentJob !== null && isBusy(currentJob) && currentJob.name === "Issues",
   );
   const matchesOpen = $derived(searching || candidates.length > 0);
   const issuesOpen = $derived(listingIssues || issues.length > 0);
-  const headerChromeJob = $derived(
-    headerJob !== null &&
-      isBusy(headerJob) &&
-      headerJob.name !== "Search" &&
-      headerJob.name !== "Issues" &&
-      headerJob.name !== "Load" &&
-      headerJob.name !== "Save" &&
-      headerJob.name !== "Convert"
-      ? headerJob
-      : null,
-  );
   const formLocked = $derived(
-    headerJob !== null &&
-      isBusy(headerJob) &&
-      (headerJob.name === "Load" || headerJob.name === "Save" || headerJob.name === "Cover"),
+    currentJob !== null &&
+      isBusy(currentJob) &&
+      (currentJob.name === "Load" || currentJob.name === "Save" || currentJob.name === "Cover"),
   );
   const selectedCbr = $derived(cbrCount(selectedRows));
   const providerOptions = $derived(
@@ -320,7 +309,7 @@
 
   function watch(job: Job) {
     activeId = job.id;
-    headerJob = isBusy(job) ? job : null;
+    currentJob = isBusy(job) ? job : null;
     if (!isBusy(job)) void settle(job);
   }
 
@@ -328,12 +317,12 @@
     const current = await getJson<Job | null>("/api/jobs/current");
     if (current && isBusy(current)) {
       const job = await getJson<Job>(`/api/jobs/${current.id}`);
-      headerJob = isBusy(job) ? job : null;
+      currentJob = isBusy(job) ? job : null;
       activeId = job.id;
       if (!isBusy(job)) await settle(job);
       return;
     }
-    headerJob = null;
+    currentJob = null;
     if (activeId === null) return;
     const id = activeId;
     activeId = null;
@@ -540,7 +529,7 @@
     try {
       const result = await postJson<{ entries: Parameters<typeof renamePlanLines>[0] }>(
         "/api/rename/preview",
-        { directory: selectedPlace, template },
+        { directory: selectedPlace, template, paths: renamePaths },
       );
       if (token !== planToken) return;
       renameLines = renamePlanLines(result.entries);
@@ -554,6 +543,7 @@
 
   function openRename() {
     if (selectedPlace === null || busy) return;
+    renamePaths = [...selection.paths];
     renameTemplate = OFFERED_RENAME_TEMPLATE;
     renameLines = [];
     renameError = "";
@@ -567,6 +557,7 @@
     await startJob("/api/jobs/rename", {
       directory: selectedPlace,
       template: renameTemplate,
+      paths: renamePaths,
     });
   }
 
@@ -611,9 +602,9 @@
   }
 
   async function cancelJob() {
-    if (headerJob === null) return;
-    const job = await postJson<Job>(`/api/jobs/${headerJob.id}/cancel`, {});
-    headerJob = isBusy(job) ? job : null;
+    if (currentJob === null) return;
+    const job = await postJson<Job>(`/api/jobs/${currentJob.id}/cancel`, {});
+    currentJob = isBusy(job) ? job : null;
     if (terminal(job.state)) await settle(job);
   }
 
@@ -739,10 +730,6 @@
       <Button icon label="Grid view" pressed={view === "grid"} onclick={() => (view = "grid")}>
         <LayoutGrid size={20} />
       </Button>
-      {#if headerChromeJob}
-        <span class="px-1 text-sm">{jobLabel(headerChromeJob)}</span>
-        <Button icon label="Cancel" onclick={cancelJob}><X size={20} /></Button>
-      {/if}
     </div>
     <div class="flex items-center justify-self-end gap-1">
       <Button icon label="Settings" onclick={() => (settingsOpen = true)}>

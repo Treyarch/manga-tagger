@@ -637,11 +637,6 @@ export function requestsPage(volume: Volume): boolean {
   return volume.archive_page_count !== null && volume.archive_page_count > 0;
 }
 
-export function jobLabel(job: Pick<Job, "name" | "completed" | "total">): string {
-  if (job.total > 0) return `${job.name} ${job.completed}/${job.total}`;
-  return job.name;
-}
-
 export function isBusy(job: Job | null): boolean {
   return job !== null && (job.state === "queued" || job.state === "running");
 }

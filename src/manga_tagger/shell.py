@@ -780,16 +780,32 @@ def run_save(
     return {"entries": entries}
 
 
+def validate_rename(
+    directory: str, paths: Sequence[str] | None, roots: Sequence[str]
+) -> None:
+    """Reject invalid rename scope before reading archives or enqueueing a job."""
+    ensure_inside(directory, roots)
+    folder = Path(directory).resolve()
+    for path in paths or ():
+        ensure_inside(path, roots)
+        if (
+            Path(path).parent.resolve() != folder
+            or Path(path).suffix.lower() not in {".cbz", ".cbr"}
+        ):
+            raise ShellError(f"{path} is not an archive directly in {directory}")
+
+
 def preview_rename(
     directory: str,
     template: str,
     roots: Sequence[str],
     *,
-    plan_rename: Callable[[str, str], list[object]],
+    plan_rename: Callable[..., list[object]],
+    paths: Sequence[str] | None = None,
 ) -> list[object]:
     """Plan renames in ``directory``. Does not call ``rename_in_directory``."""
-    ensure_inside(directory, roots)
-    return plan_rename(directory, template)
+    validate_rename(directory, paths, roots)
+    return plan_rename(directory, template, paths=paths)
 
 
 def run_rename(
@@ -800,19 +816,20 @@ def run_rename(
     write_poster_on_save: bool,
     db_path: str,
     cache_dir: str,
-    rename_in_directory: Callable[[str, str], list[object]],
+    rename_in_directory: Callable[..., list[object]],
     write_poster: Callable[[str], object],
     refresh_volume: Callable[..., object],
     forget_volume: Callable[..., object],
     copy_locked_fields: Callable[..., object],
     cancel: Cancel,
     progress: Progress,
+    paths: Sequence[str] | None = None,
 ) -> dict[str, object]:
-    """Rename every archive directly in the place, then write posters when enabled."""
-    ensure_inside(directory, roots)
+    """Rename selected archives, or all direct archives when selection is empty."""
+    validate_rename(directory, paths, roots)
     if cancel():
         raise JobCancelled({"entries": []})
-    results = rename_in_directory(directory, template)
+    results = rename_in_directory(directory, template, paths=paths)
     total = len(results)
     progress(0, total)
     entries: list[dict[str, object]] = []

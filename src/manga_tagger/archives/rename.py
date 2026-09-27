@@ -2,7 +2,7 @@
 
 import os
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from manga_tagger.archives.comicinfo import OWNED_ELEMENTS, ComicInfo
@@ -21,7 +21,12 @@ _Tag = tuple[str, int | None]
 _Part = str | _Tag
 
 
-def plan_rename(directory: os.PathLike[str] | str, template: str) -> list[FileResult]:
+def plan_rename(
+    directory: os.PathLike[str] | str,
+    template: str,
+    *,
+    paths: Sequence[os.PathLike[str] | str] | None = None,
+) -> list[FileResult]:
     """Plan renames for archives directly in ``directory``.
 
     Nothing is renamed and posters are not moved. Page bytes are not read.
@@ -29,6 +34,7 @@ def plan_rename(directory: os.PathLike[str] | str, template: str) -> list[FileRe
     Args:
         directory: Folder whose direct ``.cbz`` and ``.cbr`` children are planned.
         template: Filename stem, such as ``{Series} v{Number:02}``.
+        paths: Selected direct archives; omitted or empty means all archives.
 
     Returns:
         One result per archive, in filename order. A success carries the new path.
@@ -43,7 +49,17 @@ def plan_rename(directory: os.PathLike[str] | str, template: str) -> list[FileRe
         raise UnreadableArchiveError(f"{folder} is not a directory")
     parts = _parse_template(template)
     drafts: list[_Draft] = []
-    for path in _archives(folder):
+    if paths:
+        sources = sorted(set(map(Path, paths)), key=lambda path: path.name)
+        for path in sources:
+            if (
+                path.parent.resolve() != folder.resolve()
+                or path.suffix.lower() not in {".cbz", ".cbr"}
+            ):
+                raise UnreadableArchiveError(f"{path} is not an archive in {folder}")
+    else:
+        sources = _archives(folder)
+    for path in sources:
         try:
             info = read_comic_info(path)
             stem = _render(parts, info, path.name)
@@ -58,7 +74,10 @@ def plan_rename(directory: os.PathLike[str] | str, template: str) -> list[FileRe
 
 
 def rename_in_directory(
-    directory: os.PathLike[str] | str, template: str
+    directory: os.PathLike[str] | str,
+    template: str,
+    *,
+    paths: Sequence[os.PathLike[str] | str] | None = None,
 ) -> list[FileResult]:
     """Rename archives directly in ``directory`` from their own ComicInfo.
 
@@ -69,6 +88,7 @@ def rename_in_directory(
         directory: Folder whose direct children are renamed.
         template: Filename stem. The offered template is
             ``{Series} v{Number:02}``.
+        paths: Selected direct archives; omitted or empty means all archives.
 
     Returns:
         The same shape as ``plan_rename``, after the successful renames.
@@ -77,7 +97,7 @@ def rename_in_directory(
         UnreadableArchiveError: ``directory`` is not a directory.
         RenameTemplateError: ``template`` is invalid. Nothing is renamed.
     """
-    planned = plan_rename(directory, template)
+    planned = plan_rename(directory, template, paths=paths)
     results: list[FileResult] = []
     for item in planned:
         if not item.ok or item.output_path is None:

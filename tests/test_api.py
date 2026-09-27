@@ -517,7 +517,7 @@ def test_missing_ui_and_serve(tmp_path: Path) -> None:
 def test_rename_preview_does_not_rename(tmp_path: Path) -> None:
     planned: list[tuple[str, str]] = []
 
-    def plan_rename(directory: str, template: str):
+    def plan_rename(directory: str, template: str, *, paths=None):
         planned.append((directory, template))
         return [
             FileResult(
@@ -672,3 +672,89 @@ def _volume(path: str, **overrides: object) -> Volume:
     }
     values.update(overrides)
     return Volume(**values)
+
+
+@pytest.mark.parametrize("scope", ["one", "many", "empty", "omitted", "null"])
+def test_rename_preview_and_job_share_selection_scope(tmp_path: Path, scope: str) -> None:
+    import zipfile
+
+    folder = tmp_path / "books"
+    folder.mkdir()
+    sources = [folder / f"old-{number}.cbz" for number in range(1, 4)]
+    for number, path in enumerate(sources, 1):
+        with zipfile.ZipFile(path, "w") as archive:
+            archive.writestr(
+                "ComicInfo.xml",
+                f"<ComicInfo><Series>Claymore</Series><Number>{number}</Number></ComicInfo>",
+            )
+    selected = sources[:1] if scope == "one" else sources[:2]
+    expected = selected if scope in {"one", "many"} else sources
+    body: dict[str, object] = {
+        "directory": str(folder), "template": "{Series} v{Number:02}"
+    }
+    if scope != "omitted":
+        body["paths"] = (
+            None if scope == "null"
+            else [] if scope == "empty"
+            else [str(path) for path in selected]
+        )
+    posters: list[str] = []
+    refreshed: list[str] = []
+    forgotten: list[str] = []
+    app = _app(
+        tmp_path,
+        roots=[str(folder)],
+        write_poster=lambda path: posters.append(str(path)),
+        refresh_volume=lambda _db, path, _roots: refreshed.append(str(path)),
+        forget_volume=lambda _db, _cache, path: forgotten.append(str(path)),
+        copy_locked_fields=lambda *_args, **_kwargs: None,
+    )
+    with TestClient(app) as client:
+        preview = client.post("/api/rename/preview", json=body)
+        assert preview.status_code == 200
+        assert [entry["path"] for entry in preview.json()["entries"]] == [
+            str(path) for path in expected
+        ]
+        assert all(path.exists() for path in sources)
+        response = client.post("/api/jobs/rename", json=body)
+        assert response.status_code == 200
+        job = response.json()
+        assert job["state"] == "succeeded"
+        assert job["total"] == job["completed"] == len(expected)
+        assert job["result"]["entries"] == [
+            {"path": entry["path"], "output_path": entry["output_path"]}
+            for entry in preview.json()["entries"]
+        ]
+    for number, source in enumerate(sources, 1):
+        assert source.exists() == (source not in expected)
+        assert (folder / f"Claymore v{number:02}.cbz").exists() == (source in expected)
+    assert len(posters) == len(refreshed) == len(forgotten) == len(expected)
+
+
+@pytest.mark.parametrize("route", ["/api/rename/preview", "/api/jobs/rename"])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "relative.cbz",
+        "/outside/a.cbz",
+        "/books/other/a.cbz",
+        "/books/series/nested/a.cbz",
+        "/books/series/a.jpg",
+    ],
+)
+def test_rename_rejects_invalid_selection_before_work(
+    tmp_path: Path, route: str, path: str
+) -> None:
+    def unexpected(*_args, **_kwargs):
+        raise AssertionError("invalid scope must be rejected before archive work")
+
+    app = _app(
+        tmp_path, roots=["/books"], plan_rename=unexpected, rename_in_directory=unexpected
+    )
+    with TestClient(app) as client:
+        response = client.post(
+            route,
+            json={"directory": "/books/series", "template": "{Series}", "paths": [path]},
+        )
+        assert response.status_code == 400
+        assert client.get("/api/jobs/current").json() is None

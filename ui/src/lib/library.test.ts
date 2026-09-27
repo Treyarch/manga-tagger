@@ -23,7 +23,6 @@ import {
   groupVolumesBySeries,
   initialPageIndex,
   issuesOf,
-  jobLabel,
   folderDropRequest,
   mangaChoices,
   mangaLabel,
@@ -350,10 +349,8 @@ describe("jobs and dialogs", () => {
     expect(cbrCount([volume("/books/a.cbr", { extension: "CBR" })])).toBe(1);
   });
 
-  it("labels progress, plans renames, and confirms convert", () => {
+  it("plans renames and confirms convert", () => {
     expect(POLL_MS).toBe(500);
-    expect(jobLabel({ name: "Save", completed: 3, total: 40 })).toBe("Save 3/40");
-    expect(jobLabel({ name: "Scan", completed: 0, total: 0 })).toBe("Scan");
     expect(
       renamePlanLines([
         { path: "/books/old.cbz", output_path: "/books/Claymore v01.cbz" },

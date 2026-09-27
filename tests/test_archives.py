@@ -814,3 +814,77 @@ def test_convert_with_unar_on_path(
         }
         assert archive.read("pages/nested.jpg") == b"nested-image"
     assert not list(tmp_path.glob(".manga-tagger-*"))
+
+
+@pytest.mark.parametrize("count", [1, 2])
+def test_selected_rename_only_reads_and_moves_selected_archives(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, count: int
+) -> None:
+    from manga_tagger.archives import rename as rename_mod
+
+    archives = [tmp_path / f"old-{number}.cbz" for number in range(1, 4)]
+    for number, path in enumerate(archives, 1):
+        _simple_cbz(path, Series="Claymore", Number=str(number))
+        path.with_name(f"{path.stem}-poster.jpg").write_bytes(b"poster")
+    selected = archives[:count]
+    reads: list[Path] = []
+    original_read = rename_mod.read_comic_info
+
+    def read_selected(path: Path):
+        assert path in selected
+        reads.append(path)
+        return original_read(path)
+
+    monkeypatch.setattr(rename_mod, "read_comic_info", read_selected)
+    # Duplicate paths do not create duplicate targets or repeat a rename.
+    scope = list(reversed(selected)) + [selected[0]]
+    planned = plan_rename(tmp_path, OFFERED_RENAME_TEMPLATE, paths=scope)
+    assert [item.path for item in planned] == selected
+    assert all(path.exists() for path in archives)
+    assert reads == selected
+    reads.clear()
+    renamed = rename_in_directory(tmp_path, OFFERED_RENAME_TEMPLATE, paths=scope)
+    assert renamed == planned
+    assert reads == selected
+    for number, path in enumerate(archives, 1):
+        poster = path.with_name(f"{path.stem}-poster.jpg")
+        if path in selected:
+            assert not path.exists()
+            assert not poster.exists()
+            assert (tmp_path / f"Claymore v{number:02}.cbz").exists()
+            assert (tmp_path / f"Claymore v{number:02}-poster.jpg").read_bytes() == b"poster"
+        else:
+            assert path.exists()
+            assert poster.read_bytes() == b"poster"
+
+
+@pytest.mark.parametrize("target", ["Claymore v01.cbz", "Claymore v01-poster.jpg"])
+def test_selected_rename_preserves_unselected_conflicting_target(
+    tmp_path: Path, target: str
+) -> None:
+    selected = tmp_path / "old.cbz"
+    _simple_cbz(selected, Series="Claymore", Number="1")
+    blocker = tmp_path / target
+    blocker.write_bytes(b"untouched")
+    result = rename_in_directory(tmp_path, OFFERED_RENAME_TEMPLATE, paths=[selected])
+    assert len(result) == 1
+    assert result[0].error_type == "RenameConflictError"
+    assert selected.exists()
+    assert blocker.read_bytes() == b"untouched"
+
+
+def test_missing_selected_archive_does_not_rename_siblings(tmp_path: Path) -> None:
+    sibling = tmp_path / "old.cbz"
+    _simple_cbz(sibling, Series="Claymore", Number="1")
+    missing = tmp_path / "missing.cbz"
+    result = rename_in_directory(tmp_path, OFFERED_RENAME_TEMPLATE, paths=[missing])
+    assert len(result) == 1
+    assert result[0].path == missing
+    assert not result[0].ok
+    assert sibling.exists()
+
+
+@pytest.mark.parametrize("name", ["../outside.cbz", "nested/book.cbz", "poster.jpg"])
+def test_selected_rename_rejects_invalid_scope(tmp_path: Path, name: str) -> None:
+    with pytest.raises(UnreadableArchiveError):
+        plan_rename(tmp_path, OFFERED_RENAME_TEMPLATE, paths=[tmp_path / name])

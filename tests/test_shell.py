@@ -713,7 +713,7 @@ def test_scan_cancel_and_index_error() -> None:
 def test_rename_preview_and_job(tmp_path: Path) -> None:
     planned: list[tuple[str, str]] = []
 
-    def plan(directory: str, template: str):
+    def plan(directory: str, template: str, *, paths=None):
         planned.append((directory, template))
         return []
 
@@ -732,7 +732,7 @@ def test_rename_preview_and_job(tmp_path: Path) -> None:
     source = Path("/books/Claymore/old.cbz")
     dest = Path("/books/Claymore/Claymore v01.cbz")
 
-    def rename_in_directory(directory: str, template: str):
+    def rename_in_directory(directory: str, template: str, *, paths=None):
         recorder.renames.append((directory, template))
         return [FileResult(path=source, output_path=dest)]
 
@@ -760,7 +760,7 @@ def test_rename_preview_and_job(tmp_path: Path) -> None:
 
     recorder = _Recorder()
 
-    def rename_again(directory: str, template: str):
+    def rename_again(directory: str, template: str, *, paths=None):
         recorder.renames.append((directory, template))
         return [FileResult(path=source, output_path=dest)]
 

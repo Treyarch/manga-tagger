@@ -163,6 +163,7 @@ class RenameRequest(BaseModel):
 
     directory: str
     template: str
+    paths: list[str] | None = None
 
 
 class RenamePreviewEntry(BaseModel):
