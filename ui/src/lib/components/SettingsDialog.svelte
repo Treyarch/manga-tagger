@@ -2,6 +2,7 @@
   import { onDestroy, untrack } from "svelte";
   import { Settings } from "lucide-svelte";
   import MotionPanel from "./MotionPanel.svelte";
+  import Button from "./Button.svelte";
   import { motion } from "../motion";
   import Checkbox from "./Checkbox.svelte";
   import Dialog from "./Dialog.svelte";
@@ -9,14 +10,16 @@
   import Textarea from "./Textarea.svelte";
   import TextInput from "./TextInput.svelte";
   import { PROVIDERS, parseLanguages, parseRootLines } from "../library";
-  import { putConfig, type Config } from "../api";
+  import { postJson, putConfig, type Config } from "../api";
+  import { clearThumbnailCache } from "../cache";
 
-  type TabId = "general" | "archives" | "scrapers";
+  type TabId = "general" | "archives" | "scrapers" | "cache";
 
   const TABS: { id: TabId; label: string }[] = [
     { id: "general", label: "General" },
     { id: "archives", label: "Archives" },
     { id: "scrapers", label: "Scrapers" },
+    { id: "cache", label: "Cache" },
   ];
 
   const THEME_OPTIONS = [
@@ -37,10 +40,12 @@
     config,
     onClose,
     onSaved,
+    onCacheCleared,
   }: {
     config: Config;
     onClose: () => void;
     onSaved: (config: Config) => void;
+    onCacheCleared: () => void;
   } = $props();
 
   let tab = $state<TabId>("general");
@@ -88,6 +93,26 @@
     }),
   );
   let error = $state("");
+  let clearingCache = $state(false);
+  let cacheMessage = $state("");
+  let cacheError = $state("");
+
+  async function clearCache() {
+    if (clearingCache) return;
+    clearingCache = true;
+    cacheMessage = "";
+    cacheError = "";
+    try {
+      cacheMessage = await clearThumbnailCache(
+        () => postJson<{ removed: number }>("/api/cache/thumbnails/clear"),
+        onCacheCleared,
+      );
+    } catch (exc) {
+      cacheError = exc instanceof Error ? exc.message : "Could not clear cache.";
+    } finally {
+      clearingCache = false;
+    }
+  }
 
   async function save() {
     const parsed = parseRootLines(roots);
@@ -211,7 +236,7 @@
               </p>
             </div>
           </div>
-        {:else}
+        {:else if tab === "scrapers"}
           <ul class="flex flex-col gap-3">
             {#each scrapers as item (item.id)}
               <li
@@ -260,6 +285,27 @@
               </li>
             {/each}
           </ul>
+        {:else}
+          <div class="flex flex-col items-start gap-3">
+            <div class="flex flex-col gap-1">
+              <p class="text-sm font-medium text-app-text">Cover thumbnails</p>
+              <p class="text-xs text-app-muted">
+                Cached cover thumbnails are generated from your archives and can be
+                safely rebuilt when needed. Archives, posters, and the library index
+                are not changed.
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              disabled={clearingCache}
+              onclick={() => void clearCache()}
+            >{clearingCache ? "Clearing…" : "Clear cache"}</Button>
+            {#if cacheMessage}
+              <p class="text-sm text-app-text" aria-live="polite">{cacheMessage}</p>
+            {:else if cacheError}
+              <p class="text-sm text-app-text" aria-live="polite">{cacheError}</p>
+            {/if}
+          </div>
         {/if}
       </MotionPanel>
       {#if error}

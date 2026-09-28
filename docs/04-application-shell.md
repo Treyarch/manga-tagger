@@ -181,6 +181,7 @@ Archive, page, thumbnail, save, rename, and convert paths must be absolute. A re
 | `POST /api/jobs/convert` | Body `{ "paths" }` |
 | `POST /api/jobs/cover` | Body `{ "path", "action", "web", "number"? }` where `action` is `replace` or `insert`. See [08-cover-from-provider.md](08-cover-from-provider.md) |
 | `POST /api/field-locks` | Body `{ "paths", "field", "locked" }`. Synchronous. Updates index `locked_fields` for each path that has a row. Returns `{ "volumes": [row, ...] }`. See [07-field-locks.md](07-field-locks.md). Does not enqueue a job and does not write an archive |
+| `POST /api/cache/thumbnails/clear` | Synchronously calls `clear_thumbnail_cache` for the app thumbnail directory and returns `{ "removed": N }`. Does not enqueue a job or alter configuration, the index, archives, posters, or browser caches |
 | `GET /api/jobs/current` | The running job, or the queued job, or JSON null |
 | `GET /api/jobs/{id}` | That job |
 | `POST /api/jobs/{id}/cancel` | Cancel that job. Returns the job |
@@ -288,6 +289,17 @@ Dropping a folder on the sidebar does not call into Python from the client. `win
 
 Settings is a dialog with General, Archives, and Scrapers tabs. It edits `theme`, `animate_interface` (General, with live preview and rollback on dismissal), library roots (one absolute path per line), `title_languages` as comma-separated codes in order, `keep_cbr_original` as a checkbox labeled `Keep the original CBR` on Archives, `write_poster_on_save` as a checkbox labeled `Write poster on save` on Archives, `auto_save_metadata_on_switch` as a checkbox labeled `Auto-save metadata on switch` on Archives, the Comic Vine key, the Nautiljon base URL, the Nautiljon API key, and `enabled_providers`. Dismiss writes nothing. Save drops blank root lines. If a non-blank root line is not absolute, the dialog does not send the request and shows `Paths must be absolute.` A successful save calls `PUT /api/config`.
 
+Settings also has a Cache tab. Its `Clear cache` action calls
+`POST /api/cache/thumbnails/clear` immediately and independently of Save or
+Cancel. It does not write draft settings, close the dialog, enqueue a job, or
+require confirmation. While the request is pending the action is disabled and
+reads `Clearing…`. Success reports `Cache is already empty.` when no files were
+removed, or `Cleared N cached thumbnail(s).` with normal singular agreement.
+Failure leaves the dialog open and shows the API error. After success, the
+client increments a session-only thumbnail revision and combines it with the
+existing per-cover revision in every list and grid thumbnail URL. This bypasses
+an already cached HTTP response and regenerates visible thumbnails on demand.
+
 Per-file save, rename, and convert errors, and scan-root lines, are listed at the top of the inspector, above the form. Search and load status (match count, no matches, provider errors) is toast-only and is not repeated in the inspector. Scrape opens the Matches dialog (searching, then rows when any); match rows are not listed in the inspector. The toast for every finished job is the short summary in the jobs client section.
 
 ## Errors
@@ -301,6 +313,7 @@ Per-file save, rename, and convert errors, and scan-root lines, are listed at th
 | `JobBusyError` | `start` while a job is `queued` or `running`, including a `PUT` that would enqueue a scan and a `POST /api/library/roots` that would add a root. Nothing is enqueued |
 | `JobCancelled` | The job saw cancel before the next file, poster, or provider request. Partial entries stay on the job |
 | `NoThumbnailError` | `thumbnail_for` returns no path |
+| `LibraryIndexError` | The thumbnail cache cannot be cleared. The API reports the filesystem error and does not report success |
 | `BatchFieldError` | A save patch contains a key the mode does not allow. Nothing is written |
 
 `OutsideLibraryError` subclasses `ShellError`. `JobNotFoundError` and `ConfigError` do not. Archive and provider exceptions pass through the job as `failed`, except `ProviderCancelledError`, which is `cancelled`.
@@ -322,6 +335,7 @@ Importing `manga_tagger.config`, `manga_tagger.shell`, `manga_tagger.jobs`, or `
 Cover at least:
 
 - `animate_interface` defaults to false; invalid stored types fall back to false. GET exposes it, PUT accepts only booleans, omitted keys stay unchanged, and TOML round trips preserve it and unknown keys. Preview alone never writes configuration.
+- Clearing a missing or populated thumbnail cache returns the removal count through the injected cache service, does not create a job or change config/index data, and returns a structured `LibraryIndexError` response when clearing fails.
 
 - `load_config` on a missing path returns the known-key defaults and does not create the file. A relative `library_roots` entry is absent from the result and the file bytes are unchanged. An unknown key is still present after a `PUT` that changes `theme`. Invalid TOML raises `ConfigError` and the message includes the path. A non-boolean `auto_save_metadata_on_switch` on load becomes `false`. A `PUT` of a non-boolean for that key is `400`.
 - `app_paths("linux", {}, home)` uses `home/.config`, `home/.local/share`, and `home/.cache`. A set absolute `XDG_CONFIG_HOME` replaces only the config root. A relative `XDG_DATA_HOME` is ignored. `darwin` and `win32` use their table, including the `APPDATA` fallback under `home`.
@@ -362,6 +376,7 @@ Cover at least:
 - Scrapes, saves, converts, and rescans are jobs on one worker. A new job is refused while one is queued or running. No job adds a name, progress text, or Cancel button to the header. Search and Issues progress stay in their dialogs and can be cancelled by dismissing them. Save, Rename, Cover, Convert, and Scan outcomes are reported by toasts. A finished scrape, issues, load, save, rename, convert, or scan that succeeded or failed shows one toast summary when the toast table says so; cancelled jobs do not. A finished scan names a skipped or incomplete root in the inspector. Closing the window asks the worker to stop and does not leave a truncated archive from this process killing a write.
 - The startup scan is enqueued only after the server is bound, and only when `library_roots` is non-empty. The first library response does not wait for it.
 - Add folder asks for one directory and appends it to `library_roots`, then scans. A drop on the sidebar does the same. Existing roots stay. Settings can still replace the list.
+- Settings Cache clears generated thumbnails immediately without saving or discarding draft settings. A successful clear forces list and grid thumbnails onto a new revision URL; failures remain visible in the open dialog.
 
 ## Open questions
 

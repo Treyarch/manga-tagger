@@ -91,6 +91,12 @@ class FieldLocksResponse(BaseModel):
     volumes: list[VolumeModel]
 
 
+class CacheClearResponse(BaseModel):
+    """Number of generated thumbnail assets removed from the cache."""
+
+    removed: int
+
+
 class ConfigModel(BaseModel):
     """The known config keys."""
 

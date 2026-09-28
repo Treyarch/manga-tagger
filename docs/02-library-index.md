@@ -176,6 +176,13 @@ The JPEG is written to a temporary file in `cache_dir` and renamed into place. T
 
 `list_volumes` and `scan` do not call `thumbnail_for`.
 
+`clear_thumbnail_cache(cache_dir)` removes every file and directory inside the
+thumbnail-cache directory and returns the number of files removed. The cache
+directory itself stays in place. A missing cache directory is an empty cache
+and returns `0`. The function does not read or change the index, archives,
+sibling posters, configuration, or any browser cache. A filesystem failure
+raises `LibraryIndexError`; files removed before that failure stay removed.
+
 ## Errors
 
 | Exception | When |
@@ -211,6 +218,7 @@ Cover at least:
 - A finished scan deletes a removed file and its thumbnail, deletes rows whose root is no longer in the list, and keeps rows for a root that is not an existing directory. A finished scan with an empty root list deletes every row. A directory that cannot be listed does not prune that root.
 - `refresh_volume` updates one file after its ComicInfo changes and does not walk a sibling. `forget_volume` removes the row and the thumbnail. A missing path returns no row.
 - `thumbnail_for` reads only the cover page, writes a JPEG 256 pixels wide, and leaves the archive bytes unchanged. It does not write `{stem}-poster.jpg`. A cover narrower than 256 pixels is not enlarged. A cover with an alpha channel encodes on white. The test may decode that JPEG. A second call for the same size and mtime does not open the archive. A `failed` row returns no path. `list_volumes` creates no thumbnail.
+- `clear_thumbnail_cache` returns `0` for a missing directory, removes current, stale, partial, and nested cached assets while keeping the cache directory, reports the number of files removed, and translates a filesystem failure to `LibraryIndexError`.
 - When `unar` is absent, a `.cbr` row is `failed` with `error_type` `MissingUnarError` and a message that names `unar`, and a `.cbz` row is `ok`.
 - `user_version` 4 raises `IndexVersionError`. The version stays 4 and a sentinel row is still present.
 - Version 2 migrates to 3 with `locked_fields` default `[]`. An upsert of an existing path preserves `locked_fields`. `set_field_lock` adds and removes a name. `copy_locked_fields` moves the list to a new path.
@@ -225,4 +233,5 @@ Cover at least:
 - A finished scan drops files that disappeared and drops roots that are no longer in the list, including a finished scan of an empty root list. A root that is not an existing directory keeps its rows. A root whose directory cannot be listed is not pruned.
 - `refresh_volume` updates one archive. `forget_volume` drops one path and its thumbnail. The module does not watch the filesystem and does not start a thread.
 - A thumbnail is built when asked, from the cover page only, as a 256-pixel-wide JPEG at quality 80 on a white matte when the cover has an alpha channel, by rename inside the cache directory. The sibling poster is left alone. A scan does not build thumbnails.
+- Clearing the thumbnail cache removes every cached asset, leaves the cache directory available for later on-demand thumbnail generation, and does not change the index, an archive, or a sibling poster.
 - A database whose `user_version` is neither 0, 1, 2, nor 3 is refused. The schema is not rewritten and existing rows stay. Version 1 is migrated through to 3 (adding `count` then `locked_fields`). Version 2 is migrated to 3 by adding `locked_fields`. Upsert preserves `locked_fields` for an existing path.

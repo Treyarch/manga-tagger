@@ -81,6 +81,7 @@
   import MotionPanel from "./lib/components/MotionPanel.svelte";
   import { motion, watchReducedMotion } from "./lib/motion";
   import { applyTheme } from "./lib/theme";
+  import { thumbnailRevision } from "./lib/cache";
   import {
     SHORTCUT_HINTS,
     activeDialog,
@@ -134,6 +135,7 @@
   let planToken = 0;
   let coverStarting = $state(false);
   let coverRevisions = $state<Record<string, string>>({});
+  let cacheRevision = $state(0);
   const settled = new Set<string>();
 
   const shelf = $derived(volumesForShelf(volumes, selectedPlace));
@@ -963,7 +965,12 @@
                       </span>
                     {/if}
                     <span class="flex size-4 shrink-0 items-center justify-center overflow-hidden">
-                      <Thumb revision={coverRevisions[row.path] ?? ""} path={row.path} failed={row.status === "failed"} fallback />
+                      <Thumb
+                        revision={thumbnailRevision(cacheRevision, coverRevisions[row.path] ?? "")}
+                        path={row.path}
+                        failed={row.status === "failed"}
+                        fallback
+                      />
                     </span>
                     <span class="min-w-0 flex-1 truncate text-sm">{row.name}</span>
                   </button>
@@ -998,7 +1005,11 @@
                             : ''}"
                         >
                           {#if row.status !== "failed"}
-                            <Thumb revision={coverRevisions[row.path] ?? ""} path={row.path} failed={false} />
+                            <Thumb
+                              revision={thumbnailRevision(cacheRevision, coverRevisions[row.path] ?? "")}
+                              path={row.path}
+                              failed={false}
+                            />
                           {/if}
                         </span>
                         <span
@@ -1068,6 +1079,7 @@
   <SettingsDialog
     {config}
     onClose={() => (settingsOpen = false)}
+    onCacheCleared={() => (cacheRevision += 1)}
     onSaved={(next) => {
       const rootsChanged =
         next.library_roots.length !== config.library_roots.length ||

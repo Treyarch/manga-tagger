@@ -14,6 +14,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Res
 from starlette.requests import Request
 
 from manga_tagger.api.models import (
+    CacheClearResponse,
     ConfigModel,
     ConfigPut,
     ConvertRequest,
@@ -44,6 +45,8 @@ from manga_tagger.archives.rename import plan_rename, rename_in_directory
 from manga_tagger.archives.save import convert_cbr, save_comic_info
 from manga_tagger.config import AppConfig, ConfigError, apply_put, save_config
 from manga_tagger.index import (
+    LibraryIndexError,
+    clear_thumbnail_cache,
     copy_locked_fields,
     forget_volume,
     list_volumes,
@@ -107,6 +110,7 @@ class Services:
     list_volumes: Callable[..., object]
     scan: Callable[..., object]
     thumbnail_for: Callable[..., object]
+    clear_thumbnail_cache: Callable[..., int]
     refresh_volume: Callable[..., object]
     forget_volume: Callable[..., object]
     copy_locked_fields: Callable[..., object]
@@ -151,6 +155,7 @@ def default_services() -> Services:
         list_volumes=list_volumes,
         scan=scan,
         thumbnail_for=thumbnail_for,
+        clear_thumbnail_cache=clear_thumbnail_cache,
         refresh_volume=refresh_volume,
         forget_volume=forget_volume,
         copy_locked_fields=copy_locked_fields,
@@ -298,6 +303,7 @@ def _register_errors(app: FastAPI) -> None:
         (ShellError, 400),
         (ArchiveError, 400),
         (RemoteCoverError, 400),
+        (LibraryIndexError, 400),
         (NoThumbnailError, 404),
         (JobNotFoundError, 404),
         (JobBusyError, 409),
@@ -364,6 +370,12 @@ def _register_routes(app: FastAPI) -> None:
     @app.get("/api/config", response_model=ConfigModel)
     def get_config() -> ConfigModel:
         return ConfigModel(**_state(app).config.to_dict())
+
+    @app.post("/api/cache/thumbnails/clear", response_model=CacheClearResponse)
+    def clear_thumbnails() -> CacheClearResponse:
+        state = _state(app)
+        removed = state.services.clear_thumbnail_cache(state.thumbnail_dir)
+        return CacheClearResponse(removed=removed)
 
     @app.get("/api/system-theme", response_model=SystemThemeModel | None)
     def get_system_theme(response: Response) -> SystemThemeModel | None:

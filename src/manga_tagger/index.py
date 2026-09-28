@@ -3,6 +3,7 @@
 import hashlib
 import json
 import os
+import shutil
 import sqlite3
 import tempfile
 from collections.abc import Callable, Iterator, Sequence
@@ -485,6 +486,47 @@ def thumbnail_for(
         ) from exc
     _delete_thumbnails(cache, archive, keep=filename)
     return dest
+
+
+def clear_thumbnail_cache(cache_dir: os.PathLike[str] | str) -> int:
+    """Remove every cached thumbnail asset and return the file count.
+
+    The cache directory itself is kept so later thumbnail requests can reuse it.
+    A missing directory is an empty cache. Files deleted before a filesystem
+    failure stay deleted.
+
+    Args:
+        cache_dir: App-owned thumbnail directory.
+
+    Returns:
+        Number of files and symlinks removed. Directories are not counted.
+
+    Raises:
+        LibraryIndexError: The cache directory cannot be inspected or cleared.
+    """
+    cache = Path(cache_dir)
+    try:
+        if not cache.exists():
+            return 0
+        if not cache.is_dir():
+            raise OSError("cache path is not a directory")
+        removed = 0
+        for entry in list(cache.iterdir()):
+            if entry.is_symlink() or not entry.is_dir():
+                entry.unlink()
+                removed += 1
+                continue
+            removed += sum(
+                1
+                for child in entry.rglob("*")
+                if child.is_file() or child.is_symlink()
+            )
+            shutil.rmtree(entry)
+        return removed
+    except OSError as exc:
+        raise LibraryIndexError(
+            f"thumbnail cache {cache} could not be cleared"
+        ) from exc
 
 
 def _walk_root(

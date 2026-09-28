@@ -12,7 +12,7 @@ from manga_tagger.api import create_app, enqueue_startup_scan, serve
 from manga_tagger.api.app import default_services
 from manga_tagger.archives.results import FileResult
 from manga_tagger.config import load_config, save_config
-from manga_tagger.index import Volume
+from manga_tagger.index import LibraryIndexError, Volume
 from manga_tagger.jobs import JobRunner
 from manga_tagger.providers import search as provider_search
 from manga_tagger.shell import form_from_volumes
@@ -121,6 +121,50 @@ def test_thumbnail_hit_is_cacheable_jpeg(tmp_path: Path) -> None:
     assert response.headers["content-type"].startswith("image/jpeg")
     assert response.headers["cache-control"] == "private, max-age=3600"
     assert response.headers["etag"] == '"abc-1-2"'
+
+
+def test_clear_thumbnail_cache_is_synchronous_and_isolated(tmp_path: Path) -> None:
+    calls: list[Path] = []
+
+    def clear_thumbnail_cache(path: Path) -> int:
+        calls.append(path)
+        return 3
+
+    app = _app(
+        tmp_path,
+        clear_thumbnail_cache=clear_thumbnail_cache,
+        roots=["/books"],
+    )
+    config_before = app.state.box.config.to_dict()
+    with TestClient(app) as client:
+        response = client.post("/api/cache/thumbnails/clear")
+
+    assert response.status_code == 200
+    assert response.json() == {"removed": 3}
+    assert calls == [tmp_path / "covers"]
+    assert app.state.box.runner.current() is None
+    assert app.state.box.config.to_dict() == config_before
+    assert not (tmp_path / "index.db").exists()
+    assert not (tmp_path / "config.toml").exists()
+
+
+def test_clear_thumbnail_cache_returns_structured_error(tmp_path: Path) -> None:
+    def clear_thumbnail_cache(_path: Path) -> int:
+        raise LibraryIndexError("thumbnail cache could not be cleared")
+
+    app = _app(
+        tmp_path,
+        clear_thumbnail_cache=clear_thumbnail_cache,
+        roots=["/books"],
+    )
+    with TestClient(app) as client:
+        response = client.post("/api/cache/thumbnails/clear")
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "error_type": "LibraryIndexError",
+        "error_message": "thumbnail cache could not be cleared",
+    }
 
 
 def test_cover_rejects_hosts_outside_the_allow_list(tmp_path: Path) -> None:

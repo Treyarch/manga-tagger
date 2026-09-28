@@ -14,6 +14,7 @@ from manga_tagger.archives import cbr as cbr_mod
 from manga_tagger.index import (
     IndexVersionError,
     LibraryIndexError,
+    clear_thumbnail_cache,
     copy_locked_fields,
     forget_volume,
     list_volumes,
@@ -399,6 +400,38 @@ def test_thumbnail_uses_the_cover_only(
     failed.write_bytes(b"nope")
     scan(database, cache, [root])
     assert thumbnail_for(database, cache, failed) is None
+
+
+def test_clear_thumbnail_cache_removes_every_asset(tmp_path: Path) -> None:
+    missing = tmp_path / "missing"
+    assert clear_thumbnail_cache(missing) == 0
+    assert not missing.exists()
+
+    cache = tmp_path / "cache"
+    nested = cache / "future" / "nested"
+    nested.mkdir(parents=True)
+    (cache / "current.jpg").write_bytes(b"current")
+    (cache / "stale.jpg").write_bytes(b"stale")
+    (cache / ".manga-tagger-test.partial").write_bytes(b"partial")
+    (nested / "asset.jpg").write_bytes(b"nested")
+
+    assert clear_thumbnail_cache(cache) == 4
+    assert cache.is_dir()
+    assert list(cache.iterdir()) == []
+
+
+def test_clear_thumbnail_cache_wraps_filesystem_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    cache = tmp_path / "cache"
+    cache.mkdir()
+
+    def fail(_path: Path) -> list[Path]:
+        raise OSError("denied")
+
+    monkeypatch.setattr(Path, "iterdir", fail)
+    with pytest.raises(LibraryIndexError, match="could not be cleared"):
+        clear_thumbnail_cache(cache)
 
 
 def test_relative_root_raises_before_a_walk(

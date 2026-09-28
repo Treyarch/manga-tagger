@@ -143,6 +143,12 @@ describe("shelf and selection", () => {
     expect(thumbnailSrc("/books/Claymore/a.cbz")).toBe(
       "/api/thumbnail?path=" + encodeURIComponent("/books/Claymore/a.cbz"),
     );
+    expect(thumbnailSrc("/books/Claymore/a.cbz", "cache-1:cover-2")).toBe(
+      "/api/thumbnail?path=" +
+        encodeURIComponent("/books/Claymore/a.cbz") +
+        "&revision=" +
+        encodeURIComponent("cache-1:cover-2"),
+    );
   });
 
   it("proxies MangaDex covers through /api/cover", () => {

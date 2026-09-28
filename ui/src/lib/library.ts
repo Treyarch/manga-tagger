@@ -238,8 +238,11 @@ export type IssueCandidate = {
 };
 
 /** Same-origin img src for a shelf thumbnail. */
-export function thumbnailSrc(path: string): string {
-  return `/api/thumbnail?path=${encodeURIComponent(path)}`;
+export function thumbnailSrc(path: string, revision = ""): string {
+  const base = `/api/thumbnail?path=${encodeURIComponent(path)}`;
+  return revision === ""
+    ? base
+    : `${base}&revision=${encodeURIComponent(revision)}`;
 }
 
 /** Same-origin img src for a candidate cover. Proxied hosts stay same-origin. */

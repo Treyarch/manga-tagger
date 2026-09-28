@@ -16,7 +16,7 @@
 
   let broken = $state(false);
 
-  const src = $derived(failed ? "" : thumbnailSrc(path) + (revision ? `&revision=${encodeURIComponent(revision)}` : ""));
+  const src = $derived(failed ? "" : thumbnailSrc(path, revision));
   const showImage = $derived(src !== "" && !broken);
   const showFallback = $derived(fallback && (failed || broken || src === ""));
 
