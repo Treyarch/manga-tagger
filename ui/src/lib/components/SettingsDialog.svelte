@@ -9,9 +9,14 @@
   import Select from "./Select.svelte";
   import Textarea from "./Textarea.svelte";
   import TextInput from "./TextInput.svelte";
-  import { PROVIDERS, parseLanguages, parseRootLines } from "../library";
-  import { postJson, putConfig, type Config } from "../api";
+  import {
+    postJson,
+    putConfig,
+    withChangedLibraryRoots,
+    type Config,
+  } from "../api";
   import { clearThumbnailCache } from "../cache";
+  import { PROVIDERS, parseLanguages, parseRootLines, type Job } from "../library";
 
   type TabId = "general" | "archives" | "scrapers" | "cache";
 
@@ -44,7 +49,7 @@
   }: {
     config: Config;
     onClose: () => void;
-    onSaved: (config: Config) => void;
+    onSaved: (config: Config, job: Job | null) => void;
     onCacheCleared: () => void;
   } = $props();
 
@@ -121,8 +126,7 @@
       return;
     }
     try {
-      const next = await putConfig({
-        library_roots: parsed.roots,
+      const updates: Partial<Config> = {
         comicvine_api_key: apiKey,
         nautiljon_base_url: nautiljonBaseUrl,
         nautiljon_api_key: nautiljonApiKey,
@@ -135,11 +139,15 @@
           .map((item) => item.id),
         theme,
         animate_interface: animateInterface,
-      });
+      };
+      const result = await putConfig(
+        withChangedLibraryRoots(updates, config.library_roots, parsed.roots),
+      );
+      const next = result.config;
       finished = true;
       motion.setSaved(next.animate_interface);
       motion.clearPreview();
-      onSaved(next);
+      onSaved(next, result.job);
     } catch (exc) {
       error = exc instanceof Error ? exc.message : "Could not save settings.";
     }

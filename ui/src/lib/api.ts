@@ -1,5 +1,7 @@
 /** `fetch` against the API origin. There is no pywebview bridge. */
 
+import type { Job } from "./library";
+
 export class ApiError extends Error {
   error_type: string;
 
@@ -38,6 +40,23 @@ export type SystemTheme = {
   orange: string;
 };
 
+export type ConfigPutResult = {
+  config: Config;
+  job: Job | null;
+};
+
+/** Add roots to a Settings PUT only when their ordered normalized value changed. */
+export function withChangedLibraryRoots(
+  updates: Partial<Config>,
+  currentRoots: string[],
+  nextRoots: string[],
+): Partial<Config> {
+  const unchanged =
+    nextRoots.length === currentRoots.length &&
+    nextRoots.every((root, index) => root === currentRoots[index]);
+  return unchanged ? updates : { ...updates, library_roots: nextRoots };
+}
+
 async function parse<T>(response: Response): Promise<T> {
   if (response.ok) {
     if (response.status === 204) return undefined as T;
@@ -70,12 +89,12 @@ export function getSystemTheme(): Promise<SystemTheme | null> {
   );
 }
 
-export function putConfig(body: Partial<Config>): Promise<Config> {
+export function putConfig(body: Partial<Config>): Promise<ConfigPutResult> {
   return fetch("/api/config", {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
-  }).then((response) => parse<Config>(response));
+  }).then((response) => parse<ConfigPutResult>(response));
 }
 
 export function getJson<T>(path: string): Promise<T> {

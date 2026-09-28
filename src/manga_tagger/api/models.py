@@ -260,6 +260,13 @@ class JobModel(BaseModel):
         )
 
 
+class ConfigPutResponse(BaseModel):
+    """Saved config and the scan caused by a root change, when any."""
+
+    config: ConfigModel
+    job: JobModel | None = None
+
+
 class RootsResponse(BaseModel):
     """The config after an append, plus the directories that were new.
 

@@ -17,6 +17,7 @@ from manga_tagger.api.models import (
     CacheClearResponse,
     ConfigModel,
     ConfigPut,
+    ConfigPutResponse,
     ConvertRequest,
     CoverRequest,
     FieldLocksRequest,
@@ -56,6 +57,7 @@ from manga_tagger.index import (
     thumbnail_for,
 )
 from manga_tagger.jobs import (
+    Job,
     JobBusyError,
     JobNotFoundError,
     JobRunner,
@@ -147,6 +149,7 @@ class AppState:
     pick_folder: Callable[[], str | None] | None = None
     destroy_window: Callable[[], None] | None = None
     system_theme: Callable[[], SystemTheme | None] = read_system_theme
+    startup_job_id: str | None = None
 
 
 def default_services() -> Services:
@@ -227,15 +230,17 @@ def create_app(
     return app
 
 
-def enqueue_startup_scan(app: FastAPI) -> None:
+def enqueue_startup_scan(app: FastAPI) -> Job | None:
     """Enqueue a scan when ``library_roots`` is non-empty.
 
     Call this only after the server is bound. An empty root list does nothing.
     """
     state: AppState = app.state.box
     if not state.config.library_roots:
-        return
-    _start_scan(state)
+        return None
+    job = _start_scan(state)
+    state.startup_job_id = job.id
+    return job
 
 
 def serve(app: FastAPI) -> tuple[int, Callable[[], None]]:
@@ -383,18 +388,21 @@ def _register_routes(app: FastAPI) -> None:
         theme = _state(app).system_theme()
         return None if theme is None else SystemThemeModel(**theme.to_dict())
 
-    @app.put("/api/config", response_model=ConfigModel)
-    def put_config(body: ConfigPut) -> ConfigModel:
+    @app.put("/api/config", response_model=ConfigPutResponse)
+    def put_config(body: ConfigPut) -> ConfigPutResponse:
         state = _state(app)
         updates = body.model_dump(exclude_unset=True)
-        if "library_roots" in updates and state.runner.current() is not None:
-            raise JobBusyError("a job is already queued or running")
         updated = apply_put(state.config, updates)
+        roots_changed = updated.library_roots != state.config.library_roots
+        if roots_changed and state.runner.current() is not None:
+            raise JobBusyError("a job is already queued or running")
         save_config(state.config.path, updated)
         state.config = updated
-        if "library_roots" in updates:
-            _start_scan(state)
-        return ConfigModel(**updated.to_dict())
+        job = JobModel.from_job(_start_scan(state)) if roots_changed else None
+        return ConfigPutResponse(
+            config=ConfigModel(**updated.to_dict()),
+            job=job,
+        )
 
     @app.post("/api/dialogs/folder", response_model=FolderDialogModel)
     def post_folder_dialog() -> FolderDialogModel:
@@ -672,6 +680,13 @@ def _register_routes(app: FastAPI) -> None:
         if job is None:
             return None
         return JobModel.from_job(job)
+
+    @app.get("/api/jobs/startup", response_model=JobModel | None)
+    def startup_job() -> JobModel | None:
+        state = _state(app)
+        if state.startup_job_id is None:
+            return None
+        return JobModel.from_job(state.runner.get(state.startup_job_id))
 
     @app.get("/api/jobs/{job_id}", response_model=JobModel)
     def get_job(job_id: str) -> JobModel:

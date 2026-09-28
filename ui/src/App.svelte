@@ -38,6 +38,7 @@
     cbrCount,
     candidatesOf,
     canFetchCoverFromWeb,
+    claimJobSettlement,
     clampProvider,
     convertConfirmMessage,
     editField,
@@ -285,8 +286,7 @@
   }
 
   async function settle(job: Job) {
-    if (settled.has(job.id) || !terminal(job.state)) return;
-    settled.add(job.id);
+    if (!claimJobSettlement(settled, job)) return;
     if (job.name === "Search") {
       if (job.id !== newestSearchId) return;
       if (job.state === "failed" || job.state === "cancelled") {
@@ -733,6 +733,11 @@
   onMount(() => {
     const stopMotion = watchReducedMotion(window.matchMedia("(prefers-reduced-motion: reduce)"));
     void loadShelf();
+    void getJson<Job | null>("/api/jobs/startup")
+      .then((startup) => {
+        if (startup) watch(startup);
+      })
+      .catch(() => undefined);
     void poll();
     const timer = setInterval(() => {
       void poll().catch(() => undefined);
@@ -1085,10 +1090,7 @@
     {config}
     onClose={() => (settingsOpen = false)}
     onCacheCleared={() => (cacheRevision += 1)}
-    onSaved={(next) => {
-      const rootsChanged =
-        next.library_roots.length !== config.library_roots.length ||
-        next.library_roots.some((root, index) => root !== config.library_roots[index]);
+    onSaved={(next, job) => {
       motion.setSaved(next.animate_interface);
       motion.clearPreview();
       config = next;
@@ -1100,11 +1102,7 @@
         systemTheme,
       );
       settingsOpen = false;
-      if (rootsChanged) {
-        void getJson<Job | null>("/api/jobs/current").then((current) => {
-          if (current) watch(current);
-        });
-      }
+      if (job) watch(job);
     }}
   />
 {/if}

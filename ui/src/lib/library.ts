@@ -653,6 +653,15 @@ export function isBusy(job: Job | null): boolean {
   return job !== null && (job.state === "queued" || job.state === "running");
 }
 
+/** Claim one terminal job id for settlement, regardless of how it was observed. */
+export function claimJobSettlement(settled: Set<string>, job: Job): boolean {
+  const terminal =
+    job.state === "succeeded" || job.state === "failed" || job.state === "cancelled";
+  if (!terminal || settled.has(job.id)) return false;
+  settled.add(job.id);
+  return true;
+}
+
 export function shouldRefetchLibrary(job: Job): boolean {
   return (
     LIBRARY_JOBS.has(job.name) &&

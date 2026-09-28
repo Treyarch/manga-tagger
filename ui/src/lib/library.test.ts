@@ -6,6 +6,7 @@ import {
   SHARED_FIELDS,
   candidatesOf,
   cbrCount,
+  claimJobSettlement,
   coverProviderFromWeb,
   canFetchCoverFromWeb,
   coverPageIndex,
@@ -49,6 +50,7 @@ import {
   switchGuard,
   volumesForShelf,
   volumesInPlace,
+  type Job,
   type Volume,
 } from "./library";
 
@@ -356,6 +358,27 @@ describe("form", () => {
 });
 
 describe("jobs and dialogs", () => {
+  it("settles a startup scan exactly once after any busy observations", () => {
+    const settled = new Set<string>();
+    const scan: Job = {
+      id: "1",
+      name: "Scan",
+      state: "queued",
+      error_type: "",
+      error_message: "",
+      result: null,
+      completed: 0,
+      total: 0,
+    };
+
+    expect(claimJobSettlement(settled, scan)).toBe(false);
+    scan.state = "running";
+    expect(claimJobSettlement(settled, scan)).toBe(false);
+    scan.state = "succeeded";
+    expect(claimJobSettlement(settled, scan)).toBe(true);
+    expect(claimJobSettlement(settled, scan)).toBe(false);
+  });
+
   function saveJob(
     state: string,
     entries: unknown[],

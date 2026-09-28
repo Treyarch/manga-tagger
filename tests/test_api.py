@@ -178,24 +178,26 @@ def test_cover_rejects_hosts_outside_the_allow_list(tmp_path: Path) -> None:
     assert response.json()["error_type"] == "RemoteCoverError"
 
 
-def test_config_put_keeps_unknown_keys_and_rejects_a_busy_rescan(
+def test_config_put_scans_only_changed_roots_and_keeps_unknown_keys(
     tmp_path: Path,
 ) -> None:
     path = tmp_path / "config.toml"
     path.write_text('theme = "dark"\ncustom = "keep"\n', encoding="utf-8")
     config = load_config(path)
     runner = JobRunner(inline=True)
+    scans: list[object] = []
     app = create_app(
         config,
         tmp_path / "index.db",
         tmp_path / "covers",
         runner=runner,
-        services=replace(default_services(), scan=_scan_recorder([])),
+        services=replace(default_services(), scan=_scan_recorder(scans)),
     )
     with TestClient(app) as client:
         put = client.put("/api/config", json={"theme": "light"})
         assert put.status_code == 200
-        assert put.json()["theme"] == "light"
+        assert put.json()["config"]["theme"] == "light"
+        assert put.json()["job"] is None
         assert app.state.box.config.theme == "light"
         saved = path.read_text(encoding="utf-8")
         assert "keep" in saved
@@ -203,6 +205,36 @@ def test_config_put_keeps_unknown_keys_and_rejects_a_busy_rescan(
         assert bad.status_code == 400
         assert bad.json()["error_type"] == "ConfigError"
         assert app.state.box.config.library_roots == []
+
+        unchanged = client.put(
+            "/api/config", json={"library_roots": [], "theme": "dark"}
+        )
+        assert unchanged.status_code == 200
+        assert unchanged.json()["config"]["theme"] == "dark"
+        assert unchanged.json()["job"] is None
+        assert scans == []
+
+        changed = client.put("/api/config", json={"library_roots": ["/books"]})
+        assert changed.status_code == 200
+        assert changed.json()["config"]["library_roots"] == ["/books"]
+        assert changed.json()["job"]["name"] == "Scan"
+        assert changed.json()["job"]["state"] == "succeeded"
+        assert scans == ["scan"]
+
+        emptied = client.put("/api/config", json={"library_roots": []})
+        assert emptied.status_code == 200
+        assert emptied.json()["config"]["library_roots"] == []
+        assert emptied.json()["job"]["state"] == "succeeded"
+        assert scans == ["scan", "scan"]
+
+
+def test_config_put_allows_unrelated_settings_during_another_job(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "config.toml"
+    config = load_config(path)
+    config.library_roots = ["/books"]
+    save_config(path, config)
 
     held = JobRunner(hold=True)
     scans: list[str] = []
@@ -217,15 +249,43 @@ def test_config_put_keeps_unknown_keys_and_rejects_a_busy_rescan(
         started = client.post("/api/jobs/scan")
         assert started.status_code == 200
         assert started.json()["state"] == "queued"
-        refused = client.put("/api/config", json={"library_roots": ["/books"]})
+        allowed = client.put(
+            "/api/config",
+            json={"library_roots": ["/books"], "theme": "dark"},
+        )
+        assert allowed.status_code == 200
+        assert allowed.json()["config"]["theme"] == "dark"
+        assert allowed.json()["job"] is None
+        refused = client.put(
+            "/api/config",
+            json={"library_roots": ["/other"], "theme": "light"},
+        )
         assert refused.status_code == 409
         assert refused.json()["error_type"] == "JobBusyError"
-        assert "/books" not in path.read_text(encoding="utf-8")
-        theme = client.put("/api/config", json={"theme": "dark"})
-        assert theme.status_code == 200
+        stored = load_config(path)
+        assert stored.library_roots == ["/books"]
+        assert stored.theme == "dark"
         again = client.post("/api/jobs/scan")
         assert again.status_code == 409
     held.shutdown()
+    assert scans == []
+
+
+def test_config_put_returns_the_queued_scan_job_for_changed_roots(
+    tmp_path: Path,
+) -> None:
+    scans: list[object] = []
+    app = _app(tmp_path, roots=[], hold=True, scan=_scan_recorder(scans))
+
+    with TestClient(app) as client:
+        response = client.put("/api/config", json={"library_roots": ["/books"]})
+        assert response.status_code == 200
+        returned = response.json()["job"]
+        current = client.get("/api/jobs/current").json()
+        assert returned["id"] == current["id"]
+        assert returned["state"] == current["state"] == "queued"
+
+    app.state.box.runner.shutdown()
     assert scans == []
 
 
@@ -550,16 +610,41 @@ def test_blank_comicvine_key_sends_no_request(tmp_path: Path) -> None:
 def test_startup_scan_only_when_roots_are_set(tmp_path: Path) -> None:
     scans: list[object] = []
     empty = _app(tmp_path, scan=_scan_recorder(scans), roots=[], hold=True)
-    enqueue_startup_scan(empty)
+    assert enqueue_startup_scan(empty) is None
     assert empty.state.box.runner.current() is None
+    with TestClient(empty) as client:
+        assert client.get("/api/jobs/startup").json() is None
     filled = _app(tmp_path, scan=_scan_recorder(scans), roots=["/books"], hold=True)
-    enqueue_startup_scan(filled)
+    started = enqueue_startup_scan(filled)
+    assert started is not None
     current = filled.state.box.runner.current()
     assert current is not None
     assert current.name == "Scan"
     assert current.state == "queued"
+    with TestClient(filled) as client:
+        startup = client.get("/api/jobs/startup").json()
+        assert startup["id"] == current.id
+        assert startup["state"] == "queued"
     filled.state.box.runner.shutdown()
     assert scans == []
+
+
+def test_finished_startup_scan_remains_discoverable(tmp_path: Path) -> None:
+    scans: list[object] = []
+    app = _app(tmp_path, scan=_scan_recorder(scans), roots=["/books"])
+    started = enqueue_startup_scan(app)
+    assert started is not None
+    assert started.state == "succeeded"
+
+    with TestClient(app) as client:
+        first = client.get("/api/jobs/startup").json()
+        second = client.get("/api/jobs/startup").json()
+
+    assert first == second
+    assert first["id"] == started.id
+    assert first["state"] == "succeeded"
+    assert first["name"] == "Scan"
+    assert scans == ["scan"]
 
 
 def test_missing_ui_and_serve(tmp_path: Path) -> None:
@@ -852,8 +937,10 @@ def test_interface_motion_config_api(tmp_path: Path) -> None:
         for value in (True, False, True):
             response = client.put("/api/config", json={"animate_interface": value})
             assert response.status_code == 200
-            assert response.json()["animate_interface"] is value
-        assert client.put("/api/config", json={"theme": "dark"}).json()["animate_interface"] is True
+            assert response.json()["config"]["animate_interface"] is value
+            assert response.json()["job"] is None
+        themed = client.put("/api/config", json={"theme": "dark"}).json()
+        assert themed["config"]["animate_interface"] is True
         for invalid in (None, 1, "true", [], {}):
             assert client.put("/api/config", json={"animate_interface": invalid}).status_code == 400
             assert client.get("/api/config").json()["animate_interface"] is True

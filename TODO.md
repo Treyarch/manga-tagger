@@ -36,12 +36,12 @@ Done when no save failure can silently discard an unsaved metadata draft or navi
 
 ## 3. Correct Settings scans and job tracking
 
-- [ ] Update `docs/04-application-shell.md` to define whether unchanged `library_roots` should enqueue a scan and how the client receives the scan job id.
-- [ ] Stop sending `library_roots` from Settings when the roots were not changed, or compare old and new roots in the API before enqueueing.
-- [ ] Allow unrelated settings such as theme and provider credentials to be saved while another job is active, as the current spec intends.
-- [ ] Return the scan job from a root-changing Settings save so the client can watch the exact id without racing `/api/jobs/current`.
-- [ ] Make startup scan completion discoverable even when it finishes before the first UI poll.
-- [ ] Add integration tests for unchanged roots, changed roots, empty roots, very fast scans, startup scans, and settings saves during another job.
+- [x] Update `docs/04-application-shell.md` to define whether unchanged `library_roots` should enqueue a scan and how the client receives the scan job id.
+- [x] Stop sending `library_roots` from Settings when the roots were not changed, or compare old and new roots in the API before enqueueing.
+- [x] Allow unrelated settings such as theme and provider credentials to be saved while another job is active, as the current spec intends.
+- [x] Return the scan job from a root-changing Settings save so the client can watch the exact id without racing `/api/jobs/current`.
+- [x] Make startup scan completion discoverable even when it finishes before the first UI poll.
+- [x] Add integration tests for unchanged roots, changed roots, empty roots, very fast scans, startup scans, and settings saves during another job.
 
 Done when every root-changing scan is observed exactly once, unrelated settings do not trigger scans, and the shelf refreshes after both fast and slow scans.
 
