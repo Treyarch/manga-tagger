@@ -60,6 +60,8 @@
     renamePlanLines,
     requestsPage,
     savePatch,
+    saveAllowsPendingNavigation,
+    savePreservesDraft,
     scanRootLines,
     selectionAfterEntries,
     selectionAfterFilter,
@@ -232,6 +234,7 @@
   }
 
   async function refreshLibrary(job: Job) {
+    const draft = form;
     const library = await getJson<{ places: Place[]; volumes: Volume[] }>(
       "/api/library",
     );
@@ -256,6 +259,8 @@
       for (const entry of entriesOf(job.result)) {
         if (entry.output_path) coverRevisions[entry.output_path] = job.id;
       }
+    } else if (job.name === "Save" && savePreservesDraft(job)) {
+      form = preserveDirtyFields(formFromVolumes(rowsFor(selection.paths)), draft);
     } else if (!(job.name === "Scan" && formIsDirty(form))) rebuildForm();
     if (job.name === "Scan") {
       const result = (job.result ?? {}) as {
@@ -333,7 +338,7 @@
     if (shouldRefetchLibrary(job)) await refreshLibrary(job);
     toastFrom(job);
     if (job.name === "Save" && pendingNavigation !== null) {
-      if (job.state === "succeeded") {
+      if (saveAllowsPendingNavigation(job)) {
         const pending = pendingNavigation;
         applyNavigation(pending);
       } else {

@@ -36,6 +36,8 @@ import {
   renamePlanLines,
   requestsPage,
   savePatch,
+  saveAllowsPendingNavigation,
+  savePreservesDraft,
   scanRootLines,
   selectPlain,
   selectRange,
@@ -354,6 +356,78 @@ describe("form", () => {
 });
 
 describe("jobs and dialogs", () => {
+  function saveJob(
+    state: string,
+    entries: unknown[],
+  ) {
+    return {
+      id: "1",
+      name: "Save",
+      state,
+      error_type: "",
+      error_message: "",
+      result: { entries },
+      completed: entries.length,
+      total: entries.length,
+    };
+  }
+
+  it("preserves a one-file draft when the archive write fails", () => {
+    const job = saveJob("succeeded", [
+      { path: "/books/a.cbz", error_type: "ArchiveError", error_message: "write failed" },
+    ]);
+    expect(savePreservesDraft(job)).toBe(true);
+    expect(saveAllowsPendingNavigation(job)).toBe(false);
+  });
+
+  it("preserves the shared draft after a partial batch failure", () => {
+    const job = saveJob("succeeded", [
+      { path: "/books/a.cbz", output_path: "/books/a.cbz" },
+      { path: "/books/b.cbz", error_type: "ArchiveError", error_message: "write failed" },
+    ]);
+    expect(savePreservesDraft(job)).toBe(true);
+    expect(saveAllowsPendingNavigation(job)).toBe(false);
+
+    const rows = [
+      volume("/books/a.cbz", { series: "Claymore" }),
+      volume("/books/b.cbz", { series: "Claymore" }),
+    ];
+    const draft = editField(formFromVolumes(rows)!, "Publisher", "Kana");
+    const rebuilt = formFromVolumes(rows)!;
+    const kept = preserveDirtyFields(rebuilt, draft)!;
+    expect(kept.values.Publisher.value).toBe("Kana");
+    expect(kept.values.Publisher.dirty).toBe(true);
+  });
+
+  it("preserves a draft and blocks navigation when save is cancelled", () => {
+    const job = saveJob("cancelled", [
+      { path: "/books/a.cbz", output_path: "/books/a.cbz" },
+    ]);
+    expect(savePreservesDraft(job)).toBe(true);
+    expect(saveAllowsPendingNavigation(job)).toBe(false);
+  });
+
+  it("allows navigation after an unchanged save with no entries", () => {
+    const job = saveJob("succeeded", []);
+    expect(savePreservesDraft(job)).toBe(false);
+    expect(saveAllowsPendingNavigation(job)).toBe(true);
+  });
+
+  it("allows navigation after poster-only or index-refresh errors", () => {
+    for (const error_message of ["poster failed", "index refresh failed"]) {
+      const job = saveJob("succeeded", [
+        {
+          path: "/books/a.cbz",
+          output_path: "/books/a.cbz",
+          error_type: "FollowUpError",
+          error_message,
+        },
+      ]);
+      expect(savePreservesDraft(job)).toBe(false);
+      expect(saveAllowsPendingNavigation(job)).toBe(true);
+    }
+  });
+
   it("counts selected CBRs using the library API's dotless extensions", () => {
     expect(cbrCount([volume("/books/a.cbr")])).toBe(1);
     expect(cbrCount([

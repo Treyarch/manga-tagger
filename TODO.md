@@ -25,12 +25,12 @@ Done when a crafted CBR cannot make Manga Tagger read or package a file outside 
 
 ## 2. Preserve drafts after save failures
 
-- [ ] Update `docs/04-application-shell.md` to define navigation behavior for a job that succeeds overall but contains per-file error entries.
-- [ ] Treat a pending-navigation save as successful only when every archive write that was required succeeded.
-- [ ] Keep the current selection and dirty form when any required archive write fails.
-- [ ] Define how poster-only and index-refresh errors affect navigation, since metadata may already be safely written.
-- [ ] Preserve dirty values for failed files after an ordinary partial batch save instead of silently rebuilding them as clean.
-- [ ] Add UI tests for one-file failure, partial batch failure, cancellation, an unchanged/empty save, and poster-only failure.
+- [x] Update `docs/04-application-shell.md` to define navigation behavior for a job that succeeds overall but contains per-file error entries.
+- [x] Treat a pending-navigation save as successful only when every archive write that was required succeeded.
+- [x] Keep the current selection and dirty form when any required archive write fails.
+- [x] Define how poster-only and index-refresh errors affect navigation, since metadata may already be safely written.
+- [x] Preserve dirty values for failed files after an ordinary partial batch save instead of silently rebuilding them as clean.
+- [x] Add UI tests for one-file failure, partial batch failure, cancellation, an unchanged/empty save, and poster-only failure.
 
 Done when no save failure can silently discard an unsaved metadata draft or navigate away from the affected selection.
 

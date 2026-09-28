@@ -392,6 +392,50 @@ def test_one_save_number_rules(tmp_path: Path) -> None:
     assert recorder.saves == [("/books/Claymore.cbz", {"PageCount": ""}, False)]
 
 
+def test_save_entry_distinguishes_archive_and_follow_up_failures() -> None:
+    path = "/books/Claymore.cbz"
+
+    recorder = _Recorder()
+
+    def fail_save(*_args, **_kwargs):
+        raise RuntimeError("archive write failed")
+
+    failed = run_save(
+        **_save_kwargs(
+            recorder,
+            paths=[path],
+            patch={"Series": "Claymore"},
+            mode="one",
+            volumes=[_volume(path)],
+            save_comic_info=fail_save,
+        )
+    )["entries"][0]
+    assert failed["error_message"] == "archive write failed"
+    assert "output_path" not in failed
+
+    for service, message in (
+        ("write_poster", "poster failed"),
+        ("refresh_volume", "index refresh failed"),
+    ):
+        recorder = _Recorder()
+
+        def fail_follow_up(*_args, _message=message, **_kwargs):
+            raise RuntimeError(_message)
+
+        written = run_save(
+            **_save_kwargs(
+                recorder,
+                paths=[path],
+                patch={"Series": "Claymore"},
+                mode="one",
+                volumes=[_volume(path)],
+                **{service: fail_follow_up},
+            )
+        )["entries"][0]
+        assert written["output_path"] == path
+        assert written["error_message"] == message
+
+
 def test_many_save_per_file_number(tmp_path: Path) -> None:
     recorder = _Recorder()
     run_save(

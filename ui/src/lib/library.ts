@@ -660,6 +660,29 @@ export function shouldRefetchLibrary(job: Job): boolean {
   );
 }
 
+/**
+ * Whether a terminal Save left metadata that still needs to be written.
+ *
+ * Save entries keep ``output_path`` once the archive write succeeds, even when
+ * poster generation or index maintenance subsequently fails. Those follow-up
+ * failures are reportable errors, but they must not resurrect the metadata
+ * draft. A failed entry without ``output_path`` is an archive-write failure.
+ */
+export function savePreservesDraft(job: Job): boolean {
+  if (job.name !== "Save") return false;
+  if (job.state !== "succeeded") return true;
+  return entriesOf(job.result).some(
+    (entry) =>
+      !entry.output_path &&
+      Boolean((entry.error_type ?? "").trim() || (entry.error_message ?? "").trim()),
+  );
+}
+
+/** Pending navigation may continue only after every required metadata write. */
+export function saveAllowsPendingNavigation(job: Job): boolean {
+  return job.name === "Save" && job.state === "succeeded" && !savePreservesDraft(job);
+}
+
 export function cbrCount(rows: Volume[]): number {
   return rows.filter((row) => row.extension.toLowerCase() === "cbr").length;
 }
