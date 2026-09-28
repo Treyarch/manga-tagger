@@ -7,7 +7,7 @@ import zipfile
 from collections.abc import Callable, Mapping
 from pathlib import Path
 
-from manga_tagger.archives.cbr import extract_cbr
+from manga_tagger.archives.cbr import extract_cbr, validate_extracted_tree
 from manga_tagger.archives.comicinfo import BATCH_FIELDS, ComicInfo
 from manga_tagger.archives.errors import (
     ArchiveError,
@@ -186,6 +186,7 @@ def _save_cbr(
         raise ConvertTargetExistsError(f"{target.name} already exists")
     extracted = extract_cbr(path)
     try:
+        validate_extracted_tree(extracted)
         comic_path = extracted / "ComicInfo.xml"
         had_comicinfo = comic_path.is_file()
         if had_comicinfo:

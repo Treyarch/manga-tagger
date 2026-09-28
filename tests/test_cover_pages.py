@@ -256,7 +256,7 @@ def test_cbr_rejects_extracted_symlinks(tmp_path, image_bytes, monkeypatch):
     tree.mkdir()
     (tree / "page.jpg").symlink_to(outside)
     monkeypatch.setattr(pages_mod, "extract_cbr", lambda _: tree)
-    with pytest.raises(ArchiveError, match="symbolic links"):
+    with pytest.raises(ArchiveError, match="symbolic link"):
         replace_cover_page(original, image_bytes, "new.jpg", keep_cbr_original=False)
     assert original.read_bytes() == b"original"
     assert outside.read_bytes() == b"untouched"

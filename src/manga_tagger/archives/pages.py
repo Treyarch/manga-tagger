@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
-from manga_tagger.archives.cbr import extract_cbr
+from manga_tagger.archives.cbr import extract_cbr, validate_extracted_tree
 from manga_tagger.archives.comicinfo import ComicInfo, resolve_cover_index
 from manga_tagger.archives.errors import (
     ArchiveError,
@@ -225,9 +225,8 @@ def _write_cover_cbr(
         raise ConvertTargetExistsError(f"{target.name} already exists")
     extracted = extract_cbr(path)
     try:
+        validate_extracted_tree(extracted)
         extracted_members = list(extracted.rglob("*"))
-        if any(item.is_symlink() for item in extracted_members):
-            raise ArchiveError("cover archive contains unsafe symbolic links")
         members = [item.relative_to(extracted).as_posix() for item in extracted_members]
         pages = sorted(
             name for name in members if (extracted / name).is_file() and _is_page(name)

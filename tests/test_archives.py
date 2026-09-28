@@ -2,6 +2,7 @@
 
 import io
 import json
+import os
 import shutil
 import subprocess
 import zipfile
@@ -668,6 +669,153 @@ def test_cbr_lsar_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     responses[0] = json.dumps({"lsarContents": [{"XADFileName": 1}]}).encode()
     with pytest.raises(UnreadableArchiveError):
         list_pages(archive)
+
+
+@pytest.mark.parametrize(
+    "member",
+    [
+        "/outside.jpg",
+        "../outside.jpg",
+        "nested/../../outside.jpg",
+        "nested\\..\\outside.jpg",
+        "C:\\outside.jpg",
+        "//server/share/outside.jpg",
+    ],
+)
+def test_cbr_rejects_unsafe_member_names_before_extraction(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, member: str
+) -> None:
+    archive = tmp_path / "book.cbr"
+    archive.write_bytes(b"original-cbr")
+    calls = _stub_cbr(monkeypatch, {member: b"outside"})
+
+    with pytest.raises(UnreadableArchiveError, match="unsafe member name"):
+        convert_cbr(archive, keep_cbr_original=False)
+
+    assert [call[0] for call in calls] == ["lsar"]
+    assert archive.read_bytes() == b"original-cbr"
+    assert not archive.with_suffix(".cbz").exists()
+    assert not list(tmp_path.glob(".manga-tagger-*"))
+
+
+def test_cbr_member_read_rejects_escaping_symlink_and_cleans_up(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    archive = tmp_path / "book.cbr"
+    archive.write_bytes(b"original-cbr")
+    outside = tmp_path / "outside.jpg"
+    outside.write_bytes(b"outside")
+    extracted: list[Path] = []
+
+    def run(args: list[str]) -> subprocess.CompletedProcess[bytes]:
+        if args[0] == "lsar":
+            payload = json.dumps(
+                {
+                    "lsarContents": [
+                        {"XADFileName": "page.jpg", "XADIsDirectory": False}
+                    ]
+                }
+            ).encode()
+            return subprocess.CompletedProcess(args, 0, payload, b"")
+        output = Path(args[args.index("-output-directory") + 1])
+        extracted.append(output)
+        (output / "page.jpg").symlink_to(outside)
+        return subprocess.CompletedProcess(args, 0, b"", b"")
+
+    monkeypatch.setattr(cbr_mod, "find_executable", lambda _name: "/usr/bin/unar")
+    monkeypatch.setattr(cbr_mod, "run_command", run)
+    with pytest.raises(UnreadableArchiveError, match="symbolic link"):
+        read_page(archive, 0)
+
+    assert len(extracted) == 1
+    assert not extracted[0].exists()
+    assert outside.read_bytes() == b"outside"
+    assert archive.read_bytes() == b"original-cbr"
+
+
+@pytest.mark.parametrize("operation", ["convert", "save"])
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "hardlink", "fifo"])
+def test_cbr_full_extract_rejects_non_regular_entries_and_preserves_original(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
+    unsafe_kind: str,
+) -> None:
+    archive = tmp_path / "book.cbr"
+    archive.write_bytes(b"original-cbr")
+    outside = tmp_path / "outside.jpg"
+    outside.write_bytes(b"outside")
+    extracted: list[Path] = []
+
+    def run(args: list[str]) -> subprocess.CompletedProcess[bytes]:
+        if args[0] == "lsar":
+            payload = json.dumps(
+                {
+                    "lsarContents": [
+                        {"XADFileName": "nested/page.jpg", "XADIsDirectory": False}
+                    ]
+                }
+            ).encode()
+            return subprocess.CompletedProcess(args, 0, payload, b"")
+        output = Path(args[args.index("-output-directory") + 1])
+        extracted.append(output)
+        nested = output / "nested"
+        nested.mkdir()
+        target = nested / "page.jpg"
+        if unsafe_kind == "symlink":
+            target.symlink_to(outside)
+        elif unsafe_kind == "hardlink":
+            os.link(outside, target)
+        else:
+            os.mkfifo(target)
+        return subprocess.CompletedProcess(args, 0, b"", b"")
+
+    monkeypatch.setattr(cbr_mod, "find_executable", lambda _name: "/usr/bin/unar")
+    monkeypatch.setattr(cbr_mod, "run_command", run)
+    expected = {
+        "symlink": "symbolic link",
+        "hardlink": "hard link",
+        "fifo": "non-regular entry",
+    }[unsafe_kind]
+    with pytest.raises(UnreadableArchiveError, match=expected):
+        if operation == "convert":
+            convert_cbr(archive, keep_cbr_original=False)
+        else:
+            save_comic_info(
+                archive,
+                {"Series": "Unsafe"},
+                write_number=False,
+                keep_cbr_original=False,
+            )
+
+    assert len(extracted) == 1
+    assert not extracted[0].exists()
+    assert outside.read_bytes() == b"outside"
+    assert archive.read_bytes() == b"original-cbr"
+    assert not archive.with_suffix(".cbz").exists()
+
+
+def test_cbr_nested_safe_members_are_packaged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    archive = tmp_path / "book.cbr"
+    archive.write_bytes(b"original-cbr")
+    calls = _stub_cbr(
+        monkeypatch,
+        {
+            "pages/": b"",
+            "pages/chapter/": b"",
+            "pages/chapter/01.jpg": b"nested-page",
+        },
+    )
+
+    output = convert_cbr(archive, keep_cbr_original=True)
+
+    with _ORIGINAL_ZIP(output) as converted:
+        assert converted.read("pages/chapter/01.jpg") == b"nested-page"
+    assert archive.read_bytes() == b"original-cbr"
+    assert [call[0] for call in calls] == ["lsar", "unar"]
+    assert not list(tmp_path.glob(".manga-tagger-*"))
 
 
 def test_missing_unar_does_not_block_cbz(

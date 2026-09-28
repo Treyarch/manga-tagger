@@ -97,11 +97,17 @@ def read_page(path: os.PathLike[str] | str, index: int) -> bytes:
         MissingUnarError: A ``.cbr`` needs ``unar`` or ``lsar`` and one is absent.
     """
     archive = Path(path)
-    pages = list_pages(archive)
+    kind = _kind(archive)
+    entries: list[tuple[str, bool]] | None = None
+    if kind == "cbr":
+        entries = list_cbr_entries(archive)
+        pages = _cbr_pages(archive, entries)
+    else:
+        pages = list_pages(archive)
     if index < 0 or index >= len(pages):
         raise UnreadableArchiveError(f"page index {index} is outside the page list")
     member = pages[index]
-    if _kind(archive) == "cbz":
+    if kind == "cbz":
         with _open_cbz(archive) as zip_file:
             try:
                 return zip_file.read(member)
@@ -109,7 +115,7 @@ def read_page(path: os.PathLike[str] | str, index: int) -> bytes:
                 raise UnreadableArchiveError(
                     f"{archive.name} is missing {member}"
                 ) from exc
-    return read_cbr_member(archive, member)
+    return read_cbr_member(archive, member, entries=entries)
 
 
 def cover_index(path: os.PathLike[str] | str) -> int:
@@ -152,10 +158,19 @@ def _read_root_comicinfo(zip_file: zipfile.ZipFile) -> bytes | None:
 
 
 def _read_cbr_comicinfo(path: Path) -> ComicInfo:
-    for name, is_dir in list_cbr_entries(path):
+    entries = list_cbr_entries(path)
+    for name, is_dir in entries:
         if not is_dir and name == "ComicInfo.xml":
-            return ComicInfo.from_bytes(read_cbr_member(path, name))
+            return ComicInfo.from_bytes(read_cbr_member(path, name, entries=entries))
     return ComicInfo.empty()
+
+
+def _cbr_pages(path: Path, entries: list[tuple[str, bool]]) -> list[str]:
+    pages = [name for name, is_dir in entries if not is_dir and _is_page(name)]
+    pages.sort(key=lambda name: name.replace("\\", "/"))
+    if not pages:
+        raise NoPageImagesError(f"{path.name} contains no page images")
+    return pages
 
 
 def _is_page(name: str) -> bool:
