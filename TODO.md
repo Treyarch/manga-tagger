@@ -65,12 +65,12 @@ Done when one preview request lists the archive once and reads/extracts only the
 
 ## 6. Consolidate duplicated contracts and dead helpers
 
-- [ ] Inventory duplicated field lists, provider ids, column mappings, selection transitions, form construction, and cover URL parsing across Python and TypeScript.
-- [ ] Mark each duplication as intentional boundary code or choose one source of truth.
-- [ ] Prefer generated client contracts or explicit cross-layer contract tests where sharing runtime code is impractical.
-- [ ] Remove unused helpers such as `thumbnail_bytes` if no supported caller needs them.
-- [ ] Keep `save_many` only if its standalone core API remains intentional and tested; document why the application shell does not use it.
-- [ ] Add drift tests for form fields, shared fields, provider ids, API result keys, and lockable fields.
+- [x] Inventory duplicated field lists, provider ids, column mappings, selection transitions, form construction, and cover URL parsing across Python and TypeScript.
+- [x] Mark each duplication as intentional boundary code or choose one source of truth.
+- [x] Prefer generated client contracts or explicit cross-layer contract tests where sharing runtime code is impractical.
+- [x] Remove unused helpers such as `thumbnail_bytes` if no supported caller needs them.
+- [x] Keep `save_many` only if its standalone core API remains intentional and tested; document why the application shell does not use it.
+- [x] Add drift tests for form fields, shared fields, provider ids, API result keys, and lockable fields.
 
 Done when duplicated behavior is either eliminated or guarded by a test that fails when the Python and TypeScript contracts diverge.
 

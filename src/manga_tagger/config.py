@@ -7,6 +7,8 @@ from typing import Mapping
 
 import tomli_w
 
+from manga_tagger.providers.constants import PROVIDER_IDS
+
 _KNOWN_KEYS = (
     "library_roots",
     "keep_cbr_original",
@@ -22,7 +24,7 @@ _KNOWN_KEYS = (
 )
 _THEMES = frozenset({"system", "light", "dark"})
 _DEFAULT_LANGUAGES = ["fr", "en"]
-_DEFAULT_PROVIDERS = ["mangadex", "anilist", "jikan", "comicvine", "nautiljon"]
+_DEFAULT_PROVIDERS = list(PROVIDER_IDS)
 _KNOWN_PROVIDERS = frozenset(_DEFAULT_PROVIDERS)
 
 

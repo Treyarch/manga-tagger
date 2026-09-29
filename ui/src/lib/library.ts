@@ -127,7 +127,7 @@ export function clampProvider(
   return enabled[0] ?? "";
 }
 
-const FIELD_COLUMNS: Record<string, string> = {
+export const FIELD_COLUMNS: Record<string, string> = {
   Title: "title",
   Series: "series",
   Number: "number",

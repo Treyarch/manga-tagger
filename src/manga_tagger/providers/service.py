@@ -12,7 +12,7 @@ from manga_tagger.providers.comicvine import load as comicvine_load
 from manga_tagger.providers.comicvine import load_issue as comicvine_load_issue
 from manga_tagger.providers.comicvine import resolve_issue_id as comicvine_resolve
 from manga_tagger.providers.comicvine import search as comicvine_search
-from manga_tagger.providers.constants import RESULT_LIMIT
+from manga_tagger.providers.constants import PROVIDER_IDS, RESULT_LIMIT
 from manga_tagger.providers.errors import (
     ProviderResponseError,
     ProviderUnavailableError,
@@ -27,7 +27,7 @@ from manga_tagger.providers.nautiljon import search as nautiljon_search
 from manga_tagger.providers.query import parse_number
 from manga_tagger.providers.service_types import Candidate, IssueCandidate
 
-_PROVIDERS = frozenset({"mangadex", "anilist", "jikan", "comicvine", "nautiljon"})
+_PROVIDERS = frozenset(PROVIDER_IDS)
 _ISSUE_PROVIDERS = frozenset({"comicvine", "nautiljon"})
 _NUMERIC_ID = re.compile(r"[1-9]\d*")
 _COMICVINE_KEY = "The Comic Vine API key is not set"

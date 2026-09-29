@@ -27,6 +27,37 @@ Archive bytes and ComicInfo stay in [01-archives-and-comicinfo.md](01-archives-a
 
 When this specification is implemented, `pyproject.toml` gains `fastapi`, `uvicorn`, `pywebview`, and `tomli-w`. `httpx` is the client library named by the provider specification. The server is uvicorn. There is no Flask, no Electron, and no second HTTP framework.
 
+## Contract ownership
+
+The application has one intentional implementation boundary: Python owns the
+archive, index, provider, and HTTP contracts, while the TypeScript client owns
+its local interaction state. The following inventory defines which repeated
+values are authoritative and why a mirror exists:
+
+| Contract | Authoritative definition | Browser mirror |
+| --- | --- | --- |
+| Owned and inspector ComicInfo fields | `archives/comicinfo.py` `OWNED_ELEMENTS`; `shell.py` derives `FORM_FIELDS` by omitting `Volume` | `ui/src/lib/library.ts` `FORM_FIELDS`, needed to render controls without a round trip |
+| Shared batch fields | `archives/comicinfo.py` `BATCH_FIELDS`; `shell.py` keeps ordered `SHARED_FIELDS` and checks that the sets match at import | Ordered `SHARED_FIELDS`, needed for inspector order |
+| Index-column mapping | `shell.py` `FIELD_COLUMNS` | `FIELD_COLUMNS`, because API rows arrive as JSON objects |
+| Lockable fields | `FORM_FIELDS`; there is no separate lockable list | The same browser `FORM_FIELDS` drives lock controls |
+| Provider ids | `providers/constants.py` `PROVIDER_IDS`; config defaults and provider dispatch import it | `PROVIDERS` adds display labels to those ids |
+| Job and result keys | Pydantic `JobModel` plus shell result builders | TypeScript `Job`, `ScanResult`, candidate, issue, and work-entry shapes consume the JSON |
+| Selection transitions and form construction | `shell.py` is the behavioral contract | Intentional pure TypeScript implementations keep clicks and typing synchronous |
+| ComicInfo `Web` parsing for cover actions | `providers/web_id.py` performs authoritative validation before a write | The client mirrors supported URL shapes only to enable or disable controls early; the server always validates again |
+
+`tests/contracts/app-contracts.json` is the cross-layer drift fixture. Python
+tests compare it with the authoritative field lists, column mapping, provider
+ids, lockable fields, constructed forms, and API result models. UI tests compare
+the same fixture with their browser mirrors. A contract change therefore
+requires an explicit fixture and test update on both sides. The duplicated
+selection, form, and cover-URL algorithms also retain behavior tests in both
+test suites; sharing their runtime code across the Python/browser boundary is
+not practical.
+
+The thumbnail route returns the cached path through `thumbnail_path`; there is
+no shell helper that reads the whole thumbnail into bytes. FastAPI streams the
+file response.
+
 ## Paths and config
 
 `app_paths(platform, env, home)` returns the config file, the index file, and the thumbnail directory. `platform` is `linux`, `darwin`, or `win32`. `__main__` passes `sys.platform`. The function does not read the process environment itself. A blank environment value is unset. A relative `XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `XDG_CACHE_HOME`, `APPDATA`, or `LOCALAPPDATA` is ignored.
@@ -357,6 +388,7 @@ Cover at least:
 - `PUT /api/config` with omitted or unchanged normalized roots saves unrelated settings without scanning, including while another job is active. Changed non-empty roots and changed empty roots each save and return the exact scan job when idle. A changed-root request while busy returns 409 and writes none of its fields. A very fast inline scan is returned in its terminal state.
 - `GET /api/jobs/startup` returns null when startup had no roots, and returns the retained startup scan after enqueue and after terminal completion. Client tests cover settling that scan exactly once whether the first observation is queued, running, or already terminal.
 - A shared scan-result contract test runs a real scan with one missing root and one unreadable root through the job endpoint, then passes that same JSON shape to the TypeScript inspector formatter. It asserts the separate `skipped` and `incomplete` keys and their distinct sentences.
+- The shared app-contract fixture is checked by Python and TypeScript for ordered form fields, ordered shared fields, field-to-column mappings, provider ids, API job/result keys, and lockable fields. Both sides also build one- and many-volume forms whose keys match the fixture.
 - A `one` save with a dirty `Number` calls `save_comic_info` with `write_number` true and that value. A `one` save with no dirty fields and a filename stem `Claymore v02` whose stored `Number` is `""` calls `save_comic_info` with `Number` `2`. A `one` save with no dirty fields, a locked `Number`, and a filename that would otherwise fill `Number` does not add `Number`. A `one` save with no dirty fields, a stored `Number` that already matches the filename, a blank `page_count`, and `archive_page_count` `42` calls `save_comic_info` with `PageCount` `42`. A `one` save with a locked `PageCount` and a blank ComicInfo page count does not add `PageCount`. A `one` save with no dirty fields, a matching `Number`, and a non-blank `page_count` does not call `save_comic_info`. A dirty `PageCount` of `""` is written as `""` and does not get replaced by `archive_page_count`. A `many` save calls `save_comic_info` once per path that needs a write, with the dirty shared fields and that file's `Number` from its filename, and does not call `save_many`. A shared `Series` the user did not edit is absent. A file whose shared patch is empty and whose `Number` already matches the filename is not passed to `save_comic_info` when its `page_count` is also already set. A `many` patch that contains `Title` raises `BatchFieldError` and does not call `save_comic_info`. When `write_poster_on_save` is true, a successful save calls `write_poster` on the output path. When it is false, a successful save does not call `write_poster`.
 - A save cancel flag that becomes true after the first file leaves the second file's service uncalled. The first file's `refresh_volume` has run. The job state is `cancelled`.
 - `search` and `load` jobs call no archive write and no `scan`. A load job for `many` returns a form without `Number`.
@@ -386,6 +418,7 @@ Cover at least:
 - Add folder asks for one directory and appends it to `library_roots`, then scans. A drop on the sidebar does the same. Existing roots stay. Settings can still replace the list.
 - Settings omits unchanged roots and the API independently compares normalized roots. Unrelated settings save during another job. A root change returns its exact scan job, including an empty-root or already-finished scan, and the client watches that id without consulting `/api/jobs/current`.
 - Settings Cache clears generated thumbnails immediately without saving or discarding draft settings. A successful clear forces list and grid thumbnails onto a new revision URL; failures remain visible in the open dialog.
+- Every duplicated Python/browser contract is either identified as intentional boundary code above or guarded by the shared app-contract fixture. Provider ids have one Python source of truth, and the shell has no unused thumbnail-bytes helper.
 
 ## Open questions
 

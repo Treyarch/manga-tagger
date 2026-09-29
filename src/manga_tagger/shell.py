@@ -409,29 +409,6 @@ def thumbnail_path(
     return Path(str(found))
 
 
-def thumbnail_bytes(
-    path: str,
-    roots: Sequence[str],
-    *,
-    thumbnail_for: Callable[..., object],
-    db_path: str,
-    cache_dir: str,
-) -> bytes:
-    """Return the cached cover JPEG bytes, building it through ``thumbnail_for``.
-
-    Raises:
-        NoThumbnailError: ``thumbnail_for`` returns no path.
-        OutsideLibraryError: ``path`` is outside the library.
-    """
-    return thumbnail_path(
-        path,
-        roots,
-        thumbnail_for=thumbnail_for,
-        db_path=db_path,
-        cache_dir=cache_dir,
-    ).read_bytes()
-
-
 def media_type_for(name: str) -> str:
     """Return the response type for a page filename."""
     return _MEDIA_TYPES.get(Path(name).suffix.lower(), "application/octet-stream")

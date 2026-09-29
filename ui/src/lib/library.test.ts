@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
+import appContract from "../../../tests/contracts/app-contracts.json";
 import scanJobContract from "../../../tests/contracts/scan-job-result.json";
 
 import {
+  FIELD_COLUMNS,
   POLL_MS,
   FORM_FIELDS,
+  PROVIDERS,
   SHARED_FIELDS,
   candidatesOf,
   cbrCount,
@@ -51,8 +54,12 @@ import {
   switchGuard,
   volumesForShelf,
   volumesInPlace,
+  type Candidate,
+  type IssueCandidate,
   type Job,
+  type ScanResult,
   type Volume,
+  type WorkEntry,
 } from "./library";
 
 function volume(path: string, extra: Partial<Volume> = {}): Volume {
@@ -93,6 +100,76 @@ function volume(path: string, extra: Partial<Volume> = {}): Volume {
     ...extra,
   };
 }
+
+describe("cross-layer contracts", () => {
+  it("matches fields, columns, providers, locks, and constructed forms", () => {
+    expect([...FORM_FIELDS]).toEqual(appContract.form_fields);
+    expect([...SHARED_FIELDS]).toEqual(appContract.shared_fields);
+    expect(FIELD_COLUMNS).toEqual(appContract.field_columns);
+    expect([...FORM_FIELDS]).toEqual(appContract.lockable_fields);
+    expect(PROVIDERS.map(({ id }) => id)).toEqual(appContract.provider_ids);
+
+    const one = formFromVolumes([volume("/books/a.cbz")]);
+    const many = formFromVolumes([
+      volume("/books/a.cbz"),
+      volume("/books/b.cbz"),
+    ]);
+    expect(Object.keys(one!.values)).toEqual(appContract.form_fields);
+    expect(Object.keys(many!.values)).toEqual(appContract.shared_fields);
+  });
+
+  it("matches API result keys", () => {
+    const job = {
+      id: "1",
+      name: "Scan",
+      state: "succeeded",
+      error_type: "",
+      error_message: "",
+      result: null,
+      completed: 0,
+      total: 0,
+    } satisfies Job;
+    const scan = {
+      written: [],
+      unchanged: [],
+      failed: [],
+      deleted: [],
+      skipped: [],
+      incomplete: [],
+      cancelled: false,
+    } satisfies ScanResult;
+    const candidate = {
+      id: "",
+      title: "",
+      year: "",
+      credit: "",
+      count: "",
+      summary: "",
+      cover: "",
+    } satisfies Candidate;
+    const issue = {
+      id: "",
+      number: "",
+      title: "",
+      date: "",
+      cover: "",
+      summary: "",
+    } satisfies IssueCandidate;
+    const workEntry = {
+      path: "",
+      output_path: null,
+      error_type: "",
+      error_message: "",
+      skipped: false,
+    } satisfies WorkEntry;
+
+    expect(Object.keys(job)).toEqual(appContract.api_result_keys.job);
+    expect(Object.keys(scan)).toEqual(appContract.api_result_keys.scan);
+    expect(Object.keys(candidate)).toEqual(appContract.api_result_keys.candidate);
+    expect(Object.keys(issue)).toEqual(appContract.api_result_keys.issue);
+    expect(Object.keys(workEntry)).toEqual(appContract.api_result_keys.work_entry);
+  });
+});
 
 describe("shelf and selection", () => {
   it("keeps a place's direct volumes and shelves by place", () => {

@@ -134,6 +134,15 @@ If a step before the rename fails, the temporary files are removed, `Foo.cbz` do
 
 A batch save exists to stamp the same series-level ComicInfo onto every selected archive. `save_many(paths, patch, *, keep_cbr_original)` writes only these elements:
 
+`save_many` remains a supported standalone core API for non-shell callers that
+already have one uniform shared patch. The application shell deliberately does
+not use it because the shell must derive a different `Number` and possible
+`PageCount` for each file, preserve field locks, report progress and
+cancellation between files, write posters, and refresh the index. Its unit
+tests therefore cover the standalone shared-field validation and partial
+failure behavior even though the desktop workflow calls `save_comic_info`
+directly.
+
 - `Series`
 - `Publisher`
 - `LanguageISO`

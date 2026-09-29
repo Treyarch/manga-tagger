@@ -3,7 +3,7 @@
 The public functions do not read config, open an archive, or write a file.
 """
 
-from manga_tagger.providers.constants import RESULT_LIMIT
+from manga_tagger.providers.constants import PROVIDER_IDS, RESULT_LIMIT
 from manga_tagger.providers.cover import (
     CoverRef,
     resolve_cover,
@@ -24,6 +24,7 @@ from manga_tagger.providers.web_id import WebIdentity, parse_web
 
 __all__ = [
     "RESULT_LIMIT",
+    "PROVIDER_IDS",
     "Candidate",
     "CoverRef",
     "IssueCandidate",

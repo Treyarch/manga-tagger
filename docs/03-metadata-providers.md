@@ -74,6 +74,12 @@ The query remainder is the tag-stripped stem without that matched suffix, includ
 
 The caller chooses one provider: `mangadex`, `anilist`, `jikan`, `comicvine`, or `nautiljon`. Any other name raises `ProviderResponseError` and sends no request.
 
+That ordered id tuple is `PROVIDER_IDS` in `providers/constants.py`. Provider
+dispatch and configuration defaults import it rather than declaring their own
+sets. The TypeScript client mirrors the ids beside its display labels; the
+cross-layer contract fixture defined by [04-application-shell.md](04-application-shell.md)
+guards that browser boundary.
+
 ```text
 search(provider, query, *, title_languages, api_key="", nautiljon_base_url="", nautiljon_api_key="", enabled_providers=None, client, cancel=None) -> list[Candidate]
 list_issues(provider, series_id, *, title_languages, api_key="", nautiljon_base_url="", nautiljon_api_key="", enabled_providers=None, client, cancel=None) -> list[IssueCandidate]
