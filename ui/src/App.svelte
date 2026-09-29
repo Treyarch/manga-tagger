@@ -951,7 +951,7 @@
         }}
       ></button>
       <div class="pointer-events-none relative z-10 flex h-9 items-center gap-1 px-2">
-        <span class="min-w-0 flex-1 truncate text-xs text-app-muted"
+        <span class="min-w-0 flex-1 truncate text-sm text-app-muted"
           >My library</span
         >
         <span class="pointer-events-auto">

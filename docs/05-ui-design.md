@@ -49,12 +49,14 @@ The product brand is a mini SVG logo (closed tankōbon with a tag notch, about 2
 | --- | --- | --- |
 | Window inset | 8px (`p-2`) around the chrome, 8px (`gap-2`) under the header | Window background |
 | Header bar | 48px tall (`h-12`), three zones as above | Same fill as the main pane, hairline around the header |
-| My library sidebar | 240px (`w-60`) | Window background |
+| My library sidebar | 240px initially; session-resizable from 160px to 480px | Window background |
 | Main pane | Remaining width | View background |
 | Inspector | 384px (`w-96`) | View background, hairline along its left edge |
 | Pane strip | Sidebar, main, and inspector as one row | Hairline around the strip |
 
-The sidebar lists library places. The first row is 36px: muted caption text `My library` on the leading edge, and a quiet icon button at the trailing edge, Lucide `FolderPlus`, accessible name `Add folder`. A place row is an icon and a label, 36px tall. The selected place uses the selection wash. When no place is selected, no place row is washed and the main pane shows the whole library. Dragging a folder over the sidebar uses that same wash on the sidebar. When there are no places, one muted line under the button reads `Drop a folder here.` A failed add shows one line under the button. The main pane still says `No volumes yet.`
+The sidebar lists library places. The first row is 36px: muted `text-sm` label text `My library` on the leading edge, matching the series group headers, and a quiet icon button at the trailing edge, Lucide `FolderPlus`, accessible name `Add folder`. A place row is an icon and a label, 36px tall. The selected place uses the selection wash. When no place is selected, no place row is washed and the main pane shows the whole library. Dragging a folder over the sidebar uses that same wash on the sidebar. When there are no places, one muted line under the button reads `Drop a folder here.` A failed add shows one line under the button. The main pane still says `No volumes yet.`
+
+The hairline between the sidebar and main pane is a resize separator. Its visible line stays 1px wide, with a 7px pointer target centered on it. Hovering or dragging uses `cursor: col-resize` and changes the line from the normal hairline color to the strong hairline color; keyboard focus uses the same stronger line. A primary-button drag resizes the sidebar from its 240px initial width, clamped to 160–480px and further capped so that the main pane keeps at least 240px whenever the pane strip is wide enough. Pointer capture keeps the drag active when the pointer leaves the separator, and text selection is disabled for the duration. The separator is keyboard-focusable: Left/Right changes the width by 8px, Shift+Left/Right by 32px, Home selects the minimum, and End selects the currently available maximum. The width is session state, is not written to configuration, and returns to 240px on the next launch. A narrower window reclamps the current width to its available maximum.
 
 The main pane lists volumes. List is the default. Grid shows covers only. The switch is session state. It is not a configuration key. Switching back to list restores the list, and switching to grid restores the grid, for as long as the window is open.
 
@@ -261,6 +263,7 @@ Tests are hermetic. They do not open pywebview, do not take screenshots, do not 
 
 Cover at least:
 
+- Sidebar resizing clamps to the fixed minimum and maximum, lowers the maximum to preserve the main-pane reserve in narrower pane strips, and maps the documented keyboard keys and step sizes to the same clamp.
 - Motion resolution for saved/draft preferences and reduced motion, preview commit/rollback and failed saves, interrupted effects, height retargeting, and cleanup with mocked browser APIs.
 - The Settings tab model keeps General / Library / Archives / Scrapers / Cache in order, and the Library pane owns roots, subfolder scanning, and exclusions. Folder-list helpers append in order without duplicates and remove only the selected path.
 - Draft Settings fields survive tab switches, outgoing content cannot be interacted with, and motion never triggers extra data requests.
@@ -294,10 +297,11 @@ The product brand (SVG logo and wordmark) is presentational chrome. It is covere
 - Settings tab changes, dialog open/close/resize, Matches/Issues navigation, folder/view/selection changes, previews, and notification stacks follow the motion policy; disabled motion is immediate.
 - Verify the above in WebKitGTK with motion on/off, reduced motion, rapid switching, and small windows; automated tests remain hermetic.
 
-- The window is a header bar, a 240px My library sidebar, a flexible main pane, and a 384px inspector, separated by hairlines. An 8px window-background inset surrounds that chrome, with 8px between the header and the pane strip. A hairline outlines the header and the pane strip. The three panes stay flush with each other. The header does not scroll away.
+- The window is a header bar, a My library sidebar initially 240px wide and session-resizable from 160px to 480px, a flexible main pane, and a 384px inspector, separated by hairlines. An 8px window-background inset surrounds that chrome, with 8px between the header and the pane strip. A hairline outlines the header and the pane strip. The three panes stay flush with each other. The header does not scroll away.
 - List is the view when the window opens. Rows are 36px. List and grid both group by series: every group has a muted `text-sm` series header above its volumes, the blank-series group is first and labeled `Untitled`, then named series follow in case-folded alphabetical order. List rows are filename-only with a muted tree marker (tee or L). Grid cells show a 2:3 cover, the filename as a truncated label, and a 2px accent ring when selected, with no tree marker. List selection is the accent wash on the row. List and grid thumbs use `Thumb` with a lazy `img` on `/api/thumbnail`, not blob URLs.
 - An empty main pane shows the sentence `No volumes yet.` and no illustration. An empty sidebar shows `Drop a folder here.` under the Add folder button.
-- The first sidebar row is the muted caption `My library`, then Add folder, Lucide `FolderPlus`, 16px, trailing in a 36px row. A drag over the sidebar uses the selection wash.
+- The first sidebar row is the muted `text-sm` label `My library`, matching series group headers, then Add folder, Lucide `FolderPlus`, 16px, trailing in a 36px row. A drag over the sidebar uses the selection wash.
+- The sidebar separator has a 1px line and centered 7px hit target. Pointer hover and drag use `col-resize`; hover, focus, and drag strengthen the line. Dragging clamps the sidebar to 160–480px and preserves 240px of main-pane width when possible. Left/Right, Shift+Left/Right, Home, and End provide equivalent keyboard resizing. The chosen width lasts only for the current session and reclamps when the window narrows.
 - Built-in light and dark use the color table in this document. Dark mode is the `dark` class. The layout does not change between themes. With `dark`, native selects use a dark popup through `color-scheme: dark`. System mode replaces the semantic colors with a valid Omarchy palette without changing layout.
 - A dirty inspector field (edited or loaded, `dirty` true) shows the dirty semantic color on its value text and border. In the built-in palette that color is amber; an Omarchy palette supplies yellow/orange. A clean field keeps primary text and the hairline border. After Save rebuilds the form, dirty styling is gone.
 - A failed preview keeps the 320px preview frame and centers `CircleAlert`, `Preview unavailable`, and the wrapping backend reason using semantic danger and muted colors.
