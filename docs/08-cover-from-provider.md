@@ -106,7 +106,7 @@ Toast: success `Cover updated.` / failure uses `error_message` or `Cover failed.
 
 ## UI
 
-On the inspector page preview, when the shown page is the cover index (or `0` when cover is null) and the form mode is `one`, two quiet overlay controls sit over the image frame: **Replace cover** and **Insert cover**. They are disabled when `Web` does not parse, its provider is disabled or lacks required configuration, a job is busy, or there are no pages. They do not appear in multi-select mode.
+On the inspector page preview, when the shown page is the cover index (or `0` when cover is null) and the form mode is `one`, two small icon buttons sit over the image frame: Lucide `Replace` for **Replace cover** and Lucide `ImagePlus` for **Insert cover**. Each visible button face contains only its icon; **Replace cover** and **Insert cover** remain as the native tooltip and accessible name. They are disabled when `Web` does not parse, its provider is disabled or lacks required configuration, a job is busy, or there are no pages. They do not appear in multi-select mode.
 
 After the job, refresh the preview at the cover index and invalidate the affected thumbnail URL. Retain unsaved form edits, including `Web` and `Number`, while refreshing unedited fields such as `PageCount`; the cover job does not save those edits. This also applies when a CBR becomes a CBZ. Show Cover progress and Cancel in the header.
 
@@ -138,6 +138,7 @@ Cover at least:
 - Cover job refreshes the index path; CBR convert path respects `keep_cbr_original`.
 - Folder-order edge cases terminate, corrupt images and verification failures leave originals untouched, and retained XML extensions survive.
 - UI enablement respects provider configuration; terminal Cover jobs refresh the shelf and preserve dirty fields; errors and cancellation never show a success toast.
+- The cover action controls render as icon-only buttons while retaining `Replace cover` and `Insert cover` as their tooltips and accessible names.
 
 ## Acceptance criteria
 
@@ -145,5 +146,5 @@ Cover at least:
 - The new cover is JPEG with a `.jpg` extension and retains the scraper's filename stem, using the current cover's directory when possible and the documented fallback when necessary for sort order.
 - Existing kept page members are not recompressed. The write is atomic.
 - ComicInfo `PageCount` and `Pages` / `FrontCover` match the new page list.
-- The inspector shows Replace cover and Insert cover overlays on the cover preview in one-volume mode when `Web` parses.
+- The inspector shows icon-only Replace cover and Insert cover overlays, with text tooltips and accessible names, on the cover preview in one-volume mode when `Web` parses.
 - A Cover job success refreshes the shelf and optional poster; failure and cancel do not toast as success.

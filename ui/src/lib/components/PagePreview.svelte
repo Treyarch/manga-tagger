@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onDestroy, untrack } from "svelte";
-  import { ChevronLeft, ChevronRight } from "lucide-svelte";
+  import { ChevronLeft, ChevronRight, ImagePlus, Replace } from "lucide-svelte";
   import MotionPanel from "./MotionPanel.svelte";
   import { releaseAfterMotion } from "../motion";
   import Button from "./Button.svelte";
@@ -114,19 +114,21 @@
         >
           <Button
             variant="secondary"
+            icon
             label="Replace cover"
             disabled={coverActionsDisabled}
             onclick={() => onReplaceCover?.()}
           >
-            Replace cover
+            <Replace size={20} />
           </Button>
           <Button
             variant="secondary"
+            icon
             label="Insert cover"
             disabled={coverActionsDisabled}
             onclick={() => onInsertCover?.()}
           >
-            Insert cover
+            <ImagePlus size={20} />
           </Button>
         </div>
       {/if}
