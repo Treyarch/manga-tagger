@@ -45,6 +45,8 @@ The header bar is three zones in one 48px row: a leading product brand, a center
 
 The product brand is a mini SVG logo (closed tankōbon with a tag notch, about 20px, `currentColor` with the accent on the spine) beside the wordmark `Manga Tagger`. It is not a button.
 
+The repository also carries the same mark as a standalone launcher icon. `assets/manga-tagger.svg` is the source asset: a square SVG with a white rounded-square field, zinc-900 book and tag strokes, and the built-in light-theme blue-600 accent spine. Its colors are fixed so the icon remains recognizable independently of the running app theme. `assets/manga-tagger-512.png` is a 512×512 raster export of that source for launchers that do not accept SVG. Both assets keep the area outside the rounded-square field transparent and contain no wordmark, text, shadow, or additional illustration.
+
 | Region | Size | Surface |
 | --- | --- | --- |
 | Window inset | 8px (`p-2`) around the chrome, 8px (`gap-2`) under the header | Window background |
@@ -291,6 +293,8 @@ Cover at least:
 
 The product brand (SVG logo and wordmark) is presentational chrome. It is covered by the acceptance criteria below, not by a separate unit test.
 
+The launcher icon is also presentational. Verify the SVG directly and inspect its PNG export at 512px and launcher-sized 64px and 32px; no automated pixel snapshot is required.
+
 ## Acceptance criteria
 
 - Animate interface defaults off, previews live, persists on Save, rolls back on Cancel/Close, and obeys live reduced-motion changes.
@@ -315,4 +319,5 @@ The product brand (SVG logo and wordmark) is presentational chrome. It is covere
 - Action toasts appear in a top-center stack below the header bar, size to their icon and message up to 375px (wrapping longer content and fitting narrower viewports), use the optional interface motion policy (including the first toast), show a leading 16px Lucide icon that fades once on mount (job-matched on success, `CircleAlert` on failure), and disappear after 5 seconds or on click. They use the semantic raised surface and a stronger dark-mode shadow so they stand apart from the panes. They summarize scrape, load, save, rename, convert, and scan outcomes only—not in-progress search. Scrape match count, no matches, and provider errors are toast-only. Detailed per-file save/rename/convert errors and scan-root lines stay in the inspector.
 - Type is the default sans stack at `text-sm` for controls and rows, and `text-xs` for captions. The product wordmark alone uses the bundled Dela Gothic One face via `.font-brand`.
 - The header is three zones: leading brand (mini SVG + `Manga Tagger`), centered action cluster, trailing Settings / Close. The brand is readable in light and dark.
+- `assets/manga-tagger.svg` reproduces the header's closed-tankōbon/tag mark with its blue spine on a stable neutral field, and `assets/manga-tagger-512.png` is a visually matching 512×512 launcher-ready export.
 - A keyboard focus ring is visible on the shared controls.

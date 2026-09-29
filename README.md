@@ -68,6 +68,12 @@ The window title is **Manga Tagger**. Closing it stops the local API and exits t
 
 If the UI was not built, the window shows `UI build is missing.` while `/api` still works. Rebuild with `npm run build` in `ui/`.
 
+## Launcher icon
+
+The repository includes the app mark as [`assets/manga-tagger.svg`](assets/manga-tagger.svg), a 512×512 PNG at [`assets/manga-tagger-512.png`](assets/manga-tagger-512.png), and a Linux launcher at [`assets/manga-tagger.desktop`](assets/manga-tagger.desktop). The launcher uses the portable freedesktop icon name `manga-tagger`; the wheel installs all three files under the standard `share/applications` and `share/icons/hicolor` paths of its installation prefix.
+
+For a launcher used directly from a source checkout, either install the icon into your icon theme or replace the desktop entry's `Icon=manga-tagger` with the absolute path to `assets/manga-tagger.svg`.
+
 ## First run
 
 1. Open **Settings** (or use **Add folder** in the sidebar) and add absolute paths to folders that contain `.cbz` / `.cbr` files. Settings can disable subfolder scanning or exclude complete folder trees.
@@ -145,8 +151,9 @@ uv build --wheel
 
 The production artifact is `dist/manga_tagger-0.1.0-py3-none-any.whl`. It
 contains the compiled Svelte UI and installs the `manga-tagger` command; it does
-not require the source checkout or Node.js at runtime. Linux still needs the
-GTK/WebKitGTK system packages listed above.
+not require the source checkout or Node.js at runtime. It also carries the Linux
+desktop entry and both launcher icon formats as wheel shared data. Linux still
+needs the GTK/WebKitGTK system packages listed above.
 
 For example, install the wheel as an isolated application with:
 

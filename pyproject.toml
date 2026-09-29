@@ -35,6 +35,11 @@ packages = ["src/manga_tagger"]
 [tool.hatch.build.targets.wheel.force-include]
 "ui/dist" = "manga_tagger/ui_dist"
 
+[tool.hatch.build.targets.wheel.shared-data]
+"assets/manga-tagger.desktop" = "share/applications/manga-tagger.desktop"
+"assets/manga-tagger.svg" = "share/icons/hicolor/scalable/apps/manga-tagger.svg"
+"assets/manga-tagger-512.png" = "share/icons/hicolor/512x512/apps/manga-tagger.png"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

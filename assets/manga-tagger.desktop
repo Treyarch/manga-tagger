@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Manga Tagger
+Comment=Tag and rename manga files
+Exec=manga-tagger
+Icon=manga-tagger
+Terminal=true
+Categories=Utility;
+Keywords=manga;tagger;cbz;cbr;

@@ -61,10 +61,31 @@ A production build has two ordered stages:
 
 1. `npm run build` in `ui/` compiles the Svelte client into `ui/dist/`.
 2. `uv build --wheel` packages the Python modules and copies that compiled
-   directory into the wheel as `manga_tagger/ui_dist/`.
+   directory into the wheel as `manga_tagger/ui_dist/`. The same wheel build
+   installs the repository launcher assets as shared data:
+   `assets/manga-tagger.desktop` becomes
+   `share/applications/manga-tagger.desktop`, the SVG icon becomes
+   `share/icons/hicolor/scalable/apps/manga-tagger.svg`, and the 512px PNG
+   becomes `share/icons/hicolor/512x512/apps/manga-tagger.png`.
 
 The wheel must contain `manga_tagger/ui_dist/index.html` and its referenced
-assets. At runtime, an installed package serves that embedded directory. An
+assets, plus those three desktop integration files. The desktop entry is:
+
+```ini
+[Desktop Entry]
+Type=Application
+Name=Manga Tagger
+Comment=Tag and rename manga files
+Exec=manga-tagger
+Icon=manga-tagger
+Terminal=true
+Categories=Utility;
+Keywords=manga;tagger;cbz;cbr;
+```
+
+`Icon` uses the freedesktop icon name rather than an absolute checkout path so
+the installed launcher resolves either packaged icon from the active data
+prefix. At runtime, an installed package serves the embedded UI directory. An
 editable/source checkout without embedded assets falls back to the repository's
 `ui/dist/`, preserving the existing development workflow and missing-build
 message. Generated `ui/dist/` and top-level `dist/` output are not source files
@@ -431,7 +452,7 @@ packages before the locked Python environment.
 
 Cover at least:
 
-- UI resource resolution prefers an embedded `ui_dist/index.html` and falls back to the source checkout's `ui/dist/` when it is absent. A release check builds the wheel and verifies its HTML, referenced assets, and `manga-tagger` console entry point.
+- UI resource resolution prefers an embedded `ui_dist/index.html` and falls back to the source checkout's `ui/dist/` when it is absent. The desktop entry carries the specified name, comment, command, icon name, terminal behavior, category, and keywords. A release check builds the wheel and verifies its HTML, referenced assets, `manga-tagger` console entry point, desktop entry, scalable icon, and 512px icon.
 - `animate_interface` defaults to false; invalid stored types fall back to false. GET exposes it, PUT accepts only booleans, omitted keys stay unchanged, and TOML round trips preserve it and unknown keys. Preview alone never writes configuration.
 - Clearing a missing or populated thumbnail cache returns the removal count through the injected cache service, does not create a job or change config/index data, and returns a structured `LibraryIndexError` response when clearing fails.
 
