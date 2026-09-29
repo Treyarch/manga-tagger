@@ -41,7 +41,7 @@ from manga_tagger.api.models import (
 from manga_tagger.archives.errors import ArchiveError
 from manga_tagger.archives.pages import insert_cover_page, replace_cover_page
 from manga_tagger.archives.poster import write_poster
-from manga_tagger.archives.read import list_pages, read_page
+from manga_tagger.archives.read import read_page_with_name
 from manga_tagger.archives.rename import plan_rename, rename_in_directory
 from manga_tagger.archives.save import convert_cbr, save_comic_info
 from manga_tagger.config import AppConfig, ConfigError, apply_put, save_config
@@ -117,8 +117,7 @@ class Services:
     forget_volume: Callable[..., object]
     copy_locked_fields: Callable[..., object]
     set_field_lock: Callable[..., object]
-    list_pages: Callable[..., object]
-    read_page: Callable[..., object]
+    read_page_with_name: Callable[..., object]
     save_comic_info: Callable[..., object]
     write_poster: Callable[..., object]
     plan_rename: Callable[..., object]
@@ -163,8 +162,7 @@ def default_services() -> Services:
         forget_volume=forget_volume,
         copy_locked_fields=copy_locked_fields,
         set_field_lock=set_field_lock,
-        list_pages=list_pages,
-        read_page=read_page,
+        read_page_with_name=read_page_with_name,
         save_comic_info=save_comic_info,
         write_poster=write_poster,
         plan_rename=plan_rename,
@@ -343,8 +341,7 @@ def _register_routes(app: FastAPI) -> None:
             path,
             page_index,
             state.config.library_roots,
-            list_pages=state.services.list_pages,
-            read_page=state.services.read_page,
+            read_page_with_name=state.services.read_page_with_name,
         )
         return Response(content=payload, media_type=media)
 

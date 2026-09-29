@@ -22,6 +22,7 @@ from manga_tagger.shell import (
     places_from_volumes,
     preferred_load_number,
     preview_rename,
+    read_page_bytes,
     run_convert,
     run_list_issues,
     run_load,
@@ -67,6 +68,26 @@ def test_accept_root_paths_keeps_a_directory(tmp_path: Path) -> None:
     again, extra = accept_root_paths(roots, [str(folder)])
     assert extra == []
     assert again == roots
+
+
+def test_page_bytes_uses_combined_read_for_media_type(tmp_path: Path) -> None:
+    archive = tmp_path / "book.cbz"
+    calls: list[tuple[str, int]] = []
+
+    def read_page_with_name(path: str, index: int) -> tuple[bytes, str]:
+        calls.append((path, index))
+        return b"page", "nested/Cover.WEBP"
+
+    payload, media_type = read_page_bytes(
+        str(archive),
+        2,
+        [str(tmp_path)],
+        read_page_with_name=read_page_with_name,
+    )
+
+    assert payload == b"page"
+    assert media_type == "image/webp"
+    assert calls == [(str(archive), 2)]
 
 
 def test_places_and_selection() -> None:

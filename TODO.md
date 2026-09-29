@@ -56,10 +56,10 @@ Done when the inspector shows `{path} was skipped.` for a missing root and `{pat
 
 ## 5. Remove duplicate page-listing work
 
-- [ ] Update `docs/01-archives-and-comicinfo.md` or `docs/04-application-shell.md` if the page-read API boundary changes.
-- [ ] Introduce a member-based page read, or return the resolved member name with the read result, so the route does not list the archive twice.
-- [ ] Keep index bounds checking and media-type selection in one clear layer.
-- [ ] Add instrumentation tests proving one CBZ central-directory listing and one CBR `lsar` invocation per preview request.
+- [x] Update `docs/01-archives-and-comicinfo.md` or `docs/04-application-shell.md` if the page-read API boundary changes.
+- [x] Introduce a member-based page read, or return the resolved member name with the read result, so the route does not list the archive twice.
+- [x] Keep index bounds checking and media-type selection in one clear layer.
+- [x] Add instrumentation tests proving one CBZ central-directory listing and one CBR `lsar` invocation per preview request.
 
 Done when one preview request lists the archive once and reads/extracts only the requested page member.
 

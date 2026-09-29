@@ -3,6 +3,8 @@
 import json
 import os
 import socket
+import subprocess
+import zipfile
 from dataclasses import replace
 from pathlib import Path
 
@@ -13,6 +15,8 @@ from fastapi.testclient import TestClient
 from manga_tagger import index as index_mod
 from manga_tagger.api import create_app, enqueue_startup_scan, serve
 from manga_tagger.api.app import default_services
+from manga_tagger.archives import cbr as cbr_mod
+from manga_tagger.archives import read as read_mod
 from manga_tagger.archives.results import FileResult
 from manga_tagger.config import load_config, save_config
 from manga_tagger.index import LibraryIndexError, Volume
@@ -54,20 +58,16 @@ def test_library_does_not_scan(tmp_path: Path) -> None:
 def test_page_reads_one_index_and_rejects_paths_outside(tmp_path: Path) -> None:
     reads: list[int] = []
 
-    def list_pages(_path: str) -> list[str]:
-        return ["Cover.JPG", "b.png"]
-
-    def read_page(_path: str, index: int) -> bytes:
+    def read_page_with_name(_path: str, index: int) -> tuple[bytes, str]:
         reads.append(index)
-        return b"page-bytes"
+        return b"page-bytes", ["Cover.JPG", "b.png"][index]
 
     def save_comic_info(*_args, **_kwargs):
         raise AssertionError("save")
 
     app = _app(
         tmp_path,
-        list_pages=list_pages,
-        read_page=read_page,
+        read_page_with_name=read_page_with_name,
         save_comic_info=save_comic_info,
         roots=["/books"],
     )
@@ -95,6 +95,77 @@ def test_page_reads_one_index_and_rejects_paths_outside(tmp_path: Path) -> None:
     assert missing.status_code == 400
     assert saved.status_code == 400
     assert saved.json()["error_type"] == "OutsideLibraryError"
+
+
+def test_page_request_opens_one_cbz_central_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    library = tmp_path / "books"
+    library.mkdir()
+    archive = library / "a.cbz"
+    with zipfile.ZipFile(archive, "w") as output:
+        output.writestr("b.PNG", b"selected")
+        output.writestr("a.jpg", b"first")
+
+    original_zip_file = zipfile.ZipFile
+    opens: list[Path] = []
+
+    class CountingZipFile(original_zip_file):
+        def __init__(self, file, *args, **kwargs):  # type: ignore[no-untyped-def]
+            opens.append(Path(file))
+            super().__init__(file, *args, **kwargs)
+
+    monkeypatch.setattr(read_mod.zipfile, "ZipFile", CountingZipFile)
+    app = _app(tmp_path, roots=[str(library)])
+    with TestClient(app) as client:
+        response = client.get(
+            "/api/page", params={"path": str(archive), "index": "1"}
+        )
+
+    assert response.status_code == 200
+    assert response.content == b"selected"
+    assert response.headers["content-type"] == "image/png"
+    assert opens == [archive]
+
+
+def test_page_request_invokes_lsar_once_for_cbr(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    library = tmp_path / "books"
+    library.mkdir()
+    archive = library / "a.cbr"
+    archive.write_bytes(b"not-a-rar")
+    calls: list[list[str]] = []
+
+    def run(args: list[str]) -> subprocess.CompletedProcess[bytes]:
+        calls.append(list(args))
+        if args[0] == "lsar":
+            payload = json.dumps(
+                {
+                    "lsarContents": [
+                        {"XADFileName": "b.PNG", "XADIsDirectory": False},
+                        {"XADFileName": "a.jpg", "XADIsDirectory": False},
+                    ]
+                }
+            ).encode()
+            return subprocess.CompletedProcess(args, 0, payload, b"")
+        output = Path(args[args.index("-output-directory") + 1])
+        (output / "b.PNG").write_bytes(b"selected")
+        return subprocess.CompletedProcess(args, 0, b"", b"")
+
+    monkeypatch.setattr(cbr_mod, "find_executable", lambda _name: "/usr/bin/unar")
+    monkeypatch.setattr(cbr_mod, "run_command", run)
+    app = _app(tmp_path, roots=[str(library)])
+    with TestClient(app) as client:
+        response = client.get(
+            "/api/page", params={"path": str(archive), "index": "1"}
+        )
+
+    assert response.status_code == 200
+    assert response.content == b"selected"
+    assert response.headers["content-type"] == "image/png"
+    assert [call[0] for call in calls] == ["lsar", "unar"]
+    assert calls[0] == ["lsar", "-json", str(archive)]
 
 
 def test_thumbnail_miss_is_404(tmp_path: Path) -> None:

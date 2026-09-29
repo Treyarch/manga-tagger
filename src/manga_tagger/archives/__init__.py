@@ -25,6 +25,7 @@ from manga_tagger.archives.read import (
     list_pages,
     read_comic_info,
     read_page,
+    read_page_with_name,
 )
 from manga_tagger.archives.rename import (
     OFFERED_RENAME_TEMPLATE,
@@ -57,6 +58,7 @@ __all__ = [
     "plan_rename",
     "read_comic_info",
     "read_page",
+    "read_page_with_name",
     "rename_in_directory",
     "replace_cover_page",
     "resolve_cover_index",

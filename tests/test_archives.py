@@ -33,6 +33,7 @@ from manga_tagger.archives import (
     plan_rename,
     read_comic_info,
     read_page,
+    read_page_with_name,
     rename_in_directory,
     resolve_cover_index,
 )
@@ -214,6 +215,12 @@ def test_partial_reads_follow_filename_order(
     RecordingZipFile.reads = []
     assert read_page(archive, 1) == STORED
     assert RecordingZipFile.reads == [f"{FOLDER}/b.jpg"]
+
+    RecordingZipFile.reads = []
+    payload, member = read_page_with_name(archive, 0)
+    assert payload == DEFLATED
+    assert member == f"{FOLDER}/a.jpg"
+    assert RecordingZipFile.reads == [member]
 
     original = archive.read_bytes()
     with pytest.raises(UnreadableArchiveError):

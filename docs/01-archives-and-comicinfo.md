@@ -85,7 +85,7 @@ These operations use the zip central directory and the requested members only. T
 
 - Listing pages reads the central directory and no member bodies.
 - Reading ComicInfo reads the `ComicInfo.xml` member only. When that member is absent, the result is an empty model and no page-image member is read.
-- Reading one page reads that member only and returns its uncompressed bytes. The index is the reading-order index. An index outside the page list raises `UnreadableArchiveError` and does not write the archive.
+- Reading one page resolves the reading-order index and returns both that member's uncompressed bytes and its member name. The operation opens one CBZ central directory, or runs one CBR `lsar -json`, and reuses that listing to read or extract the selected member; callers do not list the archive separately to recover its name. The byte-only `read_page` convenience API uses the same combined operation and discards the name. An index outside the page list raises `UnreadableArchiveError` and does not write the archive.
 - Resolving the cover does not read image bytes. The cover index is the lowest reading-order index whose `Page` has `Image` equal to that index and `Type` equal to `FrontCover`. If there is no such page, the cover index is `0`. `Page` entries whose `Image` does not match a current page are ignored. A missing or stale `Pages` list still yields a cover: the first page.
 
 A CBR list runs `lsar -json` on the archive and does not extract it. `lsarContents` is a list. Each entry's `XADFileName` is the member name, as a string. An entry with `XADIsDirectory` true is a directory and is not a page. A non-zero exit, a body that is not JSON, a missing `lsarContents`, or an entry whose `XADFileName` is not a string raises `UnreadableArchiveError`.
@@ -225,12 +225,13 @@ Cover at least:
 - A `.cbr` whose `.cbz` sibling already exists is not extracted and is not deleted.
 - When `unar` is on `PATH`, a convert writes a `.cbz`, reads `ComicInfo.xml` back, and deletes the `.cbr` when `keep_cbr_original` is false. With `keep_cbr_original` true, the `.cbr` remains. A CBR metadata save applies the patch in the new `.cbz`. When `unar` is absent, the CBR test is skipped and a CBZ save still passes. A unit test for `MissingUnarError` may stub the executable lookup so it does not depend on the developer machine.
 - A unit test stubs the process runner. A list runs `lsar -json` and does not run `unar`. A one-member read runs `unar -quiet -no-directory -output-directory <temp> <archive> <member>`. `<temp>` is inside the archive's directory and is gone after the call, including when the stubbed command fails.
+- Instrumented preview-read tests prove that the combined page operation opens one CBZ central directory or invokes CBR `lsar` once, reads or extracts only the selected member, and returns that member name with its bytes.
 - CBR security tests reject absolute, parent-traversal, Windows-drive, and backslash-traversal member names before `unar` runs. Nested relative members still list, read, convert, save, and package correctly.
 - Stubbed extraction tests create a symbolic link, a hard link, and a non-regular entry in the temporary tree and verify that one-member reads and full extracts reject them before reading or packaging their targets. A resolved path outside the extraction root is rejected. The temporary tree is removed, no sibling `.cbz` is created, and the original `.cbr` bytes remain unchanged after every rejection.
 
 ## Acceptance criteria
 
-- Listing a CBZ, reading `ComicInfo.xml`, and reading one page use the central directory and the requested members only. They do not extract the CBZ to a directory.
+- Listing a CBZ, reading `ComicInfo.xml`, and reading one page use the central directory and the requested members only. A page read opens one CBZ central directory or invokes CBR `lsar` once and returns the resolved member name with the requested bytes. It does not extract the CBZ to a directory.
 - Reading order is sorted member names. It stays correct when the central directory is in a different order, when pages sit in a subdirectory, and when a spread is one file.
 - The cover is the `FrontCover` page when that type is present, and the first page otherwise. Choosing it does not read every image.
 - A metadata save replaces `ComicInfo.xml` and copies every other member unchanged, including compression method, page bytes, and central-directory order. Member names are marked UTF-8. `Pages` is not rebuilt. Unknown XML is still there after the save.

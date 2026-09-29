@@ -30,12 +30,7 @@ def list_pages(path: os.PathLike[str] | str) -> list[str]:
         MissingUnarError: A ``.cbr`` needs ``unar`` or ``lsar`` and one is absent.
     """
     archive = Path(path)
-    names = _member_names(archive)
-    pages = [name for name in names if _is_page(name)]
-    pages.sort(key=lambda name: name.replace("\\", "/"))
-    if not pages:
-        raise NoPageImagesError(f"{archive.name} contains no page images")
-    return pages
+    return _page_names(archive, _member_names(archive))
 
 
 def read_zip_comic_info(path: os.PathLike[str] | str) -> ComicInfo:
@@ -96,26 +91,49 @@ def read_page(path: os.PathLike[str] | str, index: int) -> bytes:
         NoPageImagesError: The archive contains no page images.
         MissingUnarError: A ``.cbr`` needs ``unar`` or ``lsar`` and one is absent.
     """
+    payload, _member = read_page_with_name(path, index)
+    return payload
+
+
+def read_page_with_name(
+    path: os.PathLike[str] | str, index: int
+) -> tuple[bytes, str]:
+    """Return one page's bytes and resolved archive member name.
+
+    The page list and member read share one open CBZ central directory or one
+    CBR ``lsar`` result. This lets callers select a media type without listing
+    the archive a second time.
+
+    Args:
+        path: Path of a ``.cbz`` or ``.cbr``.
+        index: Reading-order index, starting at 0.
+
+    Returns:
+        The uncompressed page bytes and its archive member name.
+
+    Raises:
+        UnreadableArchiveError: The archive cannot be read, or ``index`` is
+            outside the page list.
+        NoPageImagesError: The archive contains no page images.
+        MissingUnarError: A ``.cbr`` needs ``unar`` or ``lsar`` and one is absent.
+    """
     archive = Path(path)
-    kind = _kind(archive)
-    entries: list[tuple[str, bool]] | None = None
-    if kind == "cbr":
+    if _kind(archive) == "cbr":
         entries = list_cbr_entries(archive)
         pages = _cbr_pages(archive, entries)
-    else:
-        pages = list_pages(archive)
-    if index < 0 or index >= len(pages):
-        raise UnreadableArchiveError(f"page index {index} is outside the page list")
-    member = pages[index]
-    if kind == "cbz":
-        with _open_cbz(archive) as zip_file:
-            try:
-                return zip_file.read(member)
-            except KeyError as exc:
-                raise UnreadableArchiveError(
-                    f"{archive.name} is missing {member}"
-                ) from exc
-    return read_cbr_member(archive, member, entries=entries)
+        member = _page_at(pages, index)
+        return read_cbr_member(archive, member, entries=entries), member
+
+    with _open_cbz(archive) as zip_file:
+        pages = _page_names(
+            archive,
+            [info.filename for info in zip_file.infolist() if not info.is_dir()],
+        )
+        member = _page_at(pages, index)
+        try:
+            return zip_file.read(member), member
+        except KeyError as exc:
+            raise UnreadableArchiveError(f"{archive.name} is missing {member}") from exc
 
 
 def cover_index(path: os.PathLike[str] | str) -> int:
@@ -166,11 +184,21 @@ def _read_cbr_comicinfo(path: Path) -> ComicInfo:
 
 
 def _cbr_pages(path: Path, entries: list[tuple[str, bool]]) -> list[str]:
-    pages = [name for name, is_dir in entries if not is_dir and _is_page(name)]
+    return _page_names(path, [name for name, is_dir in entries if not is_dir])
+
+
+def _page_names(path: Path, names: list[str]) -> list[str]:
+    pages = [name for name in names if _is_page(name)]
     pages.sort(key=lambda name: name.replace("\\", "/"))
     if not pages:
         raise NoPageImagesError(f"{path.name} contains no page images")
     return pages
+
+
+def _page_at(pages: list[str], index: int) -> str:
+    if index < 0 or index >= len(pages):
+        raise UnreadableArchiveError(f"page index {index} is outside the page list")
+    return pages[index]
 
 
 def _is_page(name: str) -> bool:

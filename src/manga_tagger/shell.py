@@ -529,25 +529,21 @@ def read_page_bytes(
     index: int,
     roots: Sequence[str],
     *,
-    list_pages: Callable[[str], list[str]],
-    read_page: Callable[[str, int], bytes],
+    read_page_with_name: Callable[[str, int], tuple[bytes, str]],
 ) -> tuple[bytes, str]:
-    """List page names, then read one index.
+    """Read one page and select its media type from the resolved member name.
 
     Args:
         path: Absolute archive path inside a library root.
         index: Zero-based page index.
         roots: Current library roots.
-        list_pages: Central-directory listing. It is not given another index.
-        read_page: Reads that one index and no other.
+        read_page_with_name: Reads one index and returns its bytes and member name.
 
     Returns:
         Uncompressed page bytes and the content type.
     """
     ensure_inside(path, roots)
-    names = list_pages(path)
-    payload = read_page(path, index)
-    name = names[index] if 0 <= index < len(names) else ""
+    payload, name = read_page_with_name(path, index)
     return payload, media_type_for(name)
 
 
