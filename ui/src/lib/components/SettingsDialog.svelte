@@ -6,8 +6,8 @@
   import { motion } from "../motion";
   import Checkbox from "./Checkbox.svelte";
   import Dialog from "./Dialog.svelte";
+  import FolderList from "./FolderList.svelte";
   import Select from "./Select.svelte";
-  import Textarea from "./Textarea.svelte";
   import TextInput from "./TextInput.svelte";
   import {
     postJson,
@@ -16,16 +16,13 @@
     type Config,
   } from "../api";
   import { clearThumbnailCache } from "../cache";
-  import { PROVIDERS, parseLanguages, parseRootLines, type Job } from "../library";
-
-  type TabId = "general" | "archives" | "scrapers" | "cache";
-
-  const TABS: { id: TabId; label: string }[] = [
-    { id: "general", label: "General" },
-    { id: "archives", label: "Archives" },
-    { id: "scrapers", label: "Scrapers" },
-    { id: "cache", label: "Cache" },
-  ];
+  import { PROVIDERS, parseLanguages, type Job } from "../library";
+  import {
+    appendFolderPath,
+    removeFolderPath,
+    SETTINGS_TABS,
+    type SettingsTabId,
+  } from "../settings";
 
   const THEME_OPTIONS = [
     { value: "system", label: "System" },
@@ -53,7 +50,7 @@
     onCacheCleared: () => void;
   } = $props();
 
-  let tab = $state<TabId>("general");
+  let tab = $state<SettingsTabId>("general");
   let direction = $state(12);
   let animateInterface = $state(untrack(() => config.animate_interface));
   let finished = false;
@@ -67,14 +64,16 @@
     onClose();
   }
 
-  function switchTab(next: TabId) {
-    const nextIndex = TABS.findIndex((item) => item.id === next);
-    const previousIndex = TABS.findIndex((item) => item.id === tab);
+  function switchTab(next: SettingsTabId) {
+    const nextIndex = SETTINGS_TABS.findIndex((item) => item.id === next);
+    const previousIndex = SETTINGS_TABS.findIndex((item) => item.id === tab);
     direction = nextIndex >= previousIndex ? 12 : -12;
     tab = next;
   }
-  let roots = $state(untrack(() => config.library_roots.join("\n")));
-  let excludedFolders = $state(untrack(() => config.excluded_folders.join("\n")));
+  let roots = $state<string[]>(untrack(() => [...config.library_roots]));
+  let excludedFolders = $state<string[]>(
+    untrack(() => [...config.excluded_folders]),
+  );
   let scanSubfolders = $state(untrack(() => config.scan_subfolders));
   let apiKey = $state(untrack(() => config.comicvine_api_key));
   let nautiljonBaseUrl = $state(untrack(() => config.nautiljon_base_url));
@@ -103,6 +102,23 @@
   let clearingCache = $state(false);
   let cacheMessage = $state("");
   let cacheError = $state("");
+  let pickingFolder = $state(false);
+
+  async function browseFolder(list: "roots" | "excluded") {
+    if (pickingFolder) return;
+    pickingFolder = true;
+    error = "";
+    try {
+      const chosen = await postJson<{ path: string | null }>("/api/dialogs/folder");
+      if (!chosen.path) return;
+      if (list === "roots") roots = appendFolderPath(roots, chosen.path);
+      else excludedFolders = appendFolderPath(excludedFolders, chosen.path);
+    } catch (exc) {
+      error = exc instanceof Error ? exc.message : "Could not choose that folder.";
+    } finally {
+      pickingFolder = false;
+    }
+  }
 
   async function clearCache() {
     if (clearingCache) return;
@@ -122,16 +138,7 @@
   }
 
   async function save() {
-    const parsed = parseRootLines(roots);
-    if (parsed.error) {
-      error = parsed.error;
-      return;
-    }
-    const parsedExcluded = parseRootLines(excludedFolders);
-    if (parsedExcluded.error) {
-      error = parsedExcluded.error;
-      return;
-    }
+    error = "";
     try {
       const updates: Partial<Config> = {
         comicvine_api_key: apiKey,
@@ -152,8 +159,8 @@
           updates,
           config,
           {
-            library_roots: parsed.roots,
-            excluded_folders: parsedExcluded.roots,
+            library_roots: roots,
+            excluded_folders: excludedFolders,
             scan_subfolders: scanSubfolders,
           },
         ),
@@ -181,7 +188,7 @@
   {/snippet}
   <div class="flex min-h-72 gap-4">
     <nav class="flex w-36 shrink-0 flex-col gap-1" aria-label="Settings sections">
-      {#each TABS as item (item.id)}
+      {#each SETTINGS_TABS as item (item.id)}
         <button
           type="button"
           class="rounded-md px-2 py-1.5 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent {tab ===
@@ -221,9 +228,12 @@
               </p>
             </div>
             <label class="flex flex-col gap-1">
-              <span class="text-xs text-app-muted">Library roots</span>
-              <Textarea value={roots} rows={4} onValue={(value) => (roots = value)} />
+              <span class="text-xs text-app-muted">Title languages</span>
+              <TextInput value={languages} onValue={(value) => (languages = value)} />
             </label>
+          </div>
+        {:else if tab === "library"}
+          <div class="flex flex-col gap-3">
             <div class="flex flex-col gap-1">
               <Checkbox
                 label="Include subfolders automatically"
@@ -233,22 +243,30 @@
                 When off, only archives directly inside each library root are added.
               </p>
             </div>
-            <label class="flex flex-col gap-1">
-              <span class="text-xs text-app-muted">Excluded folders</span>
-              <Textarea
-                value={excludedFolders}
-                rows={3}
-                onValue={(value) => (excludedFolders = value)}
+            <FolderList
+              label="Library roots"
+              addLabel="Add library folder"
+              paths={roots}
+              emptyText="No library folders."
+              browseDisabled={pickingFolder}
+              onBrowse={() => void browseFolder("roots")}
+              onRemove={(path) => (roots = removeFolderPath(roots, path))}
+            />
+            <div class="flex flex-col gap-1">
+              <FolderList
+                label="Excluded folders"
+                addLabel="Add excluded folder"
+                paths={excludedFolders}
+                emptyText="No excluded folders."
+                browseDisabled={pickingFolder}
+                onBrowse={() => void browseFolder("excluded")}
+                onRemove={(path) =>
+                  (excludedFolders = removeFolderPath(excludedFolders, path))}
               />
-              <span class="text-xs text-app-muted">
-                One absolute path per line. Each folder and everything below it is
-                omitted from the library.
-              </span>
-            </label>
-            <label class="flex flex-col gap-1">
-              <span class="text-xs text-app-muted">Title languages</span>
-              <TextInput value={languages} onValue={(value) => (languages = value)} />
-            </label>
+              <p class="text-xs text-app-muted">
+                Each folder and everything below it is omitted from the library.
+              </p>
+            </div>
           </div>
         {:else if tab === "archives"}
           <div class="flex flex-col gap-4">

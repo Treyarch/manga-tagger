@@ -34,7 +34,6 @@ import {
   mangaLabel,
   matchCoverSrc,
   thumbnailSrc,
-  parseRootLines,
   placeAfterLibrary,
   placeFromClick,
   preferredIssueNumber,
@@ -607,11 +606,6 @@ describe("jobs and dialogs", () => {
     });
     expect(folderDropRequest(null)).toEqual({ paths: [] });
     expect(folderDropRequest({ paths: "nope" })).toEqual({ paths: [] });
-  });
-
-  it("rejects a relative settings root and keeps absolute ones", () => {
-    expect(parseRootLines("\n/books\n\n").roots).toEqual(["/books"]);
-    expect(parseRootLines("/books\nrelative").error).toBe("Paths must be absolute.");
   });
 
   it("filters and clamps enabled providers", () => {

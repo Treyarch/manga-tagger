@@ -716,12 +716,6 @@ export function convertConfirmMessage(count: number): string {
   return `Convert ${count} CBR ${pluralize(count, "file")} to CBZ and delete the originals?`;
 }
 
-export function isAbsolutePath(value: string): boolean {
-  if (value.startsWith("/")) return true;
-  if (value.startsWith("\\\\")) return true;
-  return /^[A-Za-z]:[\\/]/.test(value);
-}
-
 export function folderDropRequest(detail: unknown): { paths: string[] } {
   if (typeof detail !== "object" || detail === null || !("paths" in detail)) {
     return { paths: [] };
@@ -738,17 +732,6 @@ export function excludedFoldersAfterRemove(
   path: string,
 ): string[] {
   return current.includes(path) ? [...current] : [...current, path];
-}
-
-export function parseRootLines(text: string): { roots: string[]; error: string | null } {
-  const roots = text
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line !== "");
-  for (const root of roots) {
-    if (!isAbsolutePath(root)) return { roots: [], error: "Paths must be absolute." };
-  }
-  return { roots, error: null };
 }
 
 export function parseLanguages(text: string): string[] {
