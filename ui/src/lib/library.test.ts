@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import scanJobContract from "../../../tests/contracts/scan-job-result.json";
 
 import {
   POLL_MS,
@@ -483,7 +484,13 @@ describe("jobs and dialogs", () => {
     expect(
       scanRootLines({ skipped: ["/missing"], incomplete: ["/locked"] }),
     ).toEqual(["/missing was skipped.", "/locked was not fully scanned."]);
-    expect(scanRootLines({})).toEqual([]);
+    expect(scanRootLines(null)).toEqual([]);
+  });
+
+  it("formats the scan job endpoint contract", () => {
+    expect(scanRootLines(scanJobContract.result)).toEqual(
+      scanJobContract.inspector_lines,
+    );
   });
 
   it("updates saved paths and drops a failed path that left the library", () => {

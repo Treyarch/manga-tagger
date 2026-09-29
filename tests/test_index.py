@@ -276,8 +276,9 @@ def test_finished_scan_prunes_rows_and_thumbnails(tmp_path: Path) -> None:
     assert names["keep.cbz"].series == "Keep"
     assert names["stay.cbz"].root == str(offline.resolve())
     assert str((stable / "drop.cbz").resolve()) in result.deleted
-    assert str(removed.resolve()) not in result.skipped_or_incomplete
-    assert str(offline.resolve()) in result.skipped_or_incomplete
+    assert str(removed.resolve()) not in result.skipped
+    assert str(offline.resolve()) in result.skipped
+    assert result.incomplete == ()
     assert not stale.exists()
 
     emptied = scan(database, cache, [])
@@ -309,7 +310,8 @@ def test_unreadable_directory_is_not_pruned(
     names = {row.name for row in list_volumes(database)}
     assert names == {"stay.cbz", "gone.cbz"}
     assert result.deleted == ()
-    assert str(other.resolve()) in result.skipped_or_incomplete
+    assert result.skipped == ()
+    assert result.incomplete == (str(other.resolve()),)
 
 
 def test_refresh_and_forget(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

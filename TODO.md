@@ -47,10 +47,10 @@ Done when every root-changing scan is observed exactly once, unrelated settings 
 
 ## 4. Repair scan-root result reporting
 
-- [ ] Reconcile `ScanResult`, the shell job payload, and the TypeScript consumer.
-- [ ] Preserve the distinction between a skipped root and an incomplete root.
-- [ ] Emit one stable API shape and use the same field names in Python, TypeScript, tests, and `docs/04-application-shell.md`.
-- [ ] Add an end-to-end contract test that passes a real scan result through the job endpoint into the client formatting helper.
+- [x] Reconcile `ScanResult`, the shell job payload, and the TypeScript consumer.
+- [x] Preserve the distinction between a skipped root and an incomplete root.
+- [x] Emit one stable API shape and use the same field names in Python, TypeScript, tests, and `docs/04-application-shell.md`.
+- [x] Add an end-to-end contract test that passes a real scan result through the job endpoint into the client formatting helper.
 
 Done when the inspector shows `{path} was skipped.` for a missing root and `{path} was not fully scanned.` for an unreadable/incomplete root.
 

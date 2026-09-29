@@ -140,13 +140,14 @@ class Volume:
 
 @dataclass(frozen=True)
 class ScanResult:
-    """What one scan inserted, skipped, and deleted."""
+    """What one scan inserted, skipped, left incomplete, and deleted."""
 
     written: tuple[str, ...]
     unchanged: tuple[str, ...]
     failed: tuple[str, ...]
     deleted: tuple[str, ...]
-    skipped_or_incomplete: tuple[str, ...]
+    skipped: tuple[str, ...]
+    incomplete: tuple[str, ...]
     cancelled: bool
 
 
@@ -199,8 +200,8 @@ def scan(
         cancel: Called before each file and before pruning. True stops the scan.
 
     Returns:
-        Written, unchanged, failed, and deleted paths, plus skipped or
-        incomplete roots.
+        Written, unchanged, failed, and deleted paths, plus separate skipped
+        and incomplete roots.
 
     Raises:
         LibraryIndexError: A root is relative, or the database cannot be opened.
@@ -241,15 +242,17 @@ def scan(
         deleted: list[str] = []
         if not cancelled and all(status != "incomplete" for _root, status in statuses):
             deleted = _prune(connection, cache, resolved_roots, statuses, seen)
-    skipped = tuple(
-        str(root) for root, status in statuses if status in {"skipped", "incomplete"}
+    skipped = tuple(str(root) for root, status in statuses if status == "skipped")
+    incomplete = tuple(
+        str(root) for root, status in statuses if status == "incomplete"
     )
     return ScanResult(
         written=tuple(written),
         unchanged=tuple(unchanged),
         failed=tuple(failed),
         deleted=tuple(deleted),
-        skipped_or_incomplete=skipped,
+        skipped=skipped,
+        incomplete=incomplete,
         cancelled=cancelled,
     )
 

@@ -210,6 +210,16 @@ export type Job = {
   total: number;
 };
 
+export type ScanResult = {
+  written: string[];
+  unchanged: string[];
+  failed: string[];
+  deleted: string[];
+  skipped: string[];
+  incomplete: string[];
+  cancelled: boolean;
+};
+
 export type WorkEntry = {
   path: string;
   output_path?: string | null;
@@ -751,13 +761,12 @@ export function renamePlanLines(entries: WorkEntry[]): string[] {
 }
 
 /** Sentences for roots the result names as skipped or incomplete. */
-export function scanRootLines(result: {
-  skipped?: string[];
-  incomplete?: string[];
-}): string[] {
+export function scanRootLines(
+  result: Pick<ScanResult, "skipped" | "incomplete"> | null | undefined,
+): string[] {
   const lines: string[] = [];
-  for (const path of result.skipped ?? []) lines.push(`${path} was skipped.`);
-  for (const path of result.incomplete ?? []) {
+  for (const path of result?.skipped ?? []) lines.push(`${path} was skipped.`);
+  for (const path of result?.incomplete ?? []) {
     lines.push(`${path} was not fully scanned.`);
   }
   return lines;

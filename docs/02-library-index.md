@@ -147,8 +147,12 @@ The result reports:
 - paths left unchanged because size and mtime matched, in walk order
 - paths written as `failed`, in walk order
 - paths deleted by prune, in `path` order
-- roots that were skipped or incomplete, in input order
+- roots that were skipped because they were not existing directories, in input order
+- roots that were incomplete because some directory could not be listed, in input order
 - whether the scan was cancelled
+
+`ScanResult` keeps skipped and incomplete roots in separate `skipped` and
+`incomplete` tuples. It does not expose a combined root-status field.
 
 ## Single-file update
 

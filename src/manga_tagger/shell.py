@@ -1117,7 +1117,8 @@ def _scan_payload(result: ScanResult) -> dict[str, object]:
         "unchanged": list(result.unchanged),
         "failed": list(result.failed),
         "deleted": list(result.deleted),
-        "skipped_or_incomplete": list(result.skipped_or_incomplete),
+        "skipped": list(result.skipped),
+        "incomplete": list(result.incomplete),
         "cancelled": result.cancelled,
     }
 

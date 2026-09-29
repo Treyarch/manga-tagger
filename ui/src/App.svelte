@@ -78,6 +78,7 @@
     type IssueCandidate,
     type Job,
     type Place,
+    type ScanResult,
     type Selection,
     type Volume,
   } from "./lib/library";
@@ -264,10 +265,7 @@
       form = preserveDirtyFields(formFromVolumes(rowsFor(selection.paths)), draft);
     } else if (!(job.name === "Scan" && formIsDirty(form))) rebuildForm();
     if (job.name === "Scan") {
-      const result = (job.result ?? {}) as {
-        skipped?: string[];
-        incomplete?: string[];
-      };
+      const result = job.result as ScanResult | null;
       const lines = scanRootLines(result);
       if (job.state === "failed" && job.error_message) lines.unshift(job.error_message);
       inspectorLines = lines;

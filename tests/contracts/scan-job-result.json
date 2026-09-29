@@ -1,0 +1,15 @@
+{
+  "result": {
+    "written": [],
+    "unchanged": [],
+    "failed": [],
+    "deleted": [],
+    "skipped": ["/library/missing"],
+    "incomplete": ["/library/unreadable"],
+    "cancelled": false
+  },
+  "inspector_lines": [
+    "/library/missing was skipped.",
+    "/library/unreadable was not fully scanned."
+  ]
+}

@@ -722,7 +722,15 @@ def test_list_issues_and_preferred_number() -> None:
 
 def test_scan_cancel_and_index_error() -> None:
     def cancelled_scan(*_args, **_kwargs):
-        return ScanResult((), (), (), (), (), True)
+        return ScanResult(
+            written=(),
+            unchanged=(),
+            failed=(),
+            deleted=(),
+            skipped=(),
+            incomplete=(),
+            cancelled=True,
+        )
 
     with pytest.raises(JobCancelled) as raised:
         run_scan(
@@ -734,6 +742,8 @@ def test_scan_cancel_and_index_error() -> None:
             progress=lambda _completed, _total: None,
         )
     assert raised.value.result["cancelled"] is True
+    assert raised.value.result["skipped"] == []
+    assert raised.value.result["incomplete"] == []
 
     def broken_scan(*_args, **_kwargs):
         raise LibraryIndexError("bad index")

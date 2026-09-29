@@ -1,5 +1,7 @@
 """HTTP API, with archive and catalog calls replaced."""
 
+import json
+import os
 import socket
 from dataclasses import replace
 from pathlib import Path
@@ -8,6 +10,7 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
+from manga_tagger import index as index_mod
 from manga_tagger.api import create_app, enqueue_startup_scan, serve
 from manga_tagger.api.app import default_services
 from manga_tagger.archives.results import FileResult
@@ -287,6 +290,44 @@ def test_config_put_returns_the_queued_scan_job_for_changed_roots(
 
     app.state.box.runner.shutdown()
     assert scans == []
+
+
+def test_scan_job_result_matches_client_contract(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    missing = tmp_path / "missing"
+    unreadable = tmp_path / "unreadable"
+    unreadable.mkdir()
+    real_scandir = os.scandir
+
+    def scandir(path: object):
+        if Path(str(path)).resolve() == unreadable.resolve():
+            raise PermissionError("blocked")
+        return real_scandir(path)
+
+    monkeypatch.setattr(index_mod.os, "scandir", scandir)
+    app = _app(tmp_path, roots=[str(missing), str(unreadable)])
+
+    start_endpoint = next(
+        route.endpoint for route in app.routes if route.path == "/api/jobs/scan"
+    )
+    get_endpoint = next(
+        route.endpoint for route in app.routes if route.path == "/api/jobs/{job_id}"
+    )
+    started = start_endpoint()
+    body = get_endpoint(started.id).model_dump(mode="json")
+
+    contract_path = Path(__file__).parent / "contracts" / "scan-job-result.json"
+    contract = json.loads(contract_path.read_text(encoding="utf-8"))
+    result = body["result"]
+    result["skipped"] = [
+        path.replace(str(tmp_path), "/library") for path in result["skipped"]
+    ]
+    result["incomplete"] = [
+        path.replace(str(tmp_path), "/library") for path in result["incomplete"]
+    ]
+    assert body["state"] == "succeeded"
+    assert result == contract["result"]
 
 
 def test_system_theme_endpoint_is_injected_and_never_cached(tmp_path: Path) -> None:
@@ -797,7 +838,15 @@ def _scan_recorder(calls: list[object]):
         calls.append("scan")
         from manga_tagger.index import ScanResult
 
-        return ScanResult((), (), (), (), (), False)
+        return ScanResult(
+            written=(),
+            unchanged=(),
+            failed=(),
+            deleted=(),
+            skipped=(),
+            incomplete=(),
+            cancelled=False,
+        )
 
     return scan
 
