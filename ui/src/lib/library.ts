@@ -733,6 +733,13 @@ export function folderDropRequest(detail: unknown): { paths: string[] } {
   };
 }
 
+export function excludedFoldersAfterRemove(
+  current: readonly string[],
+  path: string,
+): string[] {
+  return current.includes(path) ? [...current] : [...current, path];
+}
+
 export function parseRootLines(text: string): { roots: string[]; error: string | null } {
   const roots = text
     .split(/\r?\n/)

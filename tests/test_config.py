@@ -18,6 +18,8 @@ def test_missing_config_returns_defaults(tmp_path: Path) -> None:
     path = tmp_path / "config.toml"
     config = load_config(path)
     assert config.library_roots == []
+    assert config.excluded_folders == []
+    assert config.scan_subfolders is True
     assert config.keep_cbr_original is True
     assert config.write_poster_on_save is True
     assert config.auto_save_metadata_on_switch is False
@@ -40,6 +42,8 @@ def test_missing_config_returns_defaults(tmp_path: Path) -> None:
     saved = tomllib.loads(path.read_text(encoding="utf-8"))
     assert set(saved) == {
         "library_roots",
+        "excluded_folders",
+        "scan_subfolders",
         "keep_cbr_original",
         "write_poster_on_save",
         "auto_save_metadata_on_switch",
@@ -57,6 +61,8 @@ def test_relative_root_is_dropped_and_file_is_unchanged(tmp_path: Path) -> None:
     path = tmp_path / "config.toml"
     path.write_text(
         'library_roots = ["relative", "/abs", "/abs"]\n'
+        'excluded_folders = ["relative-extra", "/abs/Extras", "/abs/Extras"]\n'
+        'scan_subfolders = "yes"\n'
         'keep_cbr_original = "no"\n'
         'write_poster_on_save = "no"\n'
         'auto_save_metadata_on_switch = "yes"\n'
@@ -66,6 +72,8 @@ def test_relative_root_is_dropped_and_file_is_unchanged(tmp_path: Path) -> None:
     before = path.read_bytes()
     config = load_config(path)
     assert config.library_roots == [str(Path("/abs").resolve())]
+    assert config.excluded_folders == [str(Path("/abs/Extras").resolve())]
+    assert config.scan_subfolders is True
     assert config.keep_cbr_original is True
     assert config.write_poster_on_save is True
     assert config.auto_save_metadata_on_switch is False
@@ -111,6 +119,10 @@ def test_put_rejects_wrong_json_types(tmp_path: Path) -> None:
     with pytest.raises(ConfigError):
         apply_put(config, {"library_roots": "/books"})
     with pytest.raises(ConfigError):
+        apply_put(config, {"excluded_folders": "/books/Extras"})
+    with pytest.raises(ConfigError):
+        apply_put(config, {"scan_subfolders": "yes"})
+    with pytest.raises(ConfigError):
         apply_put(config, {"keep_cbr_original": "yes"})
     with pytest.raises(ConfigError):
         apply_put(config, {"write_poster_on_save": "yes"})
@@ -132,11 +144,15 @@ def test_put_rejects_wrong_json_types(tmp_path: Path) -> None:
             "keep_cbr_original": False,
             "write_poster_on_save": False,
             "auto_save_metadata_on_switch": True,
+            "excluded_folders": ["/books/Extras", "relative"],
+            "scan_subfolders": False,
         },
     )
     assert off.keep_cbr_original is False
     assert off.write_poster_on_save is False
     assert off.auto_save_metadata_on_switch is True
+    assert off.excluded_folders == [str(Path("/books/Extras").resolve())]
+    assert off.scan_subfolders is False
 
 
 def test_enabled_providers_load_fallbacks(tmp_path: Path) -> None:

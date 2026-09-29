@@ -11,6 +11,8 @@ from manga_tagger.providers.constants import PROVIDER_IDS
 
 _KNOWN_KEYS = (
     "library_roots",
+    "excluded_folders",
+    "scan_subfolders",
     "keep_cbr_original",
     "write_poster_on_save",
     "auto_save_metadata_on_switch",
@@ -47,6 +49,8 @@ class AppConfig:
 
     path: Path
     library_roots: list[str] = field(default_factory=list)
+    excluded_folders: list[str] = field(default_factory=list)
+    scan_subfolders: bool = True
     keep_cbr_original: bool = True
     write_poster_on_save: bool = True
     auto_save_metadata_on_switch: bool = False
@@ -65,6 +69,8 @@ class AppConfig:
         """Return the known keys."""
         return {
             "library_roots": list(self.library_roots),
+            "excluded_folders": list(self.excluded_folders),
+            "scan_subfolders": self.scan_subfolders,
             "keep_cbr_original": self.keep_cbr_original,
             "write_poster_on_save": self.write_poster_on_save,
             "auto_save_metadata_on_switch": self.auto_save_metadata_on_switch,
@@ -138,11 +144,20 @@ def load_config(path: Path) -> AppConfig:
         raise ConfigError(f"{path}: the TOML could not be parsed")
     extra = {key: value for key, value in data.items() if key not in _KNOWN_KEYS}
     roots = data.get("library_roots", [])
+    excluded = data.get("excluded_folders", [])
     languages = data.get("title_languages", list(_DEFAULT_LANGUAGES))
     providers = data.get("enabled_providers", list(_DEFAULT_PROVIDERS))
     return AppConfig(
         path=path,
         library_roots=_clean_roots(roots) if isinstance(roots, list) else [],
+        excluded_folders=(
+            _clean_roots(excluded) if isinstance(excluded, list) else []
+        ),
+        scan_subfolders=(
+            data["scan_subfolders"]
+            if isinstance(data.get("scan_subfolders"), bool)
+            else True
+        ),
         keep_cbr_original=(
             data["keep_cbr_original"]
             if isinstance(data.get("keep_cbr_original"), bool)
@@ -211,8 +226,8 @@ def apply_put(config: AppConfig, updates: Mapping[str, object]) -> AppConfig:
         updates: Keys the client sent.
 
     Returns:
-        A new config. ``library_roots`` and ``enabled_providers`` replace those
-        lists wholesale.
+        A new config. ``library_roots``, ``excluded_folders``, and
+        ``enabled_providers`` replace those lists wholesale.
 
     Raises:
         ConfigError: A provided value has the wrong JSON type.
@@ -225,6 +240,8 @@ def apply_put(config: AppConfig, updates: Mapping[str, object]) -> AppConfig:
     return AppConfig(
         path=config.path,
         library_roots=list(current["library_roots"]),  # type: ignore[arg-type]
+        excluded_folders=list(current["excluded_folders"]),  # type: ignore[arg-type]
+        scan_subfolders=bool(current["scan_subfolders"]),
         keep_cbr_original=bool(current["keep_cbr_original"]),
         write_poster_on_save=bool(current["write_poster_on_save"]),
         auto_save_metadata_on_switch=bool(current["auto_save_metadata_on_switch"]),
@@ -240,10 +257,14 @@ def apply_put(config: AppConfig, updates: Mapping[str, object]) -> AppConfig:
 
 
 def _put_value(key: str, value: object) -> object:
-    if key == "library_roots":
+    if key in {"library_roots", "excluded_folders"}:
         if not isinstance(value, list):
-            raise ConfigError("library_roots must be a list")
+            raise ConfigError(f"{key} must be a list")
         return _clean_roots(value)
+    if key == "scan_subfolders":
+        if not isinstance(value, bool):
+            raise ConfigError("scan_subfolders must be a boolean")
+        return value
     if key == "animate_interface":
         if not isinstance(value, bool):
             raise ConfigError("animate_interface must be a boolean")

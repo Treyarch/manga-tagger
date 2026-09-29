@@ -126,6 +126,32 @@ def test_places_and_selection() -> None:
     assert volumes_for_roots(original, []) == []
     assert original == [claymore_a]
 
+    discovery_rows = [
+        _volume("/books/direct.cbz"),
+        _volume("/books/Series/volume.cbz"),
+        _volume("/books/Series/Extras/bonus.cbz"),
+    ]
+    without_extras = volumes_for_roots(
+        discovery_rows, ["/books"], ["/books/Series/Extras"]
+    )
+    assert [row.path for row in without_extras] == [
+        "/books/direct.cbz",
+        "/books/Series/volume.cbz",
+    ]
+    direct_only = volumes_for_roots(
+        discovery_rows, ["/books"], scan_subfolders=False
+    )
+    assert [row.path for row in direct_only] == ["/books/direct.cbz"]
+    explicit_nested_root = volumes_for_roots(
+        discovery_rows,
+        ["/books", "/books/Series"],
+        scan_subfolders=False,
+    )
+    assert [row.path for row in explicit_nested_root] == [
+        "/books/direct.cbz",
+        "/books/Series/volume.cbz",
+    ]
+
     visible = ["a", "b", "c"]
     selection = select_plain(visible, "a")
     selection = select_toggle(visible, selection, "b")
@@ -742,6 +768,33 @@ def test_list_issues_and_preferred_number() -> None:
 
 
 def test_scan_cancel_and_index_error() -> None:
+    received: dict[str, object] = {}
+
+    def recording_scan(*_args, **kwargs):
+        received.update(kwargs)
+        return ScanResult(
+            written=(),
+            unchanged=(),
+            failed=(),
+            deleted=(),
+            skipped=(),
+            incomplete=(),
+            cancelled=False,
+        )
+
+    run_scan(
+        db_path="index.db",
+        cache_dir="covers",
+        roots=["/books"],
+        excluded=["/books/Extras"],
+        scan_subfolders=False,
+        scan=recording_scan,
+        cancel=lambda: False,
+        progress=lambda _completed, _total: None,
+    )
+    assert received["excluded"] == ["/books/Extras"]
+    assert received["scan_subfolders"] is False
+
     def cancelled_scan(*_args, **_kwargs):
         return ScanResult(
             written=(),

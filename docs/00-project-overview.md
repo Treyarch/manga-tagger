@@ -102,7 +102,7 @@ The design size is a few hundred volumes. V1 does not add process pools or nativ
 
 The window has one primary layout: the library, a page preview, and the metadata for the current selection. One selected volume shows that volume. Several selected volumes share one series form, and the preview follows the volume used to start the scrape. Match results appear on that same screen. Tagging is not a separate wizard.
 
-Library roots are scanned recursively for `.cbz` and `.cbr`, in any letter case. Other files are ignored. A symlink is followed only when its target stays inside that root.
+Library roots are scanned for `.cbz` and `.cbr`, in any letter case. By default the scan is recursive; the user can disable automatic subfolder scanning. Explicitly excluded folders and everything below them are ignored. Other files are ignored. A symlink is followed only when its target stays inside that root and is not excluded.
 
 The scrape query is the existing `Series` value when that field is non-empty. Otherwise it is the filename without its extension. The provider specification defines how release tags and numbers are stripped from that filename.
 
@@ -131,6 +131,8 @@ On Linux, unset XDG variables mean `~/.config`, `~/.local/share`, and `~/.cache`
 | Key | Type | Default | Meaning |
 | --- | --- | --- | --- |
 | `library_roots` | list of absolute paths | `[]` | Folders scanned for `.cbz` and `.cbr` files. An empty list means an empty shelf. |
+| `excluded_folders` | list of absolute paths | `[]` | Folders omitted from library scans, including all descendants. Exclusions apply even when the folder is also a library root. |
+| `scan_subfolders` | boolean | `true` | When `true`, discover archives in subfolders of each library root. When `false`, scan only archives directly inside each root. |
 | `keep_cbr_original` | boolean | `true` | When `true`, keep the `.cbr` next to the new `.cbz`. When `false`, delete the `.cbr` after its `.cbz` has been written and read back. |
 | `write_poster_on_save` | boolean | `true` | When `true`, a successful save, rename, or cover update writes `{stem}-poster.jpg` from the cover. When `false`, those jobs do not extract a poster. Rename still moves an existing sibling poster with the archive. |
 | `auto_save_metadata_on_switch` | boolean | `false` | When `true`, leaving a dirty metadata form by changing issue or place silently saves that form before navigating. When `false`, the app asks Save / Don't save / Cancel. Only fields already dirty from an edit or an accepted load are written; scrape alone still does not write an archive. |

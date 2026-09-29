@@ -14,6 +14,8 @@ export class ApiError extends Error {
 
 export type Config = {
   library_roots: string[];
+  excluded_folders: string[];
+  scan_subfolders: boolean;
   keep_cbr_original: boolean;
   write_poster_on_save: boolean;
   auto_save_metadata_on_switch: boolean;
@@ -55,6 +57,31 @@ export function withChangedLibraryRoots(
     nextRoots.length === currentRoots.length &&
     nextRoots.every((root, index) => root === currentRoots[index]);
   return unchanged ? updates : { ...updates, library_roots: nextRoots };
+}
+
+/** Add discovery settings only when their normalized values changed. */
+export function withChangedLibraryDiscovery(
+  updates: Partial<Config>,
+  current: Pick<Config, "library_roots" | "excluded_folders" | "scan_subfolders">,
+  next: Pick<Config, "library_roots" | "excluded_folders" | "scan_subfolders">,
+): Partial<Config> {
+  let result = withChangedLibraryRoots(
+    updates,
+    current.library_roots,
+    next.library_roots,
+  );
+  const exclusionsUnchanged =
+    next.excluded_folders.length === current.excluded_folders.length &&
+    next.excluded_folders.every(
+      (folder, index) => folder === current.excluded_folders[index],
+    );
+  if (!exclusionsUnchanged) {
+    result = { ...result, excluded_folders: next.excluded_folders };
+  }
+  if (next.scan_subfolders !== current.scan_subfolders) {
+    result = { ...result, scan_subfolders: next.scan_subfolders };
+  }
+  return result;
 }
 
 async function parse<T>(response: Response): Promise<T> {

@@ -102,11 +102,14 @@ The call does not stat the library, walk directories, open archives, or build th
 
 ## Scan
 
-`scan(db_path, cache_dir, roots, *, cancel=None)` walks `roots` in list order. Each root is an absolute path. A relative root raises `LibraryIndexError` before any walk. `cancel` is `None` or a callable that returns true when the scan should stop. It is checked before each file and before pruning. The function runs on the caller's thread.
+`scan(db_path, cache_dir, roots, *, excluded=(), scan_subfolders=True, cancel=None)` walks `roots` in list order. Each root and excluded folder is an absolute path. A relative root or excluded folder raises `LibraryIndexError` before any walk. `cancel` is `None` or a callable that returns true when the scan should stop. It is checked before each file and before pruning. The function runs on the caller's thread.
 
-A root that is not an existing directory is skipped. Its rows stay. The result names that root as skipped. A missing or unmounted root does not empty the shelf.
+A root that is not an existing directory is skipped. Its rows stay. The result names that root as skipped. A missing or unmounted root does not empty the shelf. An existing root that is itself excluded is treated as fully scanned without listing it, so its indexed rows are pruned.
 
 A root that is a directory is walked recursively. Paths stored and compared are resolved absolute paths with trailing separators removed.
+
+- When `scan_subfolders` is false, only entries directly inside each root are considered. Child directories and directory symlinks are not entered. A subfolder that is separately present in `roots` is still scanned as its own root.
+- A directory whose resolved path equals an excluded folder or is below one is not entered. Archives reached through file symlinks are also ignored when their resolved path is inside an excluded folder. Exclusions win over an explicit library root and over overlapping-root ownership.
 
 - A directory entry whose name ends in `.cbz` or `.cbr`, in any letter case, is a candidate. Every other file is ignored. A ComicInfo save writes its temporary file under a name that is not `.cbz` or `.cbr`, so the scan does not index it.
 - A symlink is followed only when its resolved path stays inside that root. A symlink that leaves the root is skipped and creates no row.
@@ -200,7 +203,7 @@ Archive failures during `scan` and `refresh_volume` are stored on the row. They 
 
 ## Configuration
 
-This specification adds no configuration keys.
+This specification uses `excluded_folders` and `scan_subfolders` from [00-project-overview.md](00-project-overview.md). The application shell passes the normalized values into `scan`; callers that omit them retain recursive scanning with no exclusions.
 
 The database file and the thumbnail directory are the index and thumbnail-cache paths in [00-project-overview.md](00-project-overview.md). The application shell passes those paths in. Tests pass temporary paths. Thumbnail width 256, JPEG quality 80, and the white matte are not TOML keys.
 
@@ -215,6 +218,8 @@ Cover at least:
 - `list_volumes` on a missing database creates it, returns an empty list, and does not walk a library directory beside it.
 - `list_volumes` returns `ok` and `failed` rows ordered by `path`. `under` returns that directory and the files inside it, and does not return a sibling whose path only shares a prefix.
 - A scan indexes a nested `.CBZ` and a `.cbr`, and ignores a `.txt`, a `.pdf`, and a temporary file that is not a `.cbz` or `.cbr`.
+- With `scan_subfolders` false, a root-level archive is indexed and a nested archive is not; adding that nested directory as a separate root indexes its direct archive. Switching from recursive to direct-only scanning prunes previously indexed nested rows.
+- An excluded folder is never listed and contributes no rows, including through an in-root symlink or when it is also an explicit root. Adding an exclusion prunes its previously indexed rows and cached thumbnails; removing it allows a later scan to index them again.
 - A symlink whose target leaves the root creates no row. A symlink to a file inside the root is one row at the resolved path. A directory symlink cycle ends. The same resolved path under two roots is one row, owned by the first root. A second scan that adds an earlier root moves `root` to that root and does not open the archive when size and mtime match.
 - An unreadable archive becomes `failed`, and a later archive in the walk is still indexed. ComicInfo text, `cover_index`, and `archive_page_count` on an `ok` row match a partial read. A re-read opens `ComicInfo.xml` and no page-image body.
 - An `ok` row with the same size and mtime does not open the archive. A changed mtime re-reads ComicInfo. A `failed` row with the same mtime is opened again.
@@ -230,7 +235,7 @@ Cover at least:
 ## Acceptance criteria
 
 - The shelf is a read of the SQLite index. Opening that list does not walk the library, open an archive, or build a thumbnail. A missing database becomes an empty index.
-- A scan visits `.cbz` and `.cbr` recursively, in any letter case, and ignores every other file. A symlink is followed only when its target stays inside that root. One resolved path is one row, owned by the first root that contains it.
+- A scan visits `.cbz` and `.cbr`, in any letter case, and ignores every other file. It is recursive by default and direct-only when requested. Excluded folders and their descendants are never scanned. A symlink is followed only when its target stays inside that root and outside exclusions. One resolved path is one row, owned by the first root that contains it.
 - An unchanged `ok` file is not opened. A changed file, and a `failed` file, are read from the central directory and `ComicInfo.xml` only. The row stores every owned ComicInfo text field except `Pages`, plus the cover index and the archive page count.
 - An unreadable archive, an archive with no page images, or a `.cbr` read without `unar` is a `failed` row. The scan continues. A `.cbz` still indexes when `unar` is missing. The `unar` error message names `unar`.
 - Each file is committed on its own. Cancel keeps those rows and prunes nothing.

@@ -12,7 +12,7 @@
   import {
     postJson,
     putConfig,
-    withChangedLibraryRoots,
+    withChangedLibraryDiscovery,
     type Config,
   } from "../api";
   import { clearThumbnailCache } from "../cache";
@@ -74,6 +74,8 @@
     tab = next;
   }
   let roots = $state(untrack(() => config.library_roots.join("\n")));
+  let excludedFolders = $state(untrack(() => config.excluded_folders.join("\n")));
+  let scanSubfolders = $state(untrack(() => config.scan_subfolders));
   let apiKey = $state(untrack(() => config.comicvine_api_key));
   let nautiljonBaseUrl = $state(untrack(() => config.nautiljon_base_url));
   let nautiljonApiKey = $state(untrack(() => config.nautiljon_api_key));
@@ -125,6 +127,11 @@
       error = parsed.error;
       return;
     }
+    const parsedExcluded = parseRootLines(excludedFolders);
+    if (parsedExcluded.error) {
+      error = parsedExcluded.error;
+      return;
+    }
     try {
       const updates: Partial<Config> = {
         comicvine_api_key: apiKey,
@@ -141,7 +148,15 @@
         animate_interface: animateInterface,
       };
       const result = await putConfig(
-        withChangedLibraryRoots(updates, config.library_roots, parsed.roots),
+        withChangedLibraryDiscovery(
+          updates,
+          config,
+          {
+            library_roots: parsed.roots,
+            excluded_folders: parsedExcluded.roots,
+            scan_subfolders: scanSubfolders,
+          },
+        ),
       );
       const next = result.config;
       finished = true;
@@ -208,6 +223,27 @@
             <label class="flex flex-col gap-1">
               <span class="text-xs text-app-muted">Library roots</span>
               <Textarea value={roots} rows={4} onValue={(value) => (roots = value)} />
+            </label>
+            <div class="flex flex-col gap-1">
+              <Checkbox
+                label="Include subfolders automatically"
+                bind:checked={scanSubfolders}
+              />
+              <p class="text-xs text-app-muted">
+                When off, only archives directly inside each library root are added.
+              </p>
+            </div>
+            <label class="flex flex-col gap-1">
+              <span class="text-xs text-app-muted">Excluded folders</span>
+              <Textarea
+                value={excludedFolders}
+                rows={3}
+                onValue={(value) => (excludedFolders = value)}
+              />
+              <span class="text-xs text-app-muted">
+                One absolute path per line. Each folder and everything below it is
+                omitted from the library.
+              </span>
             </label>
             <label class="flex flex-col gap-1">
               <span class="text-xs text-app-muted">Title languages</span>

@@ -159,6 +159,85 @@ def test_scan_indexes_archives_and_ignores_other_files(
     assert not (tmp_path / "cache").exists()
 
 
+def test_scan_can_exclude_a_folder_and_prunes_its_existing_rows(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "root"
+    extras = root / "Series" / "Extras"
+    direct = root / "Series.cbz"
+    excluded_book = extras / "bonus.cbz"
+    _cbz(direct, Series="Main")
+    _cbz(excluded_book, Series="Bonus")
+    database = tmp_path / "index.db"
+    cache = tmp_path / "cache"
+
+    scan(database, cache, [root])
+    cache.mkdir()
+    cached = cache / f"{index_mod._digest(excluded_book.resolve())}-old.jpg"
+    cached.write_bytes(b"cached")
+
+    result = scan(database, cache, [root], excluded=[extras])
+
+    assert [row.name for row in list_volumes(database)] == ["Series.cbz"]
+    assert str(excluded_book.resolve()) in result.deleted
+    assert not cached.exists()
+
+
+def test_scan_can_disable_automatic_subfolders_but_keeps_explicit_roots(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "root"
+    nested = root / "Nested"
+    _cbz(root / "direct.cbz", Series="Direct")
+    _cbz(nested / "nested.cbz", Series="Nested")
+    _cbz(nested / "Deeper" / "deep.cbz", Series="Deep")
+    database = tmp_path / "index.db"
+    cache = tmp_path / "cache"
+
+    scan(database, cache, [root])
+    direct_only = scan(database, cache, [root], scan_subfolders=False)
+    assert [row.name for row in list_volumes(database)] == ["direct.cbz"]
+    assert {Path(path).name for path in direct_only.deleted} == {
+        "nested.cbz",
+        "deep.cbz",
+    }
+
+    scan(database, cache, [root, nested], scan_subfolders=False)
+    assert {row.name for row in list_volumes(database)} == {
+        "direct.cbz",
+        "nested.cbz",
+    }
+
+
+def test_exclusions_win_over_symlinks_and_explicit_roots(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    extras = root / "Extras"
+    _cbz(extras / "bonus.cbz", Series="Bonus")
+    root.mkdir(exist_ok=True)
+    (root / "Extras alias").symlink_to(extras, target_is_directory=True)
+
+    scan(
+        tmp_path / "index.db",
+        tmp_path / "cache",
+        [root, extras],
+        excluded=[extras],
+    )
+
+    assert list_volumes(tmp_path / "index.db") == []
+
+
+def test_scan_rejects_relative_excluded_folder(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    with pytest.raises(LibraryIndexError, match="excluded folder"):
+        scan(
+            tmp_path / "index.db",
+            tmp_path / "cache",
+            [root],
+            excluded=["Extras"],
+        )
+
+
 def test_symlinks_and_root_ownership(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

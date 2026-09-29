@@ -139,14 +139,21 @@ def accept_root_paths(
     return kept, added
 
 
-def volumes_for_roots(rows: Sequence[object], roots: Sequence[str]) -> list[object]:
-    """Keep rows whose path is a root or a file inside a root.
+def volumes_for_roots(
+    rows: Sequence[object],
+    roots: Sequence[str],
+    excluded_folders: Sequence[str] = (),
+    scan_subfolders: bool = True,
+) -> list[object]:
+    """Keep rows allowed by the current library discovery settings.
 
     An empty ``roots`` list keeps nothing. Rows are not deleted or scanned.
 
     Args:
         rows: Indexed volumes. Each row has a ``path`` attribute.
         roots: Current library roots.
+        excluded_folders: Folder subtrees omitted from the library.
+        scan_subfolders: Whether paths below direct root children are visible.
 
     Returns:
         The kept rows, in the order given.
@@ -154,11 +161,17 @@ def volumes_for_roots(rows: Sequence[object], roots: Sequence[str]) -> list[obje
     if not roots:
         return []
     bases = [Path(root).resolve() for root in roots]
+    excluded = [Path(folder).resolve() for folder in excluded_folders]
     kept: list[object] = []
     for row in rows:
         path = Path(str(row.path)).resolve()
-        if any(path == base or path.is_relative_to(base) for base in bases):
-            kept.append(row)
+        if not any(path.is_relative_to(base) for base in bases):
+            continue
+        if any(path.is_relative_to(folder) for folder in excluded):
+            continue
+        if not scan_subfolders and path.parent not in bases:
+            continue
+        kept.append(row)
     return kept
 
 
@@ -381,10 +394,12 @@ def load_library(
     list_volumes: Callable[[str], Sequence[object]],
     db_path: str,
     roots: Sequence[str],
+    excluded_folders: Sequence[str] = (),
+    scan_subfolders: bool = True,
 ) -> tuple[list[object], list[Place]]:
     """Return volumes inside ``roots`` and their places. Does not scan."""
     rows = list(list_volumes(db_path))
-    kept = volumes_for_roots(rows, roots)
+    kept = volumes_for_roots(rows, roots, excluded_folders, scan_subfolders)
     return kept, places_from_volumes(kept)
 
 
@@ -973,13 +988,22 @@ def run_scan(
     db_path: str,
     cache_dir: str,
     roots: Sequence[str],
+    excluded: Sequence[str] = (),
+    scan_subfolders: bool = True,
     scan: Callable[..., ScanResult],
     cancel: Cancel,
     progress: Progress,
 ) -> dict[str, object]:
     """Scan ``roots``. A cancelled scan result becomes ``JobCancelled``."""
     progress(0, 0)
-    result = scan(db_path, cache_dir, roots, cancel=cancel)
+    result = scan(
+        db_path,
+        cache_dir,
+        roots,
+        excluded=excluded,
+        scan_subfolders=scan_subfolders,
+        cancel=cancel,
+    )
     payload = _scan_payload(result)
     committed = len(result.written) + len(result.unchanged) + len(result.failed)
     progress(committed, committed)

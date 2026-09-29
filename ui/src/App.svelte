@@ -3,6 +3,7 @@
   import {
     FileArchive,
     Folder,
+    FolderMinus,
     FolderPlus,
     LayoutGrid,
     List,
@@ -17,12 +18,14 @@
     getJson,
     getSystemTheme,
     postJson,
+    putConfig,
     type Config,
     type SystemTheme,
   } from "./lib/api";
   import BrandMark from "./lib/components/BrandMark.svelte";
   import Button from "./lib/components/Button.svelte";
   import Dialog from "./lib/components/Dialog.svelte";
+  import ContextMenu from "./lib/components/ContextMenu.svelte";
   import Inspector from "./lib/components/Inspector.svelte";
   import MatchesDialog from "./lib/components/MatchesDialog.svelte";
   import IssuesDialog from "./lib/components/IssuesDialog.svelte";
@@ -43,6 +46,7 @@
     convertConfirmMessage,
     editField,
     enabledProviderOptions,
+    excludedFoldersAfterRemove,
     entriesOf,
     entryErrorLines,
     fieldLockedOnAll,
@@ -99,7 +103,10 @@
 
   type PendingNavigation =
     | { type: "place"; path: string | null }
-    | { type: "volume"; path: string; shift: boolean; toggle: boolean };
+    | { type: "volume"; path: string; shift: boolean; toggle: boolean }
+    | { type: "exclude-folder"; path: string };
+
+  type PlaceContextMenu = { path: string; x: number; y: number };
 
   let {
     initialConfig,
@@ -121,6 +128,7 @@
   let issuesSeries = $state<Candidate | null>(null);
   let inspectorLines = $state<string[]>([]);
   let folderError = $state("");
+  let placeContextMenu = $state<PlaceContextMenu | null>(null);
   let dragDepth = $state(0);
   let settingsOpen = $state(false);
   let renameOpen = $state(false);
@@ -420,6 +428,13 @@
   }
 
   function applyNavigation(pending: PendingNavigation) {
+    if (pending.type === "exclude-folder") {
+      pendingNavigation = null;
+      unsavedOpen = false;
+      rebuildForm();
+      void removeFolder(pending.path);
+      return;
+    }
     if (pending.type === "place") {
       selectedPlace = placeFromClick(selectedPlace, pending.path);
       selection = { paths: [], anchor: null };
@@ -724,6 +739,40 @@
     }
   }
 
+  function openPlaceContextMenu(event: MouseEvent, path: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    folderError = "";
+    const target = event.currentTarget as HTMLElement;
+    const bounds = target.getBoundingClientRect();
+    placeContextMenu = {
+      path,
+      x: event.clientX || bounds.left + 16,
+      y: event.clientY || bounds.top + bounds.height / 2,
+    };
+  }
+
+  function requestRemoveFolder(path: string) {
+    placeContextMenu = null;
+    requestNavigation({ type: "exclude-folder", path });
+  }
+
+  async function removeFolder(path: string) {
+    folderError = "";
+    try {
+      const result = await putConfig({
+        excluded_folders: excludedFoldersAfterRemove(
+          config.excluded_folders,
+          path,
+        ),
+      });
+      config = result.config;
+      if (result.job) watch(result.job);
+    } catch (exc) {
+      folderError = exc instanceof Error ? exc.message : "Could not remove that folder.";
+    }
+  }
+
   function onFoldersDropped(event: Event) {
     const detail = event instanceof CustomEvent ? event.detail : null;
     void addRoots(folderDropRequest(detail).paths);
@@ -920,11 +969,13 @@
       {#each places as place (place.path)}
         <button
           type="button"
+          aria-haspopup="menu"
           class="relative z-10 flex h-9 w-full items-center gap-2 px-2 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent {selectedPlace ===
           place.path
             ? 'bg-app-selection'
             : ''}"
           onclick={() => onPlace(place.path)}
+          oncontextmenu={(event) => openPlaceContextMenu(event, place.path)}
         >
           <span class="flex size-4 shrink-0 items-center justify-center" aria-hidden="true">
             <Folder size={16} />
@@ -1054,6 +1105,29 @@
     </aside>
   </div>
 </div>
+
+{#if placeContextMenu}
+  {#key `${placeContextMenu.path}:${placeContextMenu.x}:${placeContextMenu.y}`}
+    <ContextMenu
+      x={placeContextMenu.x}
+      y={placeContextMenu.y}
+      items={[
+        { id: "remove", label: "Remove folder", disabled: busy },
+      ]}
+      label="Folder actions"
+      onDismiss={() => (placeContextMenu = null)}
+      onSelect={(id) => {
+        if (id === "remove") requestRemoveFolder(placeContextMenu!.path);
+      }}
+    >
+      {#snippet icon(id)}
+        {#if id === "remove"}
+          <FolderMinus size={16} />
+        {/if}
+      {/snippet}
+    </ContextMenu>
+  {/key}
+{/if}
 
 {#if matchesOpen}
   <MatchesDialog

@@ -101,6 +101,8 @@ class ConfigModel(BaseModel):
     """The known config keys."""
 
     library_roots: list[str]
+    excluded_folders: list[str]
+    scan_subfolders: bool
     keep_cbr_original: bool
     write_poster_on_save: bool
     auto_save_metadata_on_switch: bool
@@ -119,6 +121,8 @@ class ConfigPut(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     library_roots: Any = None
+    excluded_folders: Any = None
+    scan_subfolders: Any = None
     keep_cbr_original: Any = None
     write_poster_on_save: Any = None
     auto_save_metadata_on_switch: Any = None

@@ -29,6 +29,7 @@ import {
   initialPageIndex,
   issuesOf,
   folderDropRequest,
+  excludedFoldersAfterRemove,
   mangaChoices,
   mangaLabel,
   matchCoverSrc,
@@ -173,6 +174,15 @@ describe("cross-layer contracts", () => {
 });
 
 describe("shelf and selection", () => {
+  it("adds a removed sidebar folder to exclusions once", () => {
+    expect(excludedFoldersAfterRemove([], "/books/Extras")).toEqual([
+      "/books/Extras",
+    ]);
+    expect(
+      excludedFoldersAfterRemove(["/books/Extras"], "/books/Extras"),
+    ).toEqual(["/books/Extras"]);
+  });
+
   it("keeps a place's direct volumes and shelves by place", () => {
     const rows = [
       volume("/books/Claymore/a.cbz", { series: "Claymore" }),

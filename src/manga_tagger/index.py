@@ -186,6 +186,8 @@ def scan(
     cache_dir: os.PathLike[str] | str,
     roots: Sequence[os.PathLike[str] | str],
     *,
+    excluded: Sequence[os.PathLike[str] | str] = (),
+    scan_subfolders: bool = True,
     cancel: Callable[[], bool] | None = None,
 ) -> ScanResult:
     """Index ``.cbz`` and ``.cbr`` files under ``roots``.
@@ -197,6 +199,8 @@ def scan(
         db_path: SQLite database.
         cache_dir: Thumbnail directory. Files for pruned paths are removed.
         roots: Absolute library roots, in priority order.
+        excluded: Absolute folders whose complete subtrees are ignored.
+        scan_subfolders: Whether to enter child directories under each root.
         cancel: Called before each file and before pruning. True stops the scan.
 
     Returns:
@@ -208,6 +212,7 @@ def scan(
         IndexVersionError: The schema version is not 1.
     """
     resolved_roots = _absolute_paths(roots, "root")
+    resolved_excluded = _absolute_paths(excluded, "excluded folder")
     cache = Path(cache_dir)
     written: list[str] = []
     unchanged: list[str] = []
@@ -232,6 +237,8 @@ def scan(
                 unchanged,
                 failed,
                 cancel,
+                resolved_excluded,
+                scan_subfolders,
             )
             if status == "cancelled":
                 cancelled = True
@@ -540,6 +547,8 @@ def _walk_root(
     unchanged: list[str],
     failed: list[str],
     cancel: Callable[[], bool] | None,
+    excluded: Sequence[Path],
+    scan_subfolders: bool,
 ) -> str:
     visited: set[Path] = set()
 
@@ -548,6 +557,8 @@ def _walk_root(
             resolved = directory.resolve()
         except OSError:
             return "incomplete"
+        if _excluded(resolved, excluded):
+            return "full"
         if resolved in visited:
             return "full"
         if not _inside(resolved, root):
@@ -561,6 +572,12 @@ def _walk_root(
         for entry in entries:
             path = Path(entry.path)
             if entry.is_symlink():
+                if not scan_subfolders:
+                    try:
+                        if path.resolve().is_dir():
+                            continue
+                    except OSError:
+                        continue
                 status = _follow_link(
                     connection,
                     path,
@@ -571,11 +588,14 @@ def _walk_root(
                     failed,
                     cancel,
                     walk,
+                    excluded,
                 )
                 if status != "full":
                     return status
                 continue
             if entry.is_dir(follow_symlinks=False):
+                if not scan_subfolders:
+                    continue
                 status = walk(path)
                 if status != "full":
                     return status
@@ -608,12 +628,15 @@ def _follow_link(
     failed: list[str],
     cancel: Callable[[], bool] | None,
     walk: Callable[[Path], str],
+    excluded: Sequence[Path],
 ) -> str:
     try:
         target = path.resolve()
     except OSError:
         return "full"
     if not _inside(target, root):
+        return "full"
+    if _excluded(target, excluded):
         return "full"
     if target.is_dir():
         return walk(path)
@@ -930,6 +953,10 @@ def _one_absolute(path: os.PathLike[str] | str) -> Path:
 
 def _inside(path: Path, root: Path) -> bool:
     return path == root or path.is_relative_to(root)
+
+
+def _excluded(path: Path, excluded: Sequence[Path]) -> bool:
+    return any(_inside(path, folder) for folder in excluded)
 
 
 def _is_archive(path: Path) -> bool:

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { withChangedLibraryRoots, type Config } from "./api";
+import {
+  withChangedLibraryDiscovery,
+  withChangedLibraryRoots,
+  type Config,
+} from "./api";
 
 describe("Settings config updates", () => {
   it("omits unchanged roots so unrelated settings can save during a job", () => {
@@ -20,5 +24,25 @@ describe("Settings config updates", () => {
     expect(withChangedLibraryRoots({}, ["/books"], [])).toEqual({
       library_roots: [],
     });
+  });
+
+  it("includes only changed library discovery settings", () => {
+    const current = {
+      library_roots: ["/books"],
+      excluded_folders: [],
+      scan_subfolders: true,
+    };
+    expect(
+      withChangedLibraryDiscovery({ theme: "dark" }, current, {
+        ...current,
+        excluded_folders: ["/books/Extras"],
+        scan_subfolders: false,
+      }),
+    ).toEqual({
+      theme: "dark",
+      excluded_folders: ["/books/Extras"],
+      scan_subfolders: false,
+    });
+    expect(withChangedLibraryDiscovery({}, current, current)).toEqual({});
   });
 });

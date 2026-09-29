@@ -324,6 +324,8 @@ def _register_routes(app: FastAPI) -> None:
             state.services.list_volumes,
             str(state.index_path),
             state.config.library_roots,
+            state.config.excluded_folders,
+            state.config.scan_subfolders,
         )
         return LibraryResponse(
             places=[PlaceModel.from_place(place) for place in places],
@@ -390,12 +392,16 @@ def _register_routes(app: FastAPI) -> None:
         state = _state(app)
         updates = body.model_dump(exclude_unset=True)
         updated = apply_put(state.config, updates)
-        roots_changed = updated.library_roots != state.config.library_roots
-        if roots_changed and state.runner.current() is not None:
+        discovery_changed = (
+            updated.library_roots != state.config.library_roots
+            or updated.excluded_folders != state.config.excluded_folders
+            or updated.scan_subfolders != state.config.scan_subfolders
+        )
+        if discovery_changed and state.runner.current() is not None:
             raise JobBusyError("a job is already queued or running")
         save_config(state.config.path, updated)
         state.config = updated
-        job = JobModel.from_job(_start_scan(state)) if roots_changed else None
+        job = JobModel.from_job(_start_scan(state)) if discovery_changed else None
         return ConfigPutResponse(
             config=ConfigModel(**updated.to_dict()),
             job=job,
@@ -710,6 +716,8 @@ def _start_scan(state: AppState):
             db_path=str(state.index_path),
             cache_dir=str(state.thumbnail_dir),
             roots=list(state.config.library_roots),
+            excluded=list(state.config.excluded_folders),
+            scan_subfolders=state.config.scan_subfolders,
             scan=services.scan,
             cancel=cancel,
             progress=progress,

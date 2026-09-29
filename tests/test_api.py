@@ -373,6 +373,35 @@ def test_config_put_returns_the_queued_scan_job_for_changed_roots(
     assert scans == []
 
 
+def test_config_put_scans_for_exclusion_and_subfolder_changes(tmp_path: Path) -> None:
+    calls: list[dict[str, object]] = []
+
+    def record_scan(*_args, **kwargs):
+        calls.append(kwargs)
+        from manga_tagger.index import ScanResult
+
+        return ScanResult((), (), (), (), (), (), False)
+
+    app = _app(tmp_path, roots=["/books"], scan=record_scan)
+    with TestClient(app) as client:
+        excluded = client.put(
+            "/api/config", json={"excluded_folders": ["/books/Extras"]}
+        )
+        assert excluded.status_code == 200
+        assert excluded.json()["job"]["state"] == "succeeded"
+        assert excluded.json()["config"]["excluded_folders"] == ["/books/Extras"]
+
+        direct_only = client.put("/api/config", json={"scan_subfolders": False})
+        assert direct_only.status_code == 200
+        assert direct_only.json()["job"]["state"] == "succeeded"
+        assert direct_only.json()["config"]["scan_subfolders"] is False
+
+    assert calls[0]["excluded"] == ["/books/Extras"]
+    assert calls[0]["scan_subfolders"] is True
+    assert calls[1]["excluded"] == ["/books/Extras"]
+    assert calls[1]["scan_subfolders"] is False
+
+
 def test_scan_job_result_matches_client_contract(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
