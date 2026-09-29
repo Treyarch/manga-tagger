@@ -17,6 +17,9 @@ dependencies = [
     "uvicorn",
 ]
 
+[project.scripts]
+manga-tagger = "manga_tagger.__main__:main"
+
 [dependency-groups]
 dev = [
     "pytest",
@@ -28,6 +31,9 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/manga_tagger"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"ui/dist" = "manga_tagger/ui_dist"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

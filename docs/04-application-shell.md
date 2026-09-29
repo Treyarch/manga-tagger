@@ -21,9 +21,10 @@ Archive bytes and ComicInfo stay in [01-archives-and-comicinfo.md](01-archives-a
 | `src/manga_tagger/api/` | FastAPI app, Pydantic models, and HTTP errors. Routers validate input, call `shell` or `jobs`, and return models. They do not open archives, query SQLite, or call catalogs |
 | `src/manga_tagger/window.py` | The only module that imports pywebview |
 | `src/manga_tagger/__main__.py` | Load config, bind the server, enqueue the startup scan, open the window, then shut down |
+| `src/manga_tagger/resources.py` | Resolve the compiled UI from an installed package or a source checkout. No pywebview import |
 | `ui/` | The client. `fetch` on the API origin. It does not call a pywebview JavaScript API |
 
-`config.py`, `shell.py`, `jobs.py`, and `api/` do not import pywebview. Tests do not import `window.py` or `__main__.py`.
+`config.py`, `shell.py`, `jobs.py`, `resources.py`, and `api/` do not import pywebview. Tests do not import `window.py` or `__main__.py`.
 
 When this specification is implemented, `pyproject.toml` gains `fastapi`, `uvicorn`, `pywebview`, and `tomli-w`. `httpx` is the client library named by the provider specification. The server is uvicorn. There is no Flask, no Electron, and no second HTTP framework.
 
@@ -49,6 +50,30 @@ direct dependencies here to prevent the resolver from silently selecting a
 new transitive combination that satisfies metadata constraints but hangs on
 `TestClient` startup. Updating any member requires updating the lockfile and
 passing the smoke test plus the full 3.12/3.13 matrix.
+
+## Production package
+
+The installable application is a Python wheel. `pyproject.toml` exposes the
+`manga-tagger` command, which calls the same `main` function as
+`python -m manga_tagger`.
+
+A production build has two ordered stages:
+
+1. `npm run build` in `ui/` compiles the Svelte client into `ui/dist/`.
+2. `uv build --wheel` packages the Python modules and copies that compiled
+   directory into the wheel as `manga_tagger/ui_dist/`.
+
+The wheel must contain `manga_tagger/ui_dist/index.html` and its referenced
+assets. At runtime, an installed package serves that embedded directory. An
+editable/source checkout without embedded assets falls back to the repository's
+`ui/dist/`, preserving the existing development workflow and missing-build
+message. Generated `ui/dist/` and top-level `dist/` output are not source files
+and remain ignored by Git.
+
+Building the wheel does not install the Linux system libraries required by
+PyGObject, GTK, or WebKitGTK. Those remain host prerequisites. The wheel is the
+production artifact for the supported Python minors; a standalone executable or
+OS-native installer is outside this specification.
 
 ## Contract ownership
 
@@ -406,6 +431,7 @@ packages before the locked Python environment.
 
 Cover at least:
 
+- UI resource resolution prefers an embedded `ui_dist/index.html` and falls back to the source checkout's `ui/dist/` when it is absent. A release check builds the wheel and verifies its HTML, referenced assets, and `manga-tagger` console entry point.
 - `animate_interface` defaults to false; invalid stored types fall back to false. GET exposes it, PUT accepts only booleans, omitted keys stay unchanged, and TOML round trips preserve it and unknown keys. Preview alone never writes configuration.
 - Clearing a missing or populated thumbnail cache returns the removal count through the injected cache service, does not create a job or change config/index data, and returns a structured `LibraryIndexError` response when clearing fails.
 
@@ -470,6 +496,10 @@ Cover at least:
 - A normal locked Linux install includes pywebview's GTK binding in the
   application environment; with the documented system libraries installed,
   startup does not fall through to a missing Qt backend.
+- `uv build --wheel` after the UI build produces a wheel containing the
+  compiled client and the `manga-tagger` command. The installed app serves its
+  embedded UI without the repository or Node.js, while a source checkout keeps
+  using `ui/dist/`.
 
 ## Open questions
 
