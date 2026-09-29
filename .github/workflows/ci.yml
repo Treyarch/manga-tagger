@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  python:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install GTK build and runtime libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y \
+            build-essential \
+            pkg-config \
+            libcairo2-dev \
+            libgirepository-2.0-dev \
+            gir1.2-gtk-3.0 \
+            gir1.2-webkit2-4.1
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+      - name: Install locked dependencies
+        run: uv sync --locked --group dev --python ${{ matrix.python-version }}
+      - name: Run Python suite
+        run: uv run --python ${{ matrix.python-version }} pytest
+
+  ui:
+    name: UI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Run UI suite
+        run: npm test
+      - name: Build production assets
+        run: npm run build

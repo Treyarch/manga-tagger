@@ -26,7 +26,7 @@ Later specifications turn these into concrete behavior. They must not trade them
 
 | Decision | Choice |
 | --- | --- |
-| Language | Python 3.12 or newer |
+| Language | CPython 3.12 and 3.13 |
 | Packaging of the core | `src/` layout, dependencies in `pyproject.toml`, installs via [uv](https://docs.astral.sh/uv/) |
 | HTTP API | FastAPI, Pydantic models, bound to `127.0.0.1` on an ephemeral port |
 | UI | Vite and Svelte 5 |
@@ -38,6 +38,20 @@ Later specifications turn these into concrete behavior. They must not trade them
 | Process | One desktop process. It starts the API and the window. The user does not start a server |
 
 The API is FastAPI. Do not add Flask. Do not add Electron, a bundled Chromium, or a Go or Rust component in v1. The archive, index, and provider code must import and run without FastAPI and without pywebview, so unit tests never open a window.
+
+Python support is the bounded range `>=3.12,<3.14`. Both supported minor
+versions run the complete Python suite in CI. Python 3.14 is intentionally not
+advertised until the FastAPI, Starlette, HTTPX, and AnyIO `TestClient` stack has
+been validated there; installation must fail on an unsupported minor rather
+than appear supported while its API tests can hang.
+
+`uv.lock` is committed and is the reproducible dependency contract for
+development and CI. Normal setup and CI use `uv sync --locked --group dev` so a
+dependency update is a reviewed lockfile change, not an implicit resolution.
+FastAPI `0.116.1`, Starlette `0.47.2`, HTTPX `0.28.1`, and AnyIO `4.10.0` are
+direct exact pins because newer unconstrained combinations have hung while
+entering `TestClient`; those four versions move together only after the smoke
+test and full matrix pass.
 
 ## Version 1
 
@@ -126,6 +140,7 @@ On Linux, unset XDG variables mean `~/.config`, `~/.local/share`, and `~/.cache`
 | `title_languages` | list of strings | `["fr", "en"]` | Title preference order. Each entry is a language the catalog may have. The original title is used when none of them exist. |
 | `enabled_providers` | list of strings | `["mangadex", "anilist", "jikan", "comicvine", "nautiljon"]` | Catalog providers available in the header picker and for scrape. Unknown ids are dropped. An empty list leaves no provider selectable. |
 | `theme` | string | `system` | `system` uses the active Omarchy palette when its generated `colors.toml` is available, otherwise it follows `prefers-color-scheme`. `light` and `dark` force the built-in theme. Any other value is treated as `system`. Defined in [05-ui-design.md](05-ui-design.md). Chosen in Settings, not the header. |
+| `animate_interface` | boolean | `false` | Enable decorative interface transitions unless the system requests reduced motion. Defined in [05-ui-design.md](05-ui-design.md). |
 
 Unknown keys are ignored. The feature specification that introduces a key must document it here or in its own Configuration section before that specification becomes `active`.
 
@@ -164,6 +179,11 @@ Feature specifications follow these project rules:
 - Archive tests use small fixture files under `tests/`.
 - Tests that need `unar` skip when it is not on `PATH`. Every other test passes without it.
 - Performance rules are checked by behavior: which zip members were opened, whether image bytes and compression methods survived a save, and whether a rejected scrape left the file untouched.
+- CI installs the committed lockfile and runs the complete Python suite on
+  CPython 3.12 and 3.13. A minimal FastAPI `TestClient` request is part of that
+  suite so an incompatible ASGI test stack fails before the larger API tests.
+- CI installs `ui/package-lock.json`, runs the UI unit suite, and builds the
+  production assets.
 
 ## Acceptance criteria
 
@@ -178,7 +198,7 @@ Feature specifications follow these project rules:
 All resolved. Recorded here so they are not re-opened in feature specs.
 
 - **What is the UI?** A Svelte web UI inside a pywebview window. Chosen for a real web frontend and a single desktop window, without shipping Chromium.
-- **Which language?** Python 3.12. The library is a few hundred volumes, so the speed goal is avoiding full extracts and recompression, not a native rewrite.
+- **Which language?** CPython 3.12 and 3.13. The library is a few hundred volumes, so the speed goal is avoiding full extracts and recompression, not a native rewrite. Python 3.14 remains outside the declared range until the API test stack is validated there.
 - **What must v1 do?** Edit ComicInfo, scrape the five catalogs, preview pages, apply shared series fields to every volume in the current selection, and rename archives in place from a filename template.
 - **How does a batch save work?** One shared form is reviewed, then a multi-volume save writes the dirty shared fields `Series`, `Count`, `Publisher`, `LanguageISO`, `AgeRating`, `Genre`, `Manga`, `Writer`, `Penciller`, `Inker`, and `CoverArtist` to each selected file. Each file also takes `Number` from its own filename when that name has a volume marker (and `Volume` mirrors that `Number`). A single selected volume writes the fields the user edited or a load set (including a scrape-filled `Count`). An unchanged save does not rewrite the archive. This is still a confirmed save, not an unattended auto-tag.
 - **How does rename work?** The dialog shows the planned names first. The template offered is `{Series} v{Number:02}`. Each selected archive gets a new filename from its own ComicInfo; with no selection, this applies to all archives directly in the opened folder. `{Number}` is the `Number` element, not `Volume`. `:02` zero-pads an integer to at least two digits. A fractional number such as `1.5` is kept as written and is not padded. The file is not moved to another directory. When `write_poster_on_save` is true, a successful save or rename also writes `{stem}-poster.jpg` at 600 pixels wide. An existing sibling poster still moves with the archive when that setting is false.

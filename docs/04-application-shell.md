@@ -27,6 +27,29 @@ Archive bytes and ComicInfo stay in [01-archives-and-comicinfo.md](01-archives-a
 
 When this specification is implemented, `pyproject.toml` gains `fastapi`, `uvicorn`, `pywebview`, and `tomli-w`. `httpx` is the client library named by the provider specification. The server is uvicorn. There is no Flask, no Electron, and no second HTTP framework.
 
+On Linux the dependency is the GTK extra of the pinned pywebview release,
+`pywebview[gtk]==6.2.1`; other platforms install `pywebview==6.2.1` without
+that extra. The GTK extra installs PyGObject into the same isolated Python
+environment as the application. A distribution `python-gobject` package tied
+to a different system-Python minor is not treated as satisfying this runtime
+dependency. The operating system must still provide GTK 3, WebKitGTK 4.1, the
+GObject-introspection and Cairo development files used to build the binding,
+and their typelibs. Qt is not a fallback dependency for the Linux build.
+
+`pyproject.toml` declares the supported interpreter range `>=3.12,<3.14`.
+`uv.lock` is committed and development and CI install it with
+`uv sync --locked --group dev`. CI runs the entire Python suite on CPython 3.12
+and 3.13; adding another minor version requires first validating the FastAPI,
+Starlette, HTTPX, and AnyIO `TestClient` combination on it and then expanding
+both the declared range and the matrix.
+
+The compatible ASGI test stack is pinned as one unit: FastAPI `0.116.1`,
+Starlette `0.47.2`, HTTPX `0.28.1`, and AnyIO `4.10.0`. Starlette and AnyIO are
+direct dependencies here to prevent the resolver from silently selecting a
+new transitive combination that satisfies metadata constraints but hangs on
+`TestClient` startup. Updating any member requires updating the lockfile and
+passing the smoke test plus the full 3.12/3.13 matrix.
+
 ## Contract ownership
 
 The application has one intentional implementation boundary: Python owns the
@@ -362,9 +385,20 @@ It is the only reader and writer of `library_roots`, `keep_cbr_original`, `write
 
 Tests are hermetic. They use temporary config, index, library, and UI paths. They do not open pywebview, do not use the network, do not call `time.sleep`, and do not read the developer's config, index, or library. They do not open `src/Claymore/`. Provider calls are the real `search` and `load` with `httpx.MockTransport`, or fakes passed into `create_app`. Archive and index behavior is covered by their own specifications. Shell tests replace those services and assert which ones ran.
 
+The first API compatibility check is a minimal `TestClient` smoke test that
+creates the app, enters the client context, and reads `/api/config`. It runs as
+part of the complete suite on every supported Python minor. This deliberately
+exercises the dependency boundary that can otherwise hang before an endpoint
+assertion is reached.
+
 Omarchy palette tests read only temporary `colors.toml` fixtures. API tests inject the system-theme reader and cover a complete palette, null fallback, and the no-store response without reading desktop state.
 
 Importing `manga_tagger.config`, `manga_tagger.shell`, `manga_tagger.jobs`, or `manga_tagger.api` does not import pywebview.
+
+On Linux, a runtime dependency test imports `gi`, requires `Gtk` 3.0 and
+`WebKit2` 4.1, and imports both repositories. It does not create a window or
+connect to a display. CI installs the matching distribution development
+packages before the locked Python environment.
 
 Cover at least:
 
@@ -389,6 +423,11 @@ Cover at least:
 - `GET /api/jobs/startup` returns null when startup had no roots, and returns the retained startup scan after enqueue and after terminal completion. Client tests cover settling that scan exactly once whether the first observation is queued, running, or already terminal.
 - A shared scan-result contract test runs a real scan with one missing root and one unreadable root through the job endpoint, then passes that same JSON shape to the TypeScript inspector formatter. It asserts the separate `skipped` and `incomplete` keys and their distinct sentences.
 - The shared app-contract fixture is checked by Python and TypeScript for ordered form fields, ordered shared fields, field-to-column mappings, provider ids, API job/result keys, and lockable fields. Both sides also build one- and many-volume forms whose keys match the fixture.
+- A locked install and the full Python suite pass on CPython 3.12 and 3.13;
+  the minimal `TestClient` smoke test completes and returns the config payload
+  on both.
+- On Linux, the locked environment imports `gi.repository.Gtk` 3.0 and
+  `gi.repository.WebKit2` 4.1 without using the system Python's site-packages.
 - A `one` save with a dirty `Number` calls `save_comic_info` with `write_number` true and that value. A `one` save with no dirty fields and a filename stem `Claymore v02` whose stored `Number` is `""` calls `save_comic_info` with `Number` `2`. A `one` save with no dirty fields, a locked `Number`, and a filename that would otherwise fill `Number` does not add `Number`. A `one` save with no dirty fields, a stored `Number` that already matches the filename, a blank `page_count`, and `archive_page_count` `42` calls `save_comic_info` with `PageCount` `42`. A `one` save with a locked `PageCount` and a blank ComicInfo page count does not add `PageCount`. A `one` save with no dirty fields, a matching `Number`, and a non-blank `page_count` does not call `save_comic_info`. A dirty `PageCount` of `""` is written as `""` and does not get replaced by `archive_page_count`. A `many` save calls `save_comic_info` once per path that needs a write, with the dirty shared fields and that file's `Number` from its filename, and does not call `save_many`. A shared `Series` the user did not edit is absent. A file whose shared patch is empty and whose `Number` already matches the filename is not passed to `save_comic_info` when its `page_count` is also already set. A `many` patch that contains `Title` raises `BatchFieldError` and does not call `save_comic_info`. When `write_poster_on_save` is true, a successful save calls `write_poster` on the output path. When it is false, a successful save does not call `write_poster`.
 - A save cancel flag that becomes true after the first file leaves the second file's service uncalled. The first file's `refresh_volume` has run. The job state is `cancelled`.
 - `search` and `load` jobs call no archive write and no `scan`. A load job for `many` returns a form without `Number`.
@@ -419,6 +458,12 @@ Cover at least:
 - Settings omits unchanged roots and the API independently compares normalized roots. Unrelated settings save during another job. A root change returns its exact scan job, including an empty-root or already-finished scan, and the client watches that id without consulting `/api/jobs/current`.
 - Settings Cache clears generated thumbnails immediately without saving or discarding draft settings. A successful clear forces list and grid thumbnails onto a new revision URL; failures remain visible in the open dialog.
 - Every duplicated Python/browser contract is either identified as intentional boundary code above or guarded by the shared app-contract fixture. Provider ids have one Python source of truth, and the shell has no unused thumbnail-bytes helper.
+- The supported interpreter range is `>=3.12,<3.14`; `uv.lock` is committed,
+  and CI verifies the complete Python suite on every supported minor from that
+  lockfile.
+- A normal locked Linux install includes pywebview's GTK binding in the
+  application environment; with the documented system libraries installed,
+  startup does not fall through to a missing Qt backend.
 
 ## Open questions
 

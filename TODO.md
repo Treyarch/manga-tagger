@@ -76,20 +76,20 @@ Done when duplicated behavior is either eliminated or guarded by a test that fai
 
 ## 7. Documentation and dependency validation
 
-- [ ] Update `README.md` so scan progress/cancellation matches the current UI.
-- [ ] Add `enabled_providers` and `animate_interface` to the README configuration table.
-- [ ] Add specs 06, 07, and 09 to the README spec index.
-- [ ] Decide and document the supported Python versions rather than relying on an unbounded `>=3.12` claim without a tested matrix.
-- [ ] Add a committed dependency lockfile or explicit compatible version bounds for reproducible development and CI.
-- [ ] Run the full API test suite on every supported Python version, including a minimal FastAPI `TestClient` smoke test.
-- [ ] Resolve the Python 3.14 `TestClient` hang by upgrading/pinning the compatible FastAPI, Starlette, HTTPX, and AnyIO combination, or temporarily cap the supported Python range.
+- [x] Update `README.md` so scan progress/cancellation matches the current UI.
+- [x] Add `enabled_providers` and `animate_interface` to the README configuration table.
+- [x] Add specs 06, 07, and 09 to the README spec index.
+- [x] Decide and document the supported Python versions rather than relying on an unbounded `>=3.12` claim without a tested matrix.
+- [x] Add a committed dependency lockfile or explicit compatible version bounds for reproducible development and CI.
+- [x] Run the full API test suite on every supported Python version, including a minimal FastAPI `TestClient` smoke test.
+- [x] Resolve the Python 3.14 `TestClient` hang by upgrading/pinning the compatible FastAPI, Starlette, HTTPX, and AnyIO combination, or temporarily cap the supported Python range.
 
 Done when the README matches all active specs and the complete Python and UI test suites pass from a clean, reproducible install on every supported runtime.
 
 ## Final verification
 
-- [ ] All affected specs are active and synchronized with the implementation.
-- [ ] Full Python suite passes, including all API tests.
-- [ ] Full UI unit suite and production build pass.
-- [ ] Security regression fixtures remain hermetic and contain no host filesystem paths.
-- [ ] Manual smoke test covers startup scan, Settings root changes, partial save failure, CBR conversion, and scan-root error display.
+- [x] All affected specs are active and synchronized with the implementation.
+- [x] Full Python suite passes, including all API tests.
+- [x] Full UI unit suite and production build pass.
+- [x] Security regression fixtures remain hermetic and contain no host filesystem paths.
+- [x] Manual smoke test covers startup scan, Settings root changes, partial save failure, CBR conversion, and scan-root error display.

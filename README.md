@@ -8,10 +8,10 @@ One process starts a localhost FastAPI server and a [pywebview](https://pywebvie
 
 | Tool | Why |
 | --- | --- |
-| [Python](https://www.python.org/) 3.12+ | App runtime |
+| [CPython](https://www.python.org/) 3.12 or 3.13 | App runtime; other minors are not currently supported |
 | [uv](https://docs.astral.sh/uv/) | Install Python deps and run the app |
-| [Node.js](https://nodejs.org/) 20+ (npm) | Build the UI in `ui/` |
-| WebKitGTK + GObject bindings | pywebview on Linux |
+| [Node.js](https://nodejs.org/) 20.19+ or 22.12+ (npm) | Build the UI in `ui/`; matches Vite's supported engines |
+| WebKitGTK + GObject development libraries | Build and run pywebview's GTK binding on Linux |
 | `unar` / `lsar` on `PATH` | Optional. Required only for `.cbr` read and convert (The Unarchiver CLI) |
 
 ### System packages (Linux)
@@ -19,16 +19,23 @@ One process starts a localhost FastAPI server and a [pywebview](https://pywebvie
 **Arch / Omarchy**
 
 ```bash
-sudo pacman -S webkit2gtk-4.1 python-gobject unarchiver
+sudo pacman -S --needed base-devel cairo gobject-introspection gtk3 webkit2gtk-4.1 unarchiver
 ```
 
-`unarchiver` provides `unar` and `lsar`. Skip it if you only use `.cbz`.
+`uv sync` installs PyGObject into Manga Tagger's own Python environment. Arch's
+`python-gobject` package alone is not sufficient when its system Python version
+differs from the supported Manga Tagger runtime. `unarchiver` provides `unar`
+and `lsar`; skip it if you only use `.cbz`.
 
 **Debian / Ubuntu**
 
 ```bash
-sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.1 unar
+sudo apt install build-essential pkg-config libcairo2-dev libgirepository-2.0-dev gir1.2-gtk-3.0 gir1.2-webkit2-4.1 unar
 ```
+
+These packages provide native libraries and headers. The Python `gi` module is
+installed from the locked project dependency so it is available to the same
+Python 3.12 or 3.13 interpreter that runs Manga Tagger.
 
 ## Quick start
 
@@ -36,7 +43,7 @@ From the repository root:
 
 ```bash
 # 1. Python environment and dependencies
-uv sync --group dev
+uv sync --locked --group dev
 
 # 2. UI dependencies and production build (writes ui/dist/)
 cd ui && npm ci && npm run build && cd ..
@@ -52,7 +59,7 @@ If the UI was not built, the window shows `UI build is missing.` while `/api` st
 ## First run
 
 1. Open **Settings** (or use **Add folder** in the sidebar) and add absolute paths to folders that contain `.cbz` / `.cbr` files.
-2. Wait for the library scan to finish (header shows progress; cancel is available).
+2. Wait for the background library scan to finish. Write actions are disabled while it runs, and a completion toast plus any root errors report the outcome. The current UI does not expose scan cancellation.
 3. Select one or more volumes, scrape a catalog, review the form, then **Save**.
 
 Accepting a scrape match only fills the form; **Save** writes metadata. To fix a wrong or missing cover, select one volume and use **Replace cover** or **Insert cover** over the cover preview. These actions immediately download the full-size cover from the catalog linked in the Web field and update the archive. Unsaved metadata edits stay in the form.
@@ -86,7 +93,9 @@ Linux honors `$XDG_CONFIG_HOME`, `$XDG_DATA_HOME`, and `$XDG_CACHE_HOME` when se
 | `nautiljon_base_url` | `""` | Absolute origin of the Nautiljon wrapper; empty disables it |
 | `nautiljon_api_key` | `""` | Wrapper `X-Api-Key`; empty disables Nautiljon |
 | `title_languages` | `["fr", "en"]` | Title preference order; original title is the fallback |
+| `enabled_providers` | `["mangadex", "anilist", "jikan", "comicvine", "nautiljon"]` | Catalogs shown in the provider picker; unknown ids are dropped and an empty list disables scraping |
 | `theme` | `system` | `system`, `light`, or `dark`; System live-follows the active Omarchy palette when available, then falls back to the desktop light/dark preference |
+| `animate_interface` | `false` | Enable decorative panel, dialog, preview, and notification transitions unless reduced motion is requested |
 
 On Omarchy, System reads the generated palette at `~/.local/state/omarchy/current/theme/colors.toml` and updates the open window after a theme switch. Manga Tagger only reads this file; it does not install hooks or modify Omarchy configuration. Forced Light and Dark always use Manga Tagger's built-in palette.
 
@@ -97,9 +106,13 @@ The HTTP API binds to `127.0.0.1` on an ephemeral port. The port is not configur
 ### Python
 
 ```bash
-uv sync --group dev
+uv sync --locked --group dev
 uv run pytest
 ```
+
+The committed `uv.lock` is the reproducible dependency contract. CI performs
+that locked install and runs the complete suite on every supported Python
+minor, currently CPython 3.12 and 3.13.
 
 Tests are hermetic: no network, no real sleep, and no read of your personal config, index, or library. Tests that need `unar` skip when it is not on `PATH`.
 
@@ -134,6 +147,9 @@ This project is **spec-driven**. Feature behavior lives in [docs/](docs/README.m
 - [Metadata providers](docs/03-metadata-providers.md)
 - [Application shell](docs/04-application-shell.md)
 - [UI design](docs/05-ui-design.md)
+- [Select issue](docs/06-select-issue.md)
+- [Field locks](docs/07-field-locks.md)
 - [Cover from provider](docs/08-cover-from-provider.md)
+- [Keyboard shortcuts](docs/09-keyboard-shortcuts.md)
 
 Read those before changing scope or behavior.

@@ -26,6 +26,16 @@ from manga_tagger.shell import form_from_volumes
 from manga_tagger.theme import SystemTheme
 
 
+def test_testclient_smoke(tmp_path: Path) -> None:
+    """Enter the ASGI test stack and complete one minimal API request."""
+    app = _app(tmp_path, roots=[])
+    with TestClient(app) as client:
+        response = client.get("/api/config")
+
+    assert response.status_code == 200
+    assert response.json()["library_roots"] == []
+
+
 def test_library_does_not_scan(tmp_path: Path) -> None:
     rows = [_volume("/books/Claymore/a.cbz", series="Claymore", cover_index=None)]
     calls: list[str] = []
