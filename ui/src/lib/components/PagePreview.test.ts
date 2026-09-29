@@ -58,4 +58,26 @@ describe("PagePreview cover actions", () => {
       expect(button).not.toContain(`>${label}<`);
     }
   });
+
+  it("renders archive errors as a fixed-height accessible preview state", () => {
+    const error = "a.cbz is not a readable CBZ";
+    const { body } = render(PagePreview, {
+      props: {
+        anchor: {
+          ...volume,
+          status: "failed",
+          error_type: "UnreadableArchiveError",
+          error_message: error,
+          archive_page_count: null,
+        },
+      },
+    });
+
+    expect(body).toContain('class="flex h-80 w-full');
+    expect(body).toContain('role="alert"');
+    expect(body).toContain("circle-alert");
+    expect(body).toContain("Preview unavailable");
+    expect(body).toContain(error);
+    expect(body).not.toContain("Previous page");
+  });
 });

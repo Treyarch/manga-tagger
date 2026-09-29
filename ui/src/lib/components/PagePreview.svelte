@@ -1,6 +1,12 @@
 <script lang="ts">
   import { onDestroy, untrack } from "svelte";
-  import { ChevronLeft, ChevronRight, ImagePlus, Replace } from "lucide-svelte";
+  import {
+    ChevronLeft,
+    ChevronRight,
+    CircleAlert,
+    ImagePlus,
+    Replace,
+  } from "lucide-svelte";
   import MotionPanel from "./MotionPanel.svelte";
   import { releaseAfterMotion } from "../motion";
   import Button from "./Button.svelte";
@@ -155,5 +161,18 @@
     </div>
   </div>
 {:else if anchor.error_message}
-  <p class="text-sm text-app-text">{anchor.error_message}</p>
+  <div class="flex h-80 w-full items-center justify-center px-4" role="alert">
+    <div class="flex min-w-0 max-w-72 flex-col items-center text-center">
+      <span
+        class="flex size-10 shrink-0 items-center justify-center rounded-full bg-app-danger/10 text-app-danger-text"
+        aria-hidden="true"
+      >
+        <CircleAlert size={20} />
+      </span>
+      <p class="mt-3 text-sm font-medium text-app-text">Preview unavailable</p>
+      <p class="mt-1 max-w-full break-words text-xs leading-5 text-app-muted">
+        {anchor.error_message}
+      </p>
+    </div>
+  </div>
 {/if}
