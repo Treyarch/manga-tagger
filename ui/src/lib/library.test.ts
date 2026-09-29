@@ -50,6 +50,7 @@ import {
   selectionAfterEntries,
   selectionAfterFilter,
   selectionFromClick,
+  seriesGroupLabel,
   seriesForSearch,
   switchGuard,
   volumesForShelf,
@@ -219,6 +220,14 @@ describe("shelf and selection", () => {
       "a2.cbz",
       "a1.cbz",
     ]);
+  });
+
+  it("labels the blank series group as Untitled", () => {
+    expect(seriesGroupLabel("")).toBe("Untitled");
+    expect(seriesGroupLabel("   ")).toBe("Untitled");
+    expect(seriesGroupLabel("  A Town Where You Live  ")).toBe(
+      "A Town Where You Live",
+    );
   });
 
   it("builds a thumbnail URL from the archive path", () => {

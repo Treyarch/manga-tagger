@@ -68,6 +68,7 @@
     selectionAfterFilter,
     selectionFromClick,
     selectionKey,
+    seriesGroupLabel,
     seriesForSearch,
     setFieldLocked,
     shouldRefetchLibrary,
@@ -941,13 +942,11 @@
         {:else if view === "list"}
           <ul>
             {#each groups as group (group.series)}
-              {#if group.series !== ""}
-                <li
-                  class="truncate px-2 pt-3 pb-1 text-xs text-app-muted"
-                >
-                  {group.series}
-                </li>
-              {/if}
+              <li
+                class="truncate px-2 pt-3 pb-1 text-sm text-app-muted"
+              >
+                {seriesGroupLabel(group.series)}
+              </li>
               {#each group.volumes as row, index (row.path)}
                 <li>
                   <button
@@ -959,19 +958,17 @@
                       : ''}"
                     onclick={(event) => onVolume(row.path, event)}
                   >
-                    {#if group.series !== ""}
-                      <span class="relative h-9 w-3 shrink-0" aria-hidden="true">
-                        <span
-                          class="absolute top-0 left-1 w-px bg-app-strong-border {index ===
-                          group.volumes.length - 1
-                            ? 'h-1/2'
-                            : 'bottom-0'}"
-                        ></span>
-                        <span
-                          class="absolute top-1/2 left-1 h-px w-2 bg-app-strong-border"
-                        ></span>
-                      </span>
-                    {/if}
+                    <span class="relative h-9 w-3 shrink-0" aria-hidden="true">
+                      <span
+                        class="absolute top-0 left-1 w-px bg-app-strong-border {index ===
+                        group.volumes.length - 1
+                          ? 'h-1/2'
+                          : 'bottom-0'}"
+                      ></span>
+                      <span
+                        class="absolute top-1/2 left-1 h-px w-2 bg-app-strong-border"
+                      ></span>
+                    </span>
                     <span class="flex size-4 shrink-0 items-center justify-center overflow-hidden">
                       <Thumb
                         revision={thumbnailRevision(cacheRevision, coverRevisions[row.path] ?? "")}
@@ -990,13 +987,11 @@
           <div class="flex flex-col gap-4 p-3">
             {#each groups as group (group.series)}
               <section class="flex flex-col gap-2">
-                {#if group.series !== ""}
-                  <h3
-                    class="truncate text-xs text-app-muted"
-                  >
-                    {group.series}
-                  </h3>
-                {/if}
+                <h3
+                  class="truncate text-sm text-app-muted"
+                >
+                  {seriesGroupLabel(group.series)}
+                </h3>
                 <ul class="grid grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] gap-3">
                   {#each group.volumes as row (row.path)}
                     <li>

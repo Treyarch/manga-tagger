@@ -381,6 +381,12 @@ export function volumesForShelf(
 
 export type SeriesGroup = { series: string; volumes: Volume[] };
 
+/** User-facing label for a series group whose index key may be blank. */
+export function seriesGroupLabel(series: string): string {
+  const label = series.trim();
+  return label === "" ? "Untitled" : label;
+}
+
 /** Groups by trimmed series: blank first, then case-folded series name. */
 export function groupVolumesBySeries(rows: Volume[]): SeriesGroup[] {
   const buckets = new Map<string, Volume[]>();
