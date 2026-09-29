@@ -92,6 +92,14 @@
   import { applyTheme } from "./lib/theme";
   import { thumbnailRevision } from "./lib/cache";
   import {
+    SIDEBAR_DEFAULT_WIDTH,
+    SIDEBAR_MAX_WIDTH,
+    SIDEBAR_MIN_WIDTH,
+    clampSidebarWidth,
+    sidebarMaxWidth,
+    sidebarWidthFromKey,
+  } from "./lib/layout";
+  import {
     SHORTCUT_HINTS,
     activeDialog,
     appShortcut,
@@ -149,6 +157,11 @@
   let coverStarting = $state(false);
   let coverRevisions = $state<Record<string, string>>({});
   let cacheRevision = $state(0);
+  let paneStrip: HTMLDivElement;
+  let sidebarResizeHandle: HTMLButtonElement;
+  let sidebarWidth = $state(SIDEBAR_DEFAULT_WIDTH);
+  let sidebarResizeMaximum = $state(SIDEBAR_MAX_WIDTH);
+  let sidebarResizePointer = $state<number | null>(null);
   const settled = new Set<string>();
 
   const shelf = $derived(volumesForShelf(volumes, selectedPlace));
@@ -217,6 +230,54 @@
       const row = volumes.find((item) => item.path === path);
       return row ? [row] : [];
     });
+  }
+
+  function constrainSidebarWidth() {
+    if (!paneStrip) return;
+    sidebarResizeMaximum = sidebarMaxWidth(paneStrip.clientWidth);
+    sidebarWidth = clampSidebarWidth(sidebarWidth, paneStrip.clientWidth);
+  }
+
+  function resizeSidebarAt(clientX: number) {
+    if (!paneStrip) return;
+    const bounds = paneStrip.getBoundingClientRect();
+    sidebarResizeMaximum = sidebarMaxWidth(bounds.width);
+    sidebarWidth = clampSidebarWidth(clientX - bounds.left, bounds.width);
+  }
+
+  function startSidebarResize(event: PointerEvent) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    sidebarResizePointer = event.pointerId;
+    sidebarResizeHandle.setPointerCapture(event.pointerId);
+    resizeSidebarAt(event.clientX);
+  }
+
+  function moveSidebarResize(event: PointerEvent) {
+    if (event.pointerId !== sidebarResizePointer) return;
+    resizeSidebarAt(event.clientX);
+  }
+
+  function endSidebarResize(event: PointerEvent) {
+    if (event.pointerId !== sidebarResizePointer) return;
+    sidebarResizePointer = null;
+    if (sidebarResizeHandle.hasPointerCapture(event.pointerId)) {
+      sidebarResizeHandle.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function onSidebarResizeKeydown(event: KeyboardEvent) {
+    if (!paneStrip) return;
+    const next = sidebarWidthFromKey(
+      sidebarWidth,
+      event.key,
+      paneStrip.clientWidth,
+      event.shiftKey,
+    );
+    if (next === null) return;
+    event.preventDefault();
+    sidebarResizeMaximum = sidebarMaxWidth(paneStrip.clientWidth);
+    sidebarWidth = next;
   }
 
   function rebuildForm() {
@@ -780,6 +841,7 @@
 
   onMount(() => {
     const stopMotion = watchReducedMotion(window.matchMedia("(prefers-reduced-motion: reduce)"));
+    constrainSidebarWidth();
     void loadShelf();
     void getJson<Job | null>("/api/jobs/startup")
       .then((startup) => {
@@ -819,10 +881,16 @@
   });
 </script>
 
-<svelte:window onkeydown={onShortcutKeydown} />
+<svelte:window
+  onkeydown={onShortcutKeydown}
+  onresize={constrainSidebarWidth}
+/>
 
 <div
-  class="flex h-full flex-col gap-2 bg-app-window p-2 text-app-text"
+  class="flex h-full flex-col gap-2 bg-app-window p-2 text-app-text {sidebarResizePointer !==
+  null
+    ? 'sidebar-resizing select-none'
+    : ''}"
 >
   <header
     class="grid h-12 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-1 border border-app-border bg-app-view px-2"
@@ -918,10 +986,12 @@
     </div>
   </header>
   <div
+    bind:this={paneStrip}
     class="flex min-h-0 flex-1 overflow-hidden border border-app-border"
   >
     <nav
       id="places"
+      style:width={`${sidebarWidth}px`}
       class="relative w-60 shrink-0 overflow-y-auto {dragDepth > 0
         ? 'bg-app-selection'
         : 'bg-app-window'}"
@@ -984,6 +1054,34 @@
         </button>
       {/each}
     </nav>
+    <button
+      bind:this={sidebarResizeHandle}
+      type="button"
+      aria-label={`Resize library sidebar, ${sidebarWidth} pixels. Minimum ${SIDEBAR_MIN_WIDTH}, maximum ${sidebarResizeMaximum}.`}
+      class="group relative z-20 w-px shrink-0 touch-none cursor-col-resize border-0 bg-transparent p-0 focus-visible:outline-none"
+      onpointerdown={startSidebarResize}
+      onpointermove={moveSidebarResize}
+      onpointerup={endSidebarResize}
+      onpointercancel={endSidebarResize}
+      onlostpointercapture={(event) => {
+        if (event.pointerId === sidebarResizePointer) {
+          sidebarResizePointer = null;
+        }
+      }}
+      onkeydown={onSidebarResizeKeydown}
+    >
+      <span
+        aria-hidden="true"
+        class="absolute inset-y-0 left-1/2 w-[7px] -translate-x-1/2"
+      ></span>
+      <span
+        aria-hidden="true"
+        class="pointer-events-none absolute inset-y-0 left-0 w-px {sidebarResizePointer !==
+        null
+          ? 'bg-app-strong-border'
+          : 'bg-app-border group-hover:bg-app-strong-border group-focus-visible:bg-app-strong-border'}"
+      ></span>
+    </button>
     <main class="min-w-0 flex-1 overflow-y-auto bg-app-view">
       <MotionPanel identity={`${selectedPlace}:${view}`} extra={visible.length === 0 ? "h-full" : "min-h-full"} contentClass={visible.length === 0 ? "h-full" : ""}>
         {#if visible.length === 0}

@@ -86,6 +86,11 @@ html.dark {
   --app-on-danger: #ffffff;
 }
 
+.sidebar-resizing,
+.sidebar-resizing * {
+  cursor: col-resize !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-spin {
     animation: none;
