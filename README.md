@@ -1,4 +1,16 @@
+<p align="center">
+  <img src="assets/manga-tagger.svg" alt="Manga Tagger logo" width="128" height="128">
+</p>
+
 # Manga Tagger
+
+Let me preface this by saying that this is a personal, spec-driven, LLM-assisted tool I built to replace ComicTagger, which I’ve been using forever but was missing a few features I wanted for my own use. *My main motivation was the wrapper API I made around Nautiljon, which has some of the best manga resources for French content but sits behind anti-bot protections and has no public API. I’m keeping that wrapper private for personal use.*
+
+Hence, if you’re allergic to anything AI-assisted, please stay away. If not, feel free to read the docs written for the build and use the skills provided.
+
+Now the big question... Why didn’t I just build a wrapper around the ComicTagger CLI? Well... that only dawned on me when I was already way too far into this, oh well...
+
+---
 
 Linux-first desktop app to organize and tag a personal manga library. It edits `ComicInfo.xml` inside `.cbz` / `.cbr` archives, scrapes public catalogs, renames volumes from those tags, and writes sibling `{stem}-poster.jpg` covers for Jellyfin Bookshelf. It is not a reader.
 
@@ -17,13 +29,13 @@ One process starts a localhost FastAPI server and a [pywebview](https://pywebvie
 
 ## Requirements
 
-| Tool | Why |
-| --- | --- |
-| [CPython](https://www.python.org/) 3.12 or 3.13 | App runtime; other minors are not currently supported |
-| [uv](https://docs.astral.sh/uv/) | Install Python deps and run the app |
-| [Node.js](https://nodejs.org/) 20.19+ or 22.12+ (npm) | Build the UI in `ui/`; matches Vite's supported engines |
-| WebKitGTK + GObject development libraries | Build and run pywebview's GTK binding on Linux |
-| `unar` / `lsar` on `PATH` | Optional. Required only for `.cbr` read and convert (The Unarchiver CLI) |
+| Tool                                                                 | Why                                                                        |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| [CPython](https://www.python.org/) 3.12 or 3.13                      | App runtime; other minors are not currently supported                      |
+| [uv](https://docs.astral.sh/uv/)                                     | Install Python deps and run the app                                        |
+| [Node.js](https://nodejs.org/) 22.12+ (22.x), 24.x, or 26+, with npm | Build and test the UI in `ui/`; matches the locked Vite and Vitest engines |
+| WebKitGTK + GObject development libraries                            | Build and run pywebview's GTK binding on Linux                             |
+| `unar` / `lsar` on `PATH`                                            | Optional. Required only for `.cbr` read and convert (The Unarchiver CLI)   |
 
 ### System packages (Linux)
 
@@ -70,7 +82,7 @@ If the UI was not built, the window shows `UI build is missing.` while `/api` st
 
 ## Launcher icon
 
-The repository includes the app mark as [`assets/manga-tagger.svg`](assets/manga-tagger.svg), a 512×512 PNG at [`assets/manga-tagger-512.png`](assets/manga-tagger-512.png), and a Linux launcher at [`assets/manga-tagger.desktop`](assets/manga-tagger.desktop). The launcher uses the portable freedesktop icon name `manga-tagger`; the wheel installs all three files under the standard `share/applications` and `share/icons/hicolor` paths of its installation prefix.
+The repository includes the app mark as [assets/manga-tagger.svg](assets/manga-tagger.svg), a 512×512 PNG at [assets/manga-tagger-512.png](assets/manga-tagger-512.png), and a Linux launcher at [assets/manga-tagger.desktop](assets/manga-tagger.desktop). The launcher uses the portable freedesktop icon name `manga-tagger`; the wheel installs all three files under the standard `share/applications` and `share/icons/hicolor` paths of its installation prefix.
 
 For a launcher used directly from a source checkout, either install the icon into your icon theme or replace the desktop entry's `Icon=manga-tagger` with the absolute path to `assets/manga-tagger.svg`.
 
@@ -93,29 +105,29 @@ MangaDex, AniList, and MyAnimeList (via Jikan) need no keys.
 
 A missing config file uses defaults and opens an empty library. The first Settings save creates the file.
 
-| Platform | Config | Index | Thumbnail cache |
-| --- | --- | --- | --- |
-| Linux | `~/.config/manga-tagger/config.toml` | `~/.local/share/manga-tagger/index.db` | `~/.cache/manga-tagger/covers/` |
-| macOS | `~/Library/Application Support/manga-tagger/config.toml` | same directory `index.db` | `~/Library/Caches/manga-tagger/covers/` |
-| Windows | `%APPDATA%\manga-tagger\config.toml` | same directory `index.db` | `%LOCALAPPDATA%\manga-tagger\covers\` |
+| Platform | Config                                                   | Index                                  | Thumbnail cache                         |
+| -------- | -------------------------------------------------------- | -------------------------------------- | --------------------------------------- |
+| Linux    | `~/.config/manga-tagger/config.toml`                     | `~/.local/share/manga-tagger/index.db` | `~/.cache/manga-tagger/covers/`         |
+| macOS    | `~/Library/Application Support/manga-tagger/config.toml` | same directory `index.db`              | `~/Library/Caches/manga-tagger/covers/` |
+| Windows  | `%APPDATA%\manga-tagger\config.toml`                     | same directory `index.db`              | `%LOCALAPPDATA%\manga-tagger\covers\`   |
 
 Linux honors `$XDG_CONFIG_HOME`, `$XDG_DATA_HOME`, and `$XDG_CACHE_HOME` when set.
 
-| Key | Default | Meaning |
-| --- | --- | --- |
-| `library_roots` | `[]` | Absolute folders scanned for `.cbz` / `.cbr` files |
-| `excluded_folders` | `[]` | Absolute folder trees omitted from library scans, including descendants |
-| `scan_subfolders` | `true` | Scan descendants of each root; when false, scan only files directly inside each root |
-| `keep_cbr_original` | `true` | Keep the `.cbr` after a successful convert to `.cbz` |
-| `write_poster_on_save` | `true` | Write `{stem}-poster.jpg` after a successful save, rename, or cover update |
-| `auto_save_metadata_on_switch` | `false` | When leaving a dirty form, save silently (`true`) or ask first (`false`) |
-| `comicvine_api_key` | `""` | Empty disables Comic Vine |
-| `nautiljon_base_url` | `""` | Absolute origin of the Nautiljon wrapper; empty disables it |
-| `nautiljon_api_key` | `""` | Wrapper `X-Api-Key`; empty disables Nautiljon |
-| `title_languages` | `["fr", "en"]` | Title preference order; original title is the fallback |
-| `enabled_providers` | `["mangadex", "anilist", "jikan", "comicvine", "nautiljon"]` | Catalogs shown in the provider picker; unknown ids are dropped and an empty list disables scraping |
-| `theme` | `system` | `system`, `light`, or `dark`; System live-follows the active Omarchy palette when available, then falls back to the desktop light/dark preference |
-| `animate_interface` | `false` | Enable decorative panel, dialog, preview, and notification transitions unless reduced motion is requested |
+| Key                            | Default                                                      | Meaning                                                                                                                                           |
+| ------------------------------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `library_roots`                | `[]`                                                         | Absolute folders scanned for `.cbz` / `.cbr` files                                                                                                |
+| `excluded_folders`             | `[]`                                                         | Absolute folder trees omitted from library scans, including descendants                                                                           |
+| `scan_subfolders`              | `true`                                                       | Scan descendants of each root; when false, scan only files directly inside each root                                                              |
+| `keep_cbr_original`            | `true`                                                       | Keep the `.cbr` after a successful convert to `.cbz`                                                                                              |
+| `write_poster_on_save`         | `true`                                                       | Write `{stem}-poster.jpg` after a successful save, rename, or cover update                                                                        |
+| `auto_save_metadata_on_switch` | `false`                                                      | When leaving a dirty form, save silently (`true`) or ask first (`false`)                                                                          |
+| `comicvine_api_key`            | `""`                                                         | Empty disables Comic Vine                                                                                                                         |
+| `nautiljon_base_url`           | `""`                                                         | Absolute origin of the Nautiljon wrapper; empty disables it                                                                                       |
+| `nautiljon_api_key`            | `""`                                                         | Wrapper `X-Api-Key`; empty disables Nautiljon                                                                                                     |
+| `title_languages`              | `["fr", "en"]`                                               | Title preference order; original title is the fallback                                                                                            |
+| `enabled_providers`            | `["mangadex", "anilist", "jikan", "comicvine", "nautiljon"]` | Catalogs shown in the provider picker; unknown ids are dropped and an empty list disables scraping                                                |
+| `theme`                        | `"system"`                                                   | `system`, `light`, or `dark`; System live-follows the active Omarchy palette when available, then falls back to the desktop light/dark preference |
+| `animate_interface`            | `false`                                                      | Enable decorative panel, dialog, preview, and notification transitions unless reduced motion is requested                                         |
 
 On Omarchy, System reads the generated palette at `~/.local/state/omarchy/current/theme/colors.toml` and updates the open window after a theme switch. Manga Tagger only reads this file; it does not install hooks or modify Omarchy configuration. Forced Light and Dark always use Manga Tagger's built-in palette.
 
@@ -123,16 +135,16 @@ The HTTP API binds to `127.0.0.1` on an ephemeral port. The port is not configur
 
 ## Keyboard shortcuts
 
-| Shortcut | Action |
-| --- | --- |
-| `Ctrl/Cmd+S` | Save metadata |
-| `F2` | Rename selected files, or the current folder when nothing is selected |
-| `F5` | Scan the library |
-| `Ctrl/Cmd+1` | List view |
-| `Ctrl/Cmd+2` | Grid view |
-| `Ctrl/Cmd+,` | Settings |
-| `Escape` | Close the active dialog |
-| `Left` / `Right` | Previous / next preview page when focus is not in a form control |
+| Shortcut         | Action                                                                |
+| ---------------- | --------------------------------------------------------------------- |
+| `Ctrl/Cmd+S`     | Save metadata                                                         |
+| `F2`             | Rename selected files, or the current folder when nothing is selected |
+| `F5`             | Scan the library                                                      |
+| `Ctrl/Cmd+1`     | List view                                                             |
+| `Ctrl/Cmd+2`     | Grid view                                                             |
+| `Ctrl/Cmd+,`     | Settings                                                              |
+| `Escape`         | Close the active dialog                                               |
+| `Left` / `Right` | Previous / next preview page when focus is not in a form control      |
 
 ## Release versioning
 
@@ -144,9 +156,11 @@ released versions are never reused for changed builds. After changing it, run
 
 ## Production build
 
-Build the UI first, run both test suites, then create the distributable wheel:
+From the repository root, install the locked dependencies, run both test suites, build the UI, then create the distributable wheel:
 
 ```bash
+uv sync --locked --group dev
+
 cd ui
 npm ci
 npm test
@@ -220,5 +234,6 @@ This project is **spec-driven**. Feature behavior lives in [docs/](docs/README.m
 - [Field locks](docs/07-field-locks.md)
 - [Cover from provider](docs/08-cover-from-provider.md)
 - [Keyboard shortcuts](docs/09-keyboard-shortcuts.md)
+- [Application versioning](docs/10-app-versioning.md)
 
 Read those before changing scope or behavior.
