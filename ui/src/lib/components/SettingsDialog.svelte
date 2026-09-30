@@ -40,11 +40,13 @@
 
   let {
     config,
+    appVersion,
     onClose,
     onSaved,
     onCacheCleared,
   }: {
     config: Config;
+    appVersion: string | null;
     onClose: () => void;
     onSaved: (config: Config, job: Job | null) => void;
     onCacheCleared: () => void;
@@ -231,6 +233,10 @@
               <span class="text-xs text-app-muted">Title languages</span>
               <TextInput value={languages} onValue={(value) => (languages = value)} />
             </label>
+            <dl class="flex flex-col gap-1">
+              <dt class="text-xs text-app-muted">Version</dt>
+              <dd class="text-sm text-app-text" aria-label="App version">{appVersion ?? "Unavailable"}</dd>
+            </dl>
           </div>
         {:else if tab === "library"}
           <div class="flex flex-col gap-3">

@@ -171,6 +171,8 @@ Write these before the code they describe. Each one is a normal spec: YAML front
 | `08-cover-from-provider.md` | Replace or insert the archive cover page from a full-size catalog cover resolved via ComicInfo `Web` |
 | `09-keyboard-shortcuts.md` | Fixed desktop shortcuts for save, rename, scan, view switching, Settings, dialogs, and page preview navigation |
 
+| `10-app-versioning.md` | Release version policy, shared package version, and read-only Settings display |
+
 ## Testing
 
 This guideline produces no runnable code and has no tests of its own.

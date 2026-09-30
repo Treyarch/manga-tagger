@@ -10,3 +10,7 @@ Manga Tagger is a simple and clean app to easily rename, scrape, tag and organis
 - Every spec should have `Configuration`, `Testing`, and `Acceptance criteria` sections. `proposed` specs may carry `Open questions`, but all must be answered before the status flips to `active`.
 - A feature is not complete without reasonably comprehensive unit tests.
 
+
+## Release versioning
+
+Follow `docs/10-app-versioning.md`: bump the minor version for feature releases and the patch version for fixes, unless explicitly grouped into an already bumped unreleased batch. Update only `src/manga_tagger/__init__.py` and refresh `uv.lock`; packaging reads that single version. Never reuse a released version for changed artifacts.

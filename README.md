@@ -134,6 +134,14 @@ The HTTP API binds to `127.0.0.1` on an ephemeral port. The port is not configur
 | `Escape` | Close the active dialog |
 | `Left` / `Right` | Previous / next preview page when focus is not in a form control |
 
+## Release versioning
+
+Settings → General shows the running app version. The single version is
+`__version__` in `src/manga_tagger/__init__.py`; wheel metadata reads it directly.
+Feature releases bump the minor version, fixes bump the patch version, and
+released versions are never reused for changed builds. After changing it, run
+`uv lock` and the production build below. See [the versioning spec](docs/10-app-versioning.md).
+
 ## Production build
 
 Build the UI first, run both test suites, then create the distributable wheel:
@@ -149,7 +157,7 @@ uv run pytest
 uv build --wheel
 ```
 
-The production artifact is `dist/manga_tagger-0.1.0-py3-none-any.whl`. It
+The production artifact is `dist/manga_tagger-0.2.0-py3-none-any.whl`. It
 contains the compiled Svelte UI and installs the `manga-tagger` command; it does
 not require the source checkout or Node.js at runtime. It also carries the Linux
 desktop entry and both launcher icon formats as wheel shared data. Linux still
@@ -158,7 +166,7 @@ needs the GTK/WebKitGTK system packages listed above.
 For example, install the wheel as an isolated application with:
 
 ```bash
-uv tool install --python 3.13 dist/manga_tagger-0.1.0-py3-none-any.whl
+uv tool install --python 3.13 dist/manga_tagger-0.2.0-py3-none-any.whl
 manga-tagger
 ```
 

@@ -119,7 +119,8 @@
   let {
     initialConfig,
     initialSystemTheme,
-  }: { initialConfig: Config; initialSystemTheme: SystemTheme | null } = $props();
+    appVersion,
+  }: { initialConfig: Config; initialSystemTheme: SystemTheme | null; appVersion: string | null } = $props();
 
   let config = $state(untrack(() => initialConfig));
   let systemTheme = $state<SystemTheme | null>(untrack(() => initialSystemTheme));
@@ -1253,6 +1254,7 @@
 {#if settingsOpen}
   <SettingsDialog
     {config}
+    {appVersion}
     onClose={() => (settingsOpen = false)}
     onCacheCleared={() => (cacheRevision += 1)}
     onSaved={(next, job) => {

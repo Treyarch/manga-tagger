@@ -106,6 +106,18 @@ async function parse<T>(response: Response): Promise<T> {
   throw new ApiError(error_type, error_message);
 }
 
+/** Version lookup is optional so metadata failures cannot block startup. */
+export async function getAppVersion(): Promise<string | null> {
+  try {
+    const info = await getJson<{ version?: unknown }>("/api/app-info");
+    return typeof info?.version === "string" && info.version.trim()
+      ? info.version
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function getConfig(): Promise<Config> {
   return fetch("/api/config").then((response) => parse<Config>(response));
 }

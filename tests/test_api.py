@@ -1105,3 +1105,20 @@ def test_interface_motion_config_api(tmp_path: Path) -> None:
             assert client.get("/api/config").json()["animate_interface"] is True
         assert load_config(app.state.box.config.path).animate_interface is True
         assert client.get("/api/jobs/current").json() is None
+
+
+def test_app_info_reports_running_version_without_side_effects(tmp_path: Path) -> None:
+    from manga_tagger import __version__
+
+    def no_scan(*args, **kwargs):
+        raise AssertionError("version lookup must not scan")
+
+    app = _app(tmp_path, roots=[], scan=no_scan)
+    with TestClient(app) as client:
+        response = client.get("/api/app-info")
+        assert response.status_code == 200
+        assert response.json() == {"version": __version__}
+        assert client.get("/api/jobs/current").json() is None
+        assert client.get("/api/config").json().get("version") is None
+        assert client.get("/openapi.json").json()["info"]["version"] == __version__
+    assert not (tmp_path / "config.toml").exists()

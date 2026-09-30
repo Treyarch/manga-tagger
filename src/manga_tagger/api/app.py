@@ -13,7 +13,9 @@ from fastapi import FastAPI, Query
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Response
 from starlette.requests import Request
 
+from manga_tagger import __version__
 from manga_tagger.api.models import (
+    AppInfoModel,
     CacheClearResponse,
     ConfigModel,
     ConfigPut,
@@ -210,7 +212,7 @@ def create_app(
         The FastAPI app. Routes do not open archives, query SQLite, or call
         catalogs themselves.
     """
-    app = FastAPI()
+    app = FastAPI(version=__version__)
     state = AppState(
         config=config,
         index_path=Path(index_path),
@@ -370,6 +372,10 @@ def _register_routes(app: FastAPI) -> None:
     def cover(url: str) -> Response:
         payload, media = remote_cover_bytes(url)
         return Response(content=payload, media_type=media)
+
+    @app.get("/api/app-info", response_model=AppInfoModel)
+    def app_info() -> AppInfoModel:
+        return AppInfoModel(version=__version__)
 
     @app.get("/api/config", response_model=ConfigModel)
     def get_config() -> ConfigModel:

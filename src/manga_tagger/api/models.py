@@ -8,6 +8,12 @@ from manga_tagger.jobs import Job
 from manga_tagger.shell import Place
 
 
+class AppInfoModel(BaseModel):
+    """Read-only metadata for the running application."""
+
+    version: str
+
+
 class ErrorBody(BaseModel):
     """JSON body for an expected HTTP error."""
 

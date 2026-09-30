@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  getAppVersion,
   withChangedLibraryDiscovery,
   withChangedLibraryRoots,
   type Config,
@@ -44,5 +45,29 @@ describe("Settings config updates", () => {
       scan_subfolders: false,
     });
     expect(withChangedLibraryDiscovery({}, current, current)).toEqual({});
+  });
+});
+
+
+describe("application version", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("fetches the running backend version", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ version: "0.2.0" })));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await getAppVersion()).toBe("0.2.0");
+    expect(fetchMock).toHaveBeenCalledWith("/api/app-info");
+  });
+
+  it.each([{}, { version: 2 }, { version: "" }, { version: "  " }, null])("handles missing or invalid version metadata %j", async (info) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(info))));
+    expect(await getAppVersion()).toBeNull();
+  });
+
+  it("keeps version lookup optional on network or HTTP failure", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("offline")));
+    expect(await getAppVersion()).toBeNull();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("unavailable", { status: 503 })));
+    expect(await getAppVersion()).toBeNull();
   });
 });

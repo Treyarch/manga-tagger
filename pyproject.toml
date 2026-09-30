@@ -1,6 +1,6 @@
 [project]
 name = "manga-tagger"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Organize and tag a personal manga library"
 readme = "README.md"
 requires-python = ">=3.12,<3.14"
@@ -29,6 +29,9 @@ dev = [
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+[tool.hatch.version]
+path = "src/manga_tagger/__init__.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/manga_tagger"]
 
@@ -39,6 +42,9 @@ packages = ["src/manga_tagger"]
 "assets/manga-tagger.desktop" = "share/applications/manga-tagger.desktop"
 "assets/manga-tagger.svg" = "share/icons/hicolor/scalable/apps/manga-tagger.svg"
 "assets/manga-tagger-512.png" = "share/icons/hicolor/512x512/apps/manga-tagger.png"
+
+[tool.uv]
+cache-keys = [{ file = "pyproject.toml" }, { file = "src/manga_tagger/__init__.py" }]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
