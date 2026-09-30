@@ -9,7 +9,8 @@ status: active
 
 Versions use `MAJOR.MINOR.PATCH`. Feature releases increment MINOR and reset PATCH to zero; bug-fix releases increment PATCH. Breaking changes increment MAJOR after 1.0; during 0.x, breaking changes increment MINOR and are documented. A release can group multiple changes under one version. Released versions must not be reused for changed artifacts. Feature implementation updates the release version unless it is explicitly part of an already bumped, unreleased batch. Refresh `uv.lock` after a version change, run both suites, rebuild the UI, and build a wheel before distributing it.
 
-The next release is 0.2.0, including rename-template tag chips and version display.
+The next release is 0.2.1, fixing clean-checkout CI and installation ordering
+after 0.2.0 added rename-template tag chips and version display.
 
 `GET /api/app-info` returns `{ "version": "<__version__>" }` from the running backend. It does no library or configuration work. The client fetches it once at startup alongside config and theme, then passes the result to Settings. General shows a read-only Version row after Title languages. A failed request shows `Unavailable` and leaves the app usable. Save never sends the version as configuration.
 

@@ -44,6 +44,13 @@ and 3.13; adding another minor version requires first validating the FastAPI,
 Starlette, HTTPX, and AnyIO `TestClient` combination on it and then expanding
 both the declared range and the matrix.
 
+A clean checkout must build the frontend before installing the project: Hatch
+requires `ui/dist/` for editable installs as well as wheels. Each Python CI job
+sets up Node.js 22, runs `npm ci` and `npm run build` in `ui/`, then runs the
+locked Python install and suite. Jobs have separate filesystems, so the UI
+job's build cannot supply those files to the Python jobs. The UI job continues
+to run its own unit suite and production build.
+
 The compatible ASGI test stack is pinned as one unit: FastAPI `0.116.1`,
 Starlette `0.47.2`, HTTPX `0.28.1`, and AnyIO `4.10.0`. Starlette and AnyIO are
 direct dependencies here to prevent the resolver from silently selecting a
@@ -453,6 +460,7 @@ packages before the locked Python environment.
 
 Cover at least:
 
+- Clean-checkout verification builds the frontend before a locked editable install, runs both suites, and builds a wheel without relying on pre-existing generated assets.
 - UI resource resolution prefers an embedded `ui_dist/index.html` and falls back to the source checkout's `ui/dist/` when it is absent. The desktop entry carries the specified name, comment, command, icon name, terminal behavior, category, and keywords. A release check builds the wheel and verifies its HTML, referenced assets, `manga-tagger` console entry point, desktop entry, scalable icon, and 512px icon.
 - `animate_interface` defaults to false; invalid stored types fall back to false. GET exposes it, PUT accepts only booleans, omitted keys stay unchanged, and TOML round trips preserve it and unknown keys. Preview alone never writes configuration.
 - Clearing a missing or populated thumbnail cache returns the removal count through the injected cache service, does not create a job or change config/index data, and returns a structured `LibraryIndexError` response when clearing fails.
@@ -514,7 +522,7 @@ Cover at least:
 - Every duplicated Python/browser contract is either identified as intentional boundary code above or guarded by the shared app-contract fixture. Provider ids have one Python source of truth, and the shell has no unused thumbnail-bytes helper.
 - The supported interpreter range is `>=3.12,<3.14`; `uv.lock` is committed,
   and CI verifies the complete Python suite on every supported minor from that
-  lockfile.
+  lockfile. Each Python job builds `ui/dist/` before installing the project.
 - A normal locked Linux install includes pywebview's GTK binding in the
   application environment; with the documented system libraries installed,
   startup does not fall through to a missing Qt backend.

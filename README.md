@@ -65,11 +65,12 @@ Python 3.12 or 3.13 interpreter that runs Manga Tagger.
 From the repository root:
 
 ```bash
-# 1. Python environment and dependencies
-uv sync --locked --group dev
+# 1. UI dependencies and production build (writes ui/dist/)
+npm --prefix ui ci
+npm --prefix ui run build
 
-# 2. UI dependencies and production build (writes ui/dist/)
-cd ui && npm ci && npm run build && cd ..
+# 2. Python environment and dependencies (requires ui/dist/)
+uv sync --locked --group dev
 
 # 3. Launch the desktop app
 uv run manga-tagger
@@ -156,22 +157,19 @@ released versions are never reused for changed builds. After changing it, run
 
 ## Production build
 
-From the repository root, install the locked dependencies, run both test suites, build the UI, then create the distributable wheel:
+From the repository root, build the UI before installing the Python project, run both test suites, then create the distributable wheel:
 
 ```bash
+npm --prefix ui ci
+npm --prefix ui run build
 uv sync --locked --group dev
 
-cd ui
-npm ci
-npm test
-npm run build
-cd ..
-
+npm --prefix ui test
 uv run pytest
 uv build --wheel
 ```
 
-The production artifact is `dist/manga_tagger-0.2.0-py3-none-any.whl`. It
+The production artifact is `dist/manga_tagger-0.2.1-py3-none-any.whl`. It
 contains the compiled Svelte UI and installs the `manga-tagger` command; it does
 not require the source checkout or Node.js at runtime. It also carries the Linux
 desktop entry and both launcher icon formats as wheel shared data. Linux still
@@ -180,7 +178,7 @@ needs the GTK/WebKitGTK system packages listed above.
 For example, install the wheel as an isolated application with:
 
 ```bash
-uv tool install --python 3.13 dist/manga_tagger-0.2.0-py3-none-any.whl
+uv tool install --python 3.13 dist/manga_tagger-0.2.1-py3-none-any.whl
 manga-tagger
 ```
 
@@ -188,14 +186,19 @@ manga-tagger
 
 ### Python
 
+Build the frontend first on a clean checkout: Python's editable install also
+requires `ui/dist/` because it bundles the compiled client.
+
 ```bash
+npm --prefix ui ci
+npm --prefix ui run build
 uv sync --locked --group dev
 uv run pytest
 ```
 
 The committed `uv.lock` is the reproducible dependency contract. CI performs
-that locked install and runs the complete suite on every supported Python
-minor, currently CPython 3.12 and 3.13.
+the frontend build before that locked install and runs the complete suite on
+every supported Python minor, currently CPython 3.12 and 3.13.
 
 Tests are hermetic: no network, no real sleep, and no read of your personal config, index, or library. Tests that need `unar` skip when it is not on `PATH`.
 

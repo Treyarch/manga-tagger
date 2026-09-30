@@ -24,6 +24,17 @@ jobs:
             libgirepository-2.0-dev \
             gir1.2-gtk-3.0 \
             gir1.2-webkit2-4.1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install locked UI dependencies
+        working-directory: ui
+        run: npm ci
+      - name: Build production assets
+        working-directory: ui
+        run: npm run build
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python-version }}
