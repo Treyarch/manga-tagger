@@ -7,7 +7,7 @@ on:
 jobs:
   python:
     name: Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -21,9 +21,11 @@ jobs:
             build-essential \
             pkg-config \
             libcairo2-dev \
-            libgirepository-2.0-dev \
+            libgirepository1.0-dev \
             gir1.2-gtk-3.0 \
             gir1.2-webkit2-4.1
+      - name: Verify PyGObject build dependency
+        run: pkg-config --modversion gobject-introspection-1.0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -46,7 +48,7 @@ jobs:
 
   ui:
     name: UI
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: ui

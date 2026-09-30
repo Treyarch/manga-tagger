@@ -50,13 +50,15 @@ sudo pacman -S --needed base-devel cairo gobject-introspection gtk3 webkit2gtk-4
 differs from the supported Manga Tagger runtime. `unarchiver` provides `unar`
 and `lsar`; skip it if you only use `.cbz`.
 
-**Debian / Ubuntu**
+**Debian / Ubuntu 24.04**
 
 ```bash
-sudo apt install build-essential pkg-config libcairo2-dev libgirepository-2.0-dev gir1.2-gtk-3.0 gir1.2-webkit2-4.1 unar
+sudo apt install build-essential pkg-config libcairo2-dev libgirepository1.0-dev gir1.2-gtk-3.0 gir1.2-webkit2-4.1 unar
 ```
 
-These packages provide native libraries and headers. The Python `gi` module is
+These packages provide native libraries and headers, including the
+`gobject-introspection-1.0` build interface required by the pinned PyGObject
+3.50.0. `libgirepository-2.0-dev` alone does not supply that interface. The Python `gi` module is
 installed from the locked project dependency so it is available to the same
 Python 3.12 or 3.13 interpreter that runs Manga Tagger.
 
@@ -169,7 +171,7 @@ uv run pytest
 uv build --wheel
 ```
 
-The production artifact is `dist/manga_tagger-0.2.1-py3-none-any.whl`. It
+The production artifact is `dist/manga_tagger-0.2.2-py3-none-any.whl`. It
 contains the compiled Svelte UI and installs the `manga-tagger` command; it does
 not require the source checkout or Node.js at runtime. It also carries the Linux
 desktop entry and both launcher icon formats as wheel shared data. Linux still
@@ -178,7 +180,7 @@ needs the GTK/WebKitGTK system packages listed above.
 For example, install the wheel as an isolated application with:
 
 ```bash
-uv tool install --python 3.13 dist/manga_tagger-0.2.1-py3-none-any.whl
+uv tool install --python 3.13 dist/manga_tagger-0.2.2-py3-none-any.whl
 manga-tagger
 ```
 

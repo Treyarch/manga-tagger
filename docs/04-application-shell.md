@@ -35,7 +35,12 @@ environment as the application. A distribution `python-gobject` package tied
 to a different system-Python minor is not treated as satisfying this runtime
 dependency. The operating system must still provide GTK 3, WebKitGTK 4.1, the
 GObject-introspection and Cairo development files used to build the binding,
-and their typelibs. Qt is not a fallback dependency for the Linux build.
+and their typelibs. The locked PyGObject 3.50.0 build requires the
+`gobject-introspection-1.0` pkg-config interface. On Ubuntu 24.04, install
+`libgirepository1.0-dev`; `libgirepository-2.0-dev` alone does not provide
+that interface. CI uses Ubuntu 24.04 explicitly and checks the required
+pkg-config interface before the Python install. Qt is not a fallback
+dependency for the Linux build.
 
 `pyproject.toml` declares the supported interpreter range `>=3.12,<3.14`.
 `uv.lock` is committed and development and CI install it with
@@ -460,6 +465,7 @@ packages before the locked Python environment.
 
 Cover at least:
 
+- Ubuntu dependency verification checks that the documented native packages provide `gobject-introspection-1.0` before building the pinned PyGObject binding.
 - Clean-checkout verification builds the frontend before a locked editable install, runs both suites, and builds a wheel without relying on pre-existing generated assets.
 - UI resource resolution prefers an embedded `ui_dist/index.html` and falls back to the source checkout's `ui/dist/` when it is absent. The desktop entry carries the specified name, comment, command, icon name, terminal behavior, category, and keywords. A release check builds the wheel and verifies its HTML, referenced assets, `manga-tagger` console entry point, desktop entry, scalable icon, and 512px icon.
 - `animate_interface` defaults to false; invalid stored types fall back to false. GET exposes it, PUT accepts only booleans, omitted keys stay unchanged, and TOML round trips preserve it and unknown keys. Preview alone never writes configuration.
