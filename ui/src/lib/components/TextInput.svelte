@@ -8,6 +8,7 @@
     dirty = false,
     extra = "",
     onValue,
+    onFocus,
   }: {
     value: string;
     placeholder?: string;
@@ -17,6 +18,7 @@
     dirty?: boolean;
     extra?: string;
     onValue?: (value: string) => void;
+    onFocus?: (input: HTMLInputElement) => void;
   } = $props();
 </script>
 
@@ -27,6 +29,7 @@
   {disabled}
   aria-label={label}
   oninput={(event) => onValue?.((event.currentTarget as HTMLInputElement).value)}
+  onfocus={(event) => onFocus?.(event.currentTarget as HTMLInputElement)}
   class="h-9 w-full rounded-md border bg-app-view px-2 text-sm placeholder:text-app-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent disabled:cursor-not-allowed disabled:opacity-60 {dirty
     ? 'border-app-dirty text-app-dirty'
     : 'border-app-border text-app-text'} {extra}"

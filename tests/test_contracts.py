@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from manga_tagger.api.models import JobModel
+from manga_tagger.archives.comicinfo import OWNED_ELEMENTS
 from manga_tagger.index import ScanResult
 from manga_tagger.providers.constants import PROVIDER_IDS
 from manga_tagger.providers.service_types import Candidate, IssueCandidate
@@ -39,6 +40,7 @@ def test_python_contracts_match_shared_fixture() -> None:
     contract = _contract()
 
     assert list(FORM_FIELDS) == contract["form_fields"]
+    assert list(OWNED_ELEMENTS) == contract["rename_tags"]
     assert list(SHARED_FIELDS) == contract["shared_fields"]
     assert {name: FIELD_COLUMNS[name] for name in FORM_FIELDS} == contract[
         "field_columns"

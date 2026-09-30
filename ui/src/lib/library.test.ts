@@ -62,6 +62,7 @@ import {
   type Volume,
   type WorkEntry,
 } from "./library";
+import { RENAME_TAGS } from "./rename";
 
 function volume(path: string, extra: Partial<Volume> = {}): Volume {
   const name = path.split("/").pop() ?? path;
@@ -105,6 +106,7 @@ function volume(path: string, extra: Partial<Volume> = {}): Volume {
 describe("cross-layer contracts", () => {
   it("matches fields, columns, providers, locks, and constructed forms", () => {
     expect([...FORM_FIELDS]).toEqual(appContract.form_fields);
+    expect([...RENAME_TAGS]).toEqual(appContract.rename_tags);
     expect([...SHARED_FIELDS]).toEqual(appContract.shared_fields);
     expect(FIELD_COLUMNS).toEqual(appContract.field_columns);
     expect([...FORM_FIELDS]).toEqual(appContract.lockable_fields);
